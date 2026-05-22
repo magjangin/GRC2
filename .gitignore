@@ -1,0 +1,10 @@
+.vs/
+.vscode/
+.cursor/
+
+**/bin/
+**/obj/
+
+Latest.log
+__pycache__/
+*.pyc
