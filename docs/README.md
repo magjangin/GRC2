@@ -74,4 +74,4 @@ As of 2026-05-15:
 - Removed disabled note-array JSON dumping and field inspection helpers.
 - Removed disabled music-scroll sort/filter/update/get-cell logging hooks.
 - Reduced `CharactorLoadPatcher` to the dynamic prefix factory still used by `AudioClipPatcher`.
-- Current managed source count is 113 files under `GRC2/`, excluding `bin/obj`.
+- Current managed source count is 111 files under `GRC2/`, excluding `bin/obj`.
