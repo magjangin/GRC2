@@ -23,7 +23,7 @@ namespace GRC2.Parsers
         /// <summary>
         /// 노트 데이터 파싱
         /// </summary>
-        public static List<BmsNote> ParseNoteData(int measure, int channel, string data)
+        public static List<BmsNote> ParseNoteData(int measure, int channel, string data, int valueWidth = 2)
         {
             var notes = new List<BmsNote>();
             
@@ -31,7 +31,7 @@ namespace GRC2.Parsers
                 return notes;
 
             var (lane, isLeft) = ChannelToLaneMap[channel];
-            var hexValues = ParseHexData(data);
+            var hexValues = ParseHexData(data, valueWidth);
             var measureLength = hexValues.Count;
 
             for (int i = 0; i < hexValues.Count; i++)
@@ -65,21 +65,21 @@ namespace GRC2.Parsers
         /// <summary>
         /// 16진수 데이터 파싱
         /// </summary>
-        public static List<int> ParseHexData(string data)
+        public static List<int> ParseHexData(string data, int valueWidth = 2)
         {
             var values = new List<int>();
             var trimmed = data.Trim();
+
+            if (valueWidth <= 0)
+                return values;
             
-            // 2자리씩 16진수 파싱
-            for (int i = 0; i < trimmed.Length; i += 2)
+            // WAV 키 폭에 맞춰 2자리 또는 3자리 단위로 16진수 파싱
+            for (int i = 0; i + valueWidth <= trimmed.Length; i += valueWidth)
             {
-                if (i + 1 < trimmed.Length)
+                var hex = trimmed.Substring(i, valueWidth);
+                if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int value))
                 {
-                    var hex = trimmed.Substring(i, 2);
-                    if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int value))
-                    {
-                        values.Add(value);
-                    }
+                    values.Add(value);
                 }
             }
 
@@ -158,7 +158,6 @@ namespace GRC2.Parsers
         }
     }
 }
-
 
 
 

@@ -20,6 +20,7 @@ namespace GRC2.Parsers
         private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled);
         private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)", RegexOptions.Compiled);
         private static readonly Regex MeasureRegex = new Regex(@"^#(\d{3})(\d{2}):", RegexOptions.Compiled);
+        private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled);
 
         /// <summary>
         /// BMS 파일 파싱 메인 메서드
@@ -43,12 +44,13 @@ namespace GRC2.Parsers
                 var bpmIndexTable = new Dictionary<int, float>(); // #BPM01: 140 등 인덱스→BPM 값
                 float baseBpm = 120f;  // 기본 BPM
                 float baseFreq = 60f / baseBpm;
+                int noteValueWidth = DetectNoteDataValueWidth(lines);
 
                 // 1단계: BPM 정보 수집 (기본 BPM + #BPMXX: value 인덱스 테이블)
                 CollectBpmInfo(lines, ref baseBpm, ref baseFreq, bpmIndexTable);
 
                 // 2단계: 노트 데이터 파싱
-                ParseNotes(lines, notes, baseBpm, baseFreq, bpmIndexTable, bpmChanges);
+                ParseNotes(lines, notes, baseBpm, baseFreq, bpmIndexTable, bpmChanges, noteValueWidth);
 
                 // 3단계: 홀드 노트 매칭 (02-19 쌍)
                 HoldNoteProcessor.MatchHoldNotes(notes);
@@ -76,6 +78,30 @@ namespace GRC2.Parsers
                 MelonLogger.Error($"[BmsParser] 파싱 오류: {ex.Message}\n{ex.StackTrace}");
                 return notes;
             }
+        }
+
+        /// <summary>
+        /// #WAV001, #WAV00A, #WAV010 같은 3자리 WAV 키가 있으면 노트 데이터도 3자리 단위로 읽는다.
+        /// </summary>
+        public static int DetectNoteDataValueWidth(IEnumerable<string> lines)
+        {
+            if (lines == null) return 2;
+
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                    continue;
+
+                var trimmed = line.TrimStart();
+                if (trimmed.StartsWith("//"))
+                    continue;
+
+                var wavMatch = WavKeyRegex.Match(trimmed);
+                if (wavMatch.Success && wavMatch.Groups[1].Value.Length == 3)
+                    return 3;
+            }
+
+            return 2;
         }
 
         /// <summary>
@@ -125,7 +151,7 @@ namespace GRC2.Parsers
         /// 노트 데이터 파싱
         /// </summary>
         private static void ParseNotes(string[] lines, List<BmsNote> notes, float baseBpm, float baseFreq,
-            Dictionary<int, float> bpmIndexTable, List<BpmChange> bpmChanges)
+            Dictionary<int, float> bpmIndexTable, List<BpmChange> bpmChanges, int noteValueWidth)
         {
             int currentMeasure = 0;
 
@@ -151,7 +177,7 @@ namespace GRC2.Parsers
                     // 노트 채널 처리 (11-12, 14-16, 18)
                     if (BmsNoteDataParser.ChannelToLaneMap.ContainsKey(channel))
                     {
-                        var parsedNotes = BmsNoteDataParser.ParseNoteData(currentMeasure, channel, data);
+                        var parsedNotes = BmsNoteDataParser.ParseNoteData(currentMeasure, channel, data, noteValueWidth);
                         // ⚡ 파싱된 노트에 BaseBpm 설정 (매칭 시간 오차 범위 계산용)
                         foreach (var note in parsedNotes)
                         {
