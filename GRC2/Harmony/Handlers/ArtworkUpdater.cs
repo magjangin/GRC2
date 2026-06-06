@@ -41,6 +41,13 @@ namespace GRC2.Harmony.Handlers
                     }
                 }
                 
+                // 일반 곡인 경우(커스텀 차트가 선택되지 않은 경우) 아트워크 강제 업데이트를 건너뜁니다.
+                if (!CustomAssetManager.IsCustomChartSelected())
+                {
+                    MelonLogger.Msg("[ArtworkUpdater] 일반 곡이므로 아트워크 업데이트를 건너뜁니다.");
+                    return;
+                }
+                
                 // mArtWorkAndMusicDetail 필드 찾기
                 FieldInfo artWorkField = instanceType.GetField("mArtWorkAndMusicDetail", 
                     BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);

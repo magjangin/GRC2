@@ -26,6 +26,37 @@ namespace GRC2.Harmony.Handlers
                 MelonLogger.Msg($"[AudioClipPatch]   nextMusicID: {nextMusicID ?? "null"}");
                 MelonLogger.Msg($"[AudioClipPatch]   nextMusicID 타입: {nextMusicID?.GetType().Name ?? "null"}");
                 MelonLogger.Msg("===========================================");
+
+                if (nextMusicID != null)
+                {
+                    if (AlbumManager.IsCustomChartMusicID(nextMusicID))
+                    {
+                        MelonLogger.Msg($"[AudioClipPatch] ✅ 곡 변경 - 커스텀 차트 감지: {nextMusicID}");
+                        AlbumManager.SelectAlbumByMusicID(nextMusicID);
+                        CustomAssetManager.SetCustomChartSelected(true);
+                        
+                        // 프리뷰와 환경음 중지
+                        PreviewAudioManager.StopPreviewAndAmbient();
+                        
+                        // 커스텀 BGM 주입
+                        var bgmFile = AlbumManager.GetCurrentBgmFile();
+                        if (!string.IsNullOrEmpty(bgmFile) && System.IO.File.Exists(bgmFile))
+                        {
+                            MelonLogger.Msg($"[AudioClipPatch] 🎵 곡 변경 - 커스텀 프리뷰 BGM 준비: {System.IO.Path.GetFileName(bgmFile)}");
+                            MelonLoader.MelonCoroutines.Start(CustomBgmPlayer.InjectCustomBgm(bgmFile));
+                        }
+                    }
+                    else
+                    {
+                        // 일반 곡 선택 시 커스텀 차트 플래그 해제 및 원래 프리뷰 복원
+                        if (CustomAssetManager.IsCustomChartSelected())
+                        {
+                            MelonLogger.Msg("[AudioClipPatch] ❌ 일반 곡 선택됨 - 커스텀 차트 플래그 해제 및 원래 프리뷰 복원");
+                            CustomAssetManager.SetCustomChartSelected(false);
+                            CustomBgmPlayer.CleanupAndRestore();
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -77,6 +108,16 @@ namespace GRC2.Harmony.Handlers
                         Type instanceType = __instance.GetType();
                         ArtworkUpdater.UpdateArtwork(__instance, instanceType);
                         MelonLogger.Msg("[AudioClipPatch] ✅ 난이도 변경 - 아트워크 업데이트 완료");
+                    }
+                }
+                else
+                {
+                    // 일반 곡 선택 시 커스텀 차트 플래그 해제 및 원래 프리뷰 복원
+                    if (CustomAssetManager.IsCustomChartSelected())
+                    {
+                        MelonLogger.Msg("[AudioClipPatch] ❌ 일반 곡 선택됨 - 커스텀 차트 플래그 해제 및 원래 프리뷰 복원");
+                        CustomAssetManager.SetCustomChartSelected(false);
+                        CustomBgmPlayer.CleanupAndRestore();
                     }
                 }
             }

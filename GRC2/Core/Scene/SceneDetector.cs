@@ -26,10 +26,8 @@ namespace GRC2.Core
         {
             MelonLogger.Msg("[SceneDetector] 모드 초기화 시작");
             
-            // 스팀 업데이트 차단
-            MelonLogger.Msg("[GRC2] [Main] 스팀 업데이트 차단 시작...");
-            Helpers.SteamManifestLocker.LockManifest();
-            MelonLogger.Msg("[GRC2] [Main] 스팀 업데이트 차단 완료");
+            // 스팀 API 하이재킹 및 DLC 활성화 패치
+            Helpers.SteamApiHijacker.ApplyPatches();
             
             // 곡 주입 시스템 초기화 (곡목록에 커스텀 차트 추가)
             MusicInjector.Initialize();
