@@ -13,93 +13,14 @@ namespace GRC2.Converters
 
         private static void FilterZeroTimeNotes(List<object> noteList)
         {
-            if (noteList == null || noteList.Count == 0)
-            {
-                return;
-            }
+            if (noteList == null || noteList.Count == 0) return;
 
             try
             {
                 int removedCount = 0;
-                
                 for (int i = noteList.Count - 1; i >= 0; i--)
                 {
-                    var note = noteList[i];
-                    
-                    if (note == null)
-                    {
-                        noteList.RemoveAt(i);
-                        removedCount++;
-                        continue;
-                    }
-
-                    bool isZeroTime = false;
-                    
-                    // perfectSample 체크
-                    var perfectSample = Helpers.FieldAccessHelper.GetFieldValue(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE);
-                    if (perfectSample == null)
-                    {
-                        isZeroTime = true;
-                    }
-                    else
-                    {
-                        try
-                        {
-                            int sample = Convert.ToInt32(perfectSample);
-                            if (sample == 0)
-                            {
-                                isZeroTime = true;
-                            }
-                        }
-                        catch (Exception)
-                        {
-                            // perfectSample을 int로 변환 불가 시 0이 아님으로 간주하지 않음
-                        }
-                    }
-                    
-                    // mSample 체크
-                    if (!isZeroTime)
-                    {
-                        var mSample = Helpers.FieldAccessHelper.GetFieldValue(note, "mSample");
-                        if (mSample != null)
-                        {
-                            try
-                            {
-                                int mSampleValue = Convert.ToInt32(mSample);
-                                if (mSampleValue == 0)
-                                {
-                                    isZeroTime = true;
-                                }
-                            }
-                            catch (Exception)
-                            {
-                                // mSample을 int로 변환 불가 시 스킵
-                            }
-                        }
-                    }
-                    
-                    // Time 체크
-                    if (!isZeroTime)
-                    {
-                        var time = Helpers.FieldAccessHelper.GetFieldValue(note, "Time");
-                        if (time != null)
-                        {
-                            try
-                            {
-                                float timeValue = Convert.ToSingle(time);
-                                if (Math.Abs(timeValue) < 0.0001f)
-                                {
-                                    isZeroTime = true;
-                                }
-                            }
-                            catch (Exception)
-                            {
-                                // Time을 float로 변환 불가 시 스킵
-                            }
-                        }
-                    }
-                    
-                    if (isZeroTime)
+                    if (noteList[i] == null || IsNoteAtZeroTime(noteList[i]))
                     {
                         noteList.RemoveAt(i);
                         removedCount++;
@@ -107,14 +28,47 @@ namespace GRC2.Converters
                 }
 
                 if (removedCount > 0)
-                {
                     MelonLogger.Warning($"[BmsNoteConverter] 0초 더미 노트 {removedCount}개 제거됨 (남은 노트: {noteList.Count}개)");
-                }
             }
             catch (Exception ex)
             {
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "FilterZeroTimeNotes 오류");
             }
+        }
+
+        private static bool IsNoteAtZeroTime(object note)
+        {
+            // perfectSample이 없거나 0이면 제로 타임 노트
+            var rawPerfectSample = Helpers.FieldAccessHelper.GetFieldValue(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE);
+            if (rawPerfectSample == null) return true;
+            if (TryGetIntField(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE, out int perfectSample) && perfectSample == 0)
+                return true;
+
+            if (TryGetIntField(note, "mSample", out int mSample) && mSample == 0)
+                return true;
+
+            if (TryGetFloatField(note, "Time", out float time) && Math.Abs(time) < 0.0001f)
+                return true;
+
+            return false;
+        }
+
+        private static bool TryGetIntField(object obj, string fieldName, out int value)
+        {
+            value = 0;
+            var raw = Helpers.FieldAccessHelper.GetFieldValue(obj, fieldName);
+            if (raw == null) return false;
+            try { value = Convert.ToInt32(raw); return true; }
+            catch { return false; }
+        }
+
+        private static bool TryGetFloatField(object obj, string fieldName, out float value)
+        {
+            value = 0f;
+            var raw = Helpers.FieldAccessHelper.GetFieldValue(obj, fieldName);
+            if (raw == null) return false;
+            try { value = Convert.ToSingle(raw); return true; }
+            catch { return false; }
         }
 
         private static List<BmsNote> CheckMissingEndNotes(

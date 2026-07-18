@@ -84,6 +84,9 @@ namespace GRC2.Core
                 
                 // 텍스트 설정 관련 타입 찾기 및 후킹
                 PatchApplier.PatchTextTypes();
+
+                // 결과 씬 아트워크/곡 제목 직접 주입 후킹
+                PatchApplier.PatchResultSceneUpdater();
                 
                 // cMusicSelectScrollViewItem 및 cMusicSelectScrollView 메서드 후킹
                 PatchMusicScrollViewMethods();

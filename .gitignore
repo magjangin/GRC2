@@ -8,3 +8,6 @@
 Latest.log
 __pycache__/
 *.pyc
+
+# Assembly-CSharp.dll 디컴파일 산출물 (게임 원본 코드, 저작권상 커밋 대상 아님)
+/Decompiled/

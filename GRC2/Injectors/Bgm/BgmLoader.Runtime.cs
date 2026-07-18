@@ -11,160 +11,175 @@ namespace GRC2.Injectors
 {
     internal static partial class BgmLoader
     {
-    
+        private const int BaseTimeoutFrames = 600;       // 기본 10초 (60fps 기준)
+        private const int MaxTimeoutFrames = 3600;       // 최대 60초
+        private const int LogIntervalFrames = 120;       // 2초마다 로딩 진행 로그
+        private const float FramesPerSecond = 60.0f;
+        private const double FramesPerMbPerSec = 6.0;   // 10MB당 60프레임
 
         public static IEnumerator TryInjectViaSorceField(
-            string bgmFilePath, 
+            string bgmFilePath,
             Type bgmBeatManagerType,
             object bgmBeatManagerInstance,
             Action<bool> setInjectedCallback,
             Action<bool> setLogShownCallback)
         {
-            FieldInfo sorceField = null;
+            var sorceField = TryGetSorceField(bgmBeatManagerType, setLogShownCallback);
+            if (sorceField != null)
+            {
+                yield return InjectViaSorceField(bgmFilePath, sorceField, bgmBeatManagerInstance, setInjectedCallback, setLogShownCallback);
+                yield break;
+            }
+
+            TryCallRequestLoadBgm(bgmBeatManagerType, bgmBeatManagerInstance, setLogShownCallback);
+        }
+
+        private static FieldInfo TryGetSorceField(Type type, Action<bool> setLogShownCallback)
+        {
             try
             {
-                sorceField = bgmBeatManagerType.GetField("_sorce", 
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                return type.GetField("_sorce", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             }
             catch (Exception ex)
             {
-                if (setLogShownCallback != null && !BgmInjector.LogShown)
-                {
-                    MelonLogger.Warning($"[BgmLoader] _sorce 필드 찾기 실패: {ex.Message}");
-                    setLogShownCallback(true);
-                }
+                WarnOnce(setLogShownCallback, $"[BgmLoader] _sorce 필드 찾기 실패: {ex.Message}");
+                return null;
             }
-            
-            if (sorceField != null)
+        }
+
+        private static IEnumerator InjectViaSorceField(
+            string bgmFilePath,
+            FieldInfo sorceField,
+            object bgmBeatManagerInstance,
+            Action<bool> setInjectedCallback,
+            Action<bool> setLogShownCallback)
+        {
+            MelonLogger.Msg("[BgmLoader] _sorce 필드 발견, 직접 AudioSource.clip 설정 시도");
+
+            long fileSizeBytes = GetFileSizeBytes(bgmFilePath);
+            int maxWaitFrames = CalcTimeoutFrames(fileSizeBytes);
+
+            var fileUrl = "file://" + bgmFilePath.Replace("\\", "/");
+            UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(fileUrl, GetAudioType(bgmFilePath));
+            request.SendWebRequest();
+
+            yield return WaitForRequest(request, maxWaitFrames);
+
+            if (!request.isDone)
             {
-                MelonLogger.Msg("[BgmLoader] _sorce 필드 발견, 직접 AudioSource.clip 설정 시도");
-                
-                // 파일 크기 확인
-                long fileSizeBytes = 0;
-                try
-                {
-                    var fileInfo = new FileInfo(bgmFilePath);
-                    fileSizeBytes = fileInfo.Length;
-                    var fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
-                    MelonLogger.Msg($"[BgmLoader] 오디오 파일: {Path.GetFileName(bgmFilePath)} ({fileSizeMB:F2} MB)");
-                    
-                    if (fileSizeMB > 50)
-                    {
-                        MelonLogger.Warning($"[BgmLoader] 대용량 오디오 파일 감지 ({fileSizeMB:F2} MB)");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning($"[BgmLoader] 파일 크기 확인 실패: {ex.Message}");
-                }
-                
-                var fileUrl = "file://" + bgmFilePath.Replace("\\", "/");
-                UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(fileUrl, GetAudioType(bgmFilePath));
-                request.SendWebRequest();
-                
-                // 로딩 타임아웃 설정
-                int maxWaitFrames = 600; // 기본 10초
-                if (fileSizeBytes > 0)
-                {
-                    var fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
-                    var additionalFrames = (int)(fileSizeMB / 10.0 * 60.0);
-                    maxWaitFrames = Math.Min(600 + additionalFrames, 3600);
-                }
-                
-                int waitCount = 0;
-                int lastLogFrame = 0;
-                while (!request.isDone && waitCount < maxWaitFrames)
-                {
-                    waitCount++;
-                    if (waitCount - lastLogFrame >= 120)
-                    {
-                        var elapsedSeconds = waitCount / 60.0f;
-                        var progress = request.downloadProgress * 100.0f;
-                        MelonLogger.Msg($"[BgmLoader] BGM 로딩 중... ({elapsedSeconds:F1}초 경과, {progress:F1}%)");
-                        lastLogFrame = waitCount;
-                    }
-                    yield return null;
-                }
-                
-                if (!request.isDone)
-                {
-                    var elapsedSeconds = waitCount / 60.0f;
-                    MelonLogger.Error($"[BgmLoader] BGM 로딩 타임아웃 ({elapsedSeconds:F1}초 경과)");
-                    request.Dispose();
-                    yield break;
-                }
-                
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    try
-                    {
-                        var audioClip = DownloadHandlerAudioClip.GetContent(request);
-                        if (audioClip != null)
-                        {
-                            var audioSource = sorceField.GetValue(bgmBeatManagerInstance) as AudioSource;
-                            if (audioSource != null)
-                            {
-                                audioSource.clip = audioClip;
-                                audioSource.Play();
-                                MelonLogger.Msg("[BgmLoader] BGM 주입 성공 (_sorce 필드 직접 설정)");
-                                setInjectedCallback?.Invoke(true);
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        if (setLogShownCallback != null && !BgmInjector.LogShown)
-                        {
-                            MelonLogger.Warning($"[BgmLoader] _sorce 필드 설정 실패: {ex.Message}");
-                            setLogShownCallback(true);
-                        }
-                    }
-                }
-                else
-                {
-                    if (setLogShownCallback != null && !BgmInjector.LogShown)
-                    {
-                        MelonLogger.Warning($"[BgmLoader] BGM 로드 실패: {request.error}");
-                        setLogShownCallback(true);
-                    }
-                }
-                
+                MelonLogger.Error($"[BgmLoader] BGM 로딩 타임아웃 ({maxWaitFrames / FramesPerSecond:F1}초 경과)");
                 request.Dispose();
                 yield break;
             }
-            
-            // requestLoadBGM 메서드 찾기
+
+            if (request.result == UnityWebRequest.Result.Success)
+                TrySetAudioSourceClip(request, sorceField, bgmBeatManagerInstance, setInjectedCallback, setLogShownCallback);
+            else
+                WarnOnce(setLogShownCallback, $"[BgmLoader] BGM 로드 실패: {request.error}");
+
+            request.Dispose();
+        }
+
+        private static long GetFileSizeBytes(string bgmFilePath)
+        {
+            try
+            {
+                var fileInfo = new FileInfo(bgmFilePath);
+                double fileSizeMB = fileInfo.Length / (1024.0 * 1024.0);
+                MelonLogger.Msg($"[BgmLoader] 오디오 파일: {Path.GetFileName(bgmFilePath)} ({fileSizeMB:F2} MB)");
+                if (fileSizeMB > 50) MelonLogger.Warning($"[BgmLoader] 대용량 오디오 파일 감지 ({fileSizeMB:F2} MB)");
+                return fileInfo.Length;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[BgmLoader] 파일 크기 확인 실패: {ex.Message}");
+                return 0;
+            }
+        }
+
+        private static int CalcTimeoutFrames(long fileSizeBytes)
+        {
+            if (fileSizeBytes <= 0) return BaseTimeoutFrames;
+            double fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
+            int additional = (int)(fileSizeMB * FramesPerMbPerSec);
+            return Math.Min(BaseTimeoutFrames + additional, MaxTimeoutFrames);
+        }
+
+        private static IEnumerator WaitForRequest(UnityWebRequest request, int maxWaitFrames)
+        {
+            int waitCount = 0;
+            int lastLogFrame = 0;
+            while (!request.isDone && waitCount < maxWaitFrames)
+            {
+                waitCount++;
+                if (waitCount - lastLogFrame >= LogIntervalFrames)
+                {
+                    float elapsed = waitCount / FramesPerSecond;
+                    float progress = request.downloadProgress * 100.0f;
+                    MelonLogger.Msg($"[BgmLoader] BGM 로딩 중... ({elapsed:F1}초 경과, {progress:F1}%)");
+                    lastLogFrame = waitCount;
+                }
+                yield return null;
+            }
+        }
+
+        private static void TrySetAudioSourceClip(
+            UnityWebRequest request,
+            FieldInfo sorceField,
+            object bgmBeatManagerInstance,
+            Action<bool> setInjectedCallback,
+            Action<bool> setLogShownCallback)
+        {
+            try
+            {
+                var audioClip = DownloadHandlerAudioClip.GetContent(request);
+                if (audioClip == null) return;
+
+                var audioSource = sorceField.GetValue(bgmBeatManagerInstance) as AudioSource;
+                if (audioSource == null) return;
+
+                audioSource.clip = audioClip;
+                audioSource.Play();
+                MelonLogger.Msg("[BgmLoader] BGM 주입 성공 (_sorce 필드 직접 설정)");
+                setInjectedCallback?.Invoke(true);
+            }
+            catch (Exception ex)
+            {
+                WarnOnce(setLogShownCallback, $"[BgmLoader] _sorce 필드 설정 실패: {ex.Message}");
+            }
+        }
+
+        private static void TryCallRequestLoadBgm(Type bgmBeatManagerType, object bgmBeatManagerInstance, Action<bool> setLogShownCallback)
+        {
             MethodInfo loadBgmMethod = null;
             try
             {
-                loadBgmMethod = bgmBeatManagerType.GetMethod("requestLoadBGM", 
+                loadBgmMethod = bgmBeatManagerType.GetMethod("requestLoadBGM",
                     BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
             }
             catch (Exception ex)
             {
-                if (setLogShownCallback != null && !BgmInjector.LogShown)
-                {
-                    MelonLogger.Warning($"[BgmLoader] requestLoadBGM 메서드 찾기 실패: {ex.Message}");
-                    setLogShownCallback(true);
-                }
+                WarnOnce(setLogShownCallback, $"[BgmLoader] requestLoadBGM 메서드 찾기 실패: {ex.Message}");
             }
-            
-            if (loadBgmMethod != null)
+
+            if (loadBgmMethod == null) return;
+
+            try
             {
-                try
-                {
-                    MelonLogger.Msg("[BgmLoader] requestLoadBGM 메서드 발견");
-                    loadBgmMethod.Invoke(bgmBeatManagerInstance, null);
-                }
-                catch (Exception ex)
-                {
-                    if (setLogShownCallback != null && !BgmInjector.LogShown)
-                    {
-                        MelonLogger.Warning($"[BgmLoader] requestLoadBGM 호출 실패: {ex.Message}");
-                        setLogShownCallback(true);
-                    }
-                }
+                MelonLogger.Msg("[BgmLoader] requestLoadBGM 메서드 발견");
+                loadBgmMethod.Invoke(bgmBeatManagerInstance, null);
             }
+            catch (Exception ex)
+            {
+                WarnOnce(setLogShownCallback, $"[BgmLoader] requestLoadBGM 호출 실패: {ex.Message}");
+            }
+        }
+
+        private static void WarnOnce(Action<bool> setLogShownCallback, string message)
+        {
+            if (BgmInjector.LogShown) return;
+            MelonLogger.Warning(message);
+            setLogShownCallback?.Invoke(true);
         }
 
         public static AudioType GetAudioType(string filePath)

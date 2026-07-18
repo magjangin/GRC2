@@ -38,82 +38,51 @@ namespace GRC2.Injectors
             try
             {
                 var methodName = __originalMethod.Name;
-                
-                // Unity 기본 메서드 및 프레임마다 호출되는 메서드 제외
-                if (_excludedMethods.Contains(methodName))
-                {
-                    return;
-                }
-                
-                // requestPause는 로그 제외
-                if (_importantMethods.Contains(methodName))
-                {
-                    var argsStr = BgmFormattingUtils.FormatArguments(__args);
-                    MelonLogger.Msg($"[BgmInjectorHooks] ⚡ {methodName} 호출됨: {methodName}({argsStr})");
-                    
-                    HandleImportantMethodCall(__instance, methodName);
-                }
-                else if (methodName == "requestPause")
-                {
-                    // requestPause는 로그 없이 처리만
-                    HandleImportantMethodCall(__instance, methodName);
-                }
-                else if (methodName == "requestCommonRythmGameEnd")
-                {
+                if (_excludedMethods.Contains(methodName)) return;
+
+                LogAndHandleMethodCall(__instance, methodName, __args, resultStr: null);
+
+                if (methodName == "requestCommonRythmGameEnd")
                     LogRythmGameEndTiming(__instance);
-                }
-                else if (methodName.Contains("Clear") || methodName.Contains("End") || methodName.Contains("Finish"))
-                {
-                    // 기타 클리어/종료 관련 메서드
-                    var argsStr = BgmFormattingUtils.FormatArguments(__args);
-                    MelonLogger.Msg($"[BgmInjectorHooks] ⚠ 게임 종료/클리어 메서드 호출: {methodName}({argsStr})");
-                }
-                else
-                {
-                    var argsStr = BgmFormattingUtils.FormatArguments(__args);
-                    MelonLogger.Msg($"[BgmInjectorHooks] 호출: {methodName}({argsStr})");
-                }
             }
-            catch
-            {
-                // 로그 출력 실패는 무시
-            }
+            catch { }
         }
-        
+
         public static void MethodCallPostfix(object __instance, MethodBase __originalMethod, object[] __args, object __result)
         {
             try
             {
                 var methodName = __originalMethod.Name;
-                
-                if (_excludedMethods.Contains(methodName))
-                {
-                    return;
-                }
-                
-                // requestPause는 로그 제외
-                if (_importantMethods.Contains(methodName))
-                {
-                    var argsStr = BgmFormattingUtils.FormatArguments(__args);
-                    MelonLogger.Msg($"[BgmInjectorHooks] ⚡ {methodName} 호출됨: {methodName}({argsStr})");
-                    
-                    HandleImportantMethodCall(__instance, methodName);
-                }
-                else if (methodName == "requestPause")
-                {
-                    // requestPause는 로그 없이 처리만
-                    HandleImportantMethodCall(__instance, methodName);
-                }
-                else
-                {
-                    var argsStr = BgmFormattingUtils.FormatArguments(__args);
-                    var resultStr = BgmFormattingUtils.FormatResult(__result);
-                    MelonLogger.Msg($"[BgmInjectorHooks] 호출: {methodName}({argsStr}){resultStr}");
-                }
+                if (_excludedMethods.Contains(methodName)) return;
+
+                var resultStr = BgmFormattingUtils.FormatResult(__result);
+                LogAndHandleMethodCall(__instance, methodName, __args, resultStr);
             }
-            catch
+            catch { }
+        }
+
+        private static void LogAndHandleMethodCall(object instance, string methodName, object[] args, string resultStr)
+        {
+            if (_importantMethods.Contains(methodName))
             {
-                // 로그 출력 실패는 무시
+                var argsStr = BgmFormattingUtils.FormatArguments(args);
+                MelonLogger.Msg($"[BgmInjectorHooks] ⚡ {methodName} 호출됨: {methodName}({argsStr})");
+                HandleImportantMethodCall(instance, methodName);
+            }
+            else if (methodName == "requestPause")
+            {
+                HandleImportantMethodCall(instance, methodName);
+            }
+            else if (methodName.Contains("Clear") || methodName.Contains("End") || methodName.Contains("Finish"))
+            {
+                var argsStr = BgmFormattingUtils.FormatArguments(args);
+                MelonLogger.Msg($"[BgmInjectorHooks] ⚠ 게임 종료/클리어 메서드 호출: {methodName}({argsStr})");
+            }
+            else
+            {
+                var argsStr = BgmFormattingUtils.FormatArguments(args);
+                var suffix = resultStr != null ? resultStr : string.Empty;
+                MelonLogger.Msg($"[BgmInjectorHooks] 호출: {methodName}({argsStr}){suffix}");
             }
         }
         

@@ -22,6 +22,7 @@ namespace GRC2.Injectors
             AudioClipPatcher.Initialize(harmonyInstance);
             SelectingMusicUIPatcher.Initialize(harmonyInstance);
             TextPatcher.Initialize(harmonyInstance);
+            ResultSceneUpdaterPatcher.Initialize(harmonyInstance);
         }
 
         /// <summary>
@@ -54,6 +55,14 @@ namespace GRC2.Injectors
         public static void PatchTextTypes()
         {
             TextPatcher.Patch();
+        }
+
+        /// <summary>
+        /// 결과 씬 아트워크/곡 제목 직접 주입 후킹
+        /// </summary>
+        public static void PatchResultSceneUpdater()
+        {
+            ResultSceneUpdaterPatcher.Patch();
         }
     }
 }

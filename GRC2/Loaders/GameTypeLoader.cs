@@ -175,64 +175,36 @@ namespace GRC2.Loaders
             return null;
         }
 
-        /// <summary>
-        /// 초기화 상태를 로그로 출력합니다.
-        /// </summary>
         private static void LogInitializationStatus()
         {
             MelonLogger.Msg("[GameTypeLoader] 초기화 완료 - 로드된 타입:");
-            
-            if (NoteCreateDataType != null)
-                MelonLogger.Msg($"  - {NoteCreateDataType.Name} ({NoteCreateDataType.Namespace})");
-            
-            if (NoteTypeIdEnum != null)
-                MelonLogger.Msg($"  - {NoteTypeIdEnum.Name}");
-            
-            if (NoteLaneLeftRightEnum != null)
-                MelonLogger.Msg($"  - {NoteLaneLeftRightEnum.Name}");
-            
-            if (NoteSubLaneTypeEnum != null)
-                MelonLogger.Msg($"  - {NoteSubLaneTypeEnum.Name}");
-            
-            if (NoteDirectionIndexEnum != null)
-                MelonLogger.Msg($"  - {NoteDirectionIndexEnum.Name}");
-            
-            if (NoteSizeEnum != null)
-                MelonLogger.Msg($"  - {NoteSizeEnum.Name}");
-            
-            if (SlideEndFlickDirectionEnum != null)
-                MelonLogger.Msg($"  - {SlideEndFlickDirectionEnum.Name}");
-        }
-
-        /// <summary>
-        /// 모든 Enum 타입을 찾습니다.
-        /// </summary>
-        private static void FindEnumTypes(Assembly assembly)
-        {
-            NoteTypeIdEnum = assembly.GetType("IntiCreates.RythmGame.FairyMode.NoteTypeId") 
-                ?? FindTypeByName(assembly, "NoteTypeId");
-
-            NoteLaneLeftRightEnum = assembly.GetType("IntiCreates.RythmGame.FairyMode.NoteLaneLeftRight") 
-                ?? FindTypeByName(assembly, "NoteLaneLeftRight");
-
-            NoteSubLaneTypeEnum = assembly.GetType("IntiCreates.RythmGame.FairyMode.NoteSubLaneType") 
-                ?? FindTypeByName(assembly, "NoteSubLaneType");
-
-            NoteDirectionIndexEnum = assembly.GetType("IntiCreates.RythmGame.NoteDirectionIndex") 
-                ?? FindTypeByName(assembly, "NoteDirectionIndex");
-
-            NoteSizeEnum = assembly.GetType("IntiCreates.RythmGame.NoteSize") 
-                ?? FindTypeByName(assembly, "NoteSize");
-
-            SlideEndFlickDirectionEnum = assembly.GetType("IntiCreates.RythmGame.SlideEndFlickDirection") 
-                ?? FindTypeByName(assembly, "SlideEndFlickDirection");
-            
-            // SlideEndFlickDirection을 찾지 못한 경우, NoteCreateData 필드에서 타입 확인
-            if (SlideEndFlickDirectionEnum == null && NoteCreateDataType != null)
+            var types = new Type[]
             {
-                SlideEndFlickDirectionEnum = FindSlideEndFlickDirectionFromField(assembly);
+                NoteCreateDataType, NoteTypeIdEnum, NoteLaneLeftRightEnum,
+                NoteSubLaneTypeEnum, NoteDirectionIndexEnum, NoteSizeEnum, SlideEndFlickDirectionEnum
+            };
+            foreach (var t in types)
+            {
+                if (t != null)
+                    MelonLogger.Msg($"  - {t.Name} ({t.Namespace})");
             }
         }
+
+        private static void FindEnumTypes(Assembly assembly)
+        {
+            NoteTypeIdEnum          = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteTypeId",         "NoteTypeId");
+            NoteLaneLeftRightEnum   = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteLaneLeftRight",  "NoteLaneLeftRight");
+            NoteSubLaneTypeEnum     = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteSubLaneType",    "NoteSubLaneType");
+            NoteDirectionIndexEnum  = FindEnumType(assembly, "IntiCreates.RythmGame.NoteDirectionIndex",           "NoteDirectionIndex");
+            NoteSizeEnum            = FindEnumType(assembly, "IntiCreates.RythmGame.NoteSize",                     "NoteSize");
+            SlideEndFlickDirectionEnum = FindEnumType(assembly, "IntiCreates.RythmGame.SlideEndFlickDirection",    "SlideEndFlickDirection");
+
+            if (SlideEndFlickDirectionEnum == null && NoteCreateDataType != null)
+                SlideEndFlickDirectionEnum = FindSlideEndFlickDirectionFromField(assembly);
+        }
+
+        private static Type FindEnumType(Assembly assembly, string fullName, string shortName)
+            => assembly.GetType(fullName) ?? FindTypeByName(assembly, shortName);
 
         /// <summary>
         /// 이름으로 타입을 찾습니다.

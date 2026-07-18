@@ -106,18 +106,10 @@ namespace GRC2.Core
                 }
             }
 
-            try
-            {
-                ApplyDifficultyToResultScene();
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[ResultSceneInjector] 난이도 적용 오류: {ex.Message}");
-            }
-            finally
-            {
-                _coroutineRef = null;
-            }
+            // 난이도 표시는 ResultSceneUpdaterPatch(initializePreFade 후킹)에서
+            // 재생한 난이도 하나만 정확히 덮어쓰므로 여기서는 더 이상 처리하지 않습니다.
+            // (기존 폴백은 4개 난이도를 모두 이어붙인 문자열을 mDifficultyText에 덮어쓰는 버그가 있었음)
+            _coroutineRef = null;
         }
     }
 }

@@ -23,6 +23,10 @@ namespace GRC2.Injectors
 
         private static bool _methodsCached = false;
 
+        private static int _consecutiveInvokeFailures = 0;
+        private const int MaxInvokeFailuresBeforeDisable = 3;
+        private static bool _invokeDisabledThisSession = false;
+
         private static void CacheMethods(Type bgmBeatManagerType)
         {
             if (_methodsCached || bgmBeatManagerType == null) return;
@@ -45,6 +49,8 @@ namespace GRC2.Injectors
 
         private static float GetBgmTimeFromManager()
         {
+            if (_invokeDisabledThisSession) return 0f;
+
             try
             {
                 if (_cachedGameAssembly == null)
@@ -93,7 +99,8 @@ namespace GRC2.Injectors
                 if (_getCurrentSampleMethod != null)
                 {
                     var currentSample = _getCurrentSampleMethod.Invoke(bgmManager, null);
-                    
+                    _consecutiveInvokeFailures = 0;
+
                     if (currentSample is int intSample && intSample > 0)
                     {
                         return intSample / 48000f;
@@ -108,7 +115,8 @@ namespace GRC2.Injectors
                 if (_getTimeMethod != null)
                 {
                     var time = _getTimeMethod.Invoke(bgmManager, null);
-                    
+                    _consecutiveInvokeFailures = 0;
+
                     if (time is float floatTime && floatTime > 0f)
                     {
                         return floatTime;
@@ -121,7 +129,17 @@ namespace GRC2.Injectors
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"[BGAPlayerHook] GetBgmTimeFromManager 오류: {ex.Message}");
+                _consecutiveInvokeFailures++;
+                if (_consecutiveInvokeFailures <= MaxInvokeFailuresBeforeDisable)
+                {
+                    MelonLogger.Warning($"[BGAPlayerHook] GetBgmTimeFromManager 오류 ({_consecutiveInvokeFailures}/{MaxInvokeFailuresBeforeDisable}): {ex.Message}");
+                }
+
+                if (_consecutiveInvokeFailures == MaxInvokeFailuresBeforeDisable)
+                {
+                    _invokeDisabledThisSession = true;
+                    MelonLogger.Warning("[BGAPlayerHook] GetBgmTimeFromManager이 반복 실패하여 이번 곡에서는 더 이상 시도하지 않습니다 (BGA 없는 곡일 수 있음).");
+                }
             }
 
             return 0f;
@@ -244,6 +262,8 @@ namespace GRC2.Injectors
             _bgmAudioSource = null;
             _videoPlayers = null;
             _cachedBgmManagerInstance = null;
+            _consecutiveInvokeFailures = 0;
+            _invokeDisabledThisSession = false;
 
             MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
         }

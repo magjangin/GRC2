@@ -132,7 +132,9 @@
     <Compile Include="Harmony\Registration\CoverImagePatcher.cs" />
     <Compile Include="Harmony\Registration\SelectingMusicUIPatcher.cs" />
     <Compile Include="Harmony\Registration\TextPatcher.cs" />
+    <Compile Include="Harmony\Registration\ResultSceneUpdaterPatcher.cs" />
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
+    <Compile Include="Harmony\Handlers\ResultSceneUpdaterPatch.cs" />
     <Compile Include="Harmony\Handlers\ArtworkUpdater.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
     <Compile Include="Harmony\Handlers\AudioSource\AudioSourceFinder.cs" />

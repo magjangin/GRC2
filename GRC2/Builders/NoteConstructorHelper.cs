@@ -72,99 +72,48 @@ namespace GRC2.Builders
                 }
             }
             
-            // 6개 파라미터 생성자 시도 (Direction 추가)
-            if (noteCreateData == null && bmsNote.Direction.HasValue)
-            {
-                noteCreateData = TryCreateWith6ParamsWithDirection(noteCreateDataType, bmsNote, perfectSample, noteTypeId, isLeftBool);
-            }
-            
-            // 6개 파라미터 생성자 시도 (기본 Direction)
+            // 6개 파라미터 생성자 시도 (Direction 포함, 없으면 기본값)
             if (noteCreateData == null)
             {
-                noteCreateData = TryCreateWith6ParamsDefaultDirection(noteCreateDataType, bmsNote, perfectSample, noteTypeId, isLeftBool);
+                var directionIndex = bmsNote.Direction.HasValue
+                    ? EnumValueHelper.GetDirectionIndex(bmsNote.Direction.Value)
+                    : EnumValueHelper.GetEnumValue(GameTypeLoader.NoteDirectionIndexEnum, EnumValueHelper.GetEnumCenterMiddle());
+
+                noteCreateData = TryCreateWith6Params(noteCreateDataType, bmsNote, perfectSample, noteTypeId, isLeftBool, directionIndex);
             }
-            
+
             return noteCreateData;
         }
 
-        /// <summary>
-        /// 6개 파라미터 생성자 시도 (Direction 포함)
-        /// </summary>
-        private static object TryCreateWith6ParamsWithDirection(
+        private static object TryCreateWith6Params(
             Type noteCreateDataType,
             BmsNote bmsNote,
             int perfectSample,
             object noteTypeId,
-            bool isLeftBool)
+            bool isLeftBool,
+            object directionIndex)
         {
+            if (directionIndex == null) return null;
             try
             {
-                var directionIndex = EnumValueHelper.GetDirectionIndex(bmsNote.Direction.Value);
-                if (directionIndex != null)
-                {
-                    var directionType = directionIndex.GetType();
-                    var constructor6 = noteCreateDataType.GetConstructor(
-                        CONSTRUCTOR_FLAGS,
-                        null,
-                        new Type[] { typeof(int), typeof(float), typeof(int), noteTypeId.GetType(), typeof(bool), directionType },
-                        null);
-                    
-                    if (constructor6 != null)
-                    {
-                        var result = constructor6.Invoke(new object[] { bmsNote.Lane, bmsNote.Time, perfectSample, noteTypeId, isLeftBool, directionIndex });
-                        if (EnableConstructorLogging)
-                        {
-                            MelonLogger.Msg("[NoteConstructorHelper] 6개 파라미터 생성자 찾기 성공: 6개 파라미터 (Direction 포함)");
-                        }
-                        return result;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(ex, "[NoteConstructorHelper]", "6개 파라미터 생성자 호출 실패 (Direction 포함)");
-            }
-            return null;
-        }
+                var constructor6 = noteCreateDataType.GetConstructor(
+                    CONSTRUCTOR_FLAGS,
+                    null,
+                    new Type[] { typeof(int), typeof(float), typeof(int), noteTypeId.GetType(), typeof(bool), directionIndex.GetType() },
+                    null);
 
-        /// <summary>
-        /// 6개 파라미터 생성자 시도 (기본 Direction)
-        /// </summary>
-        private static object TryCreateWith6ParamsDefaultDirection(
-            Type noteCreateDataType,
-            BmsNote bmsNote,
-            int perfectSample,
-            object noteTypeId,
-            bool isLeftBool)
-        {
-            try
-            {
-                var directionIndex = EnumValueHelper.GetEnumValue(GameTypeLoader.NoteDirectionIndexEnum, EnumValueHelper.GetEnumCenterMiddle());
-                if (directionIndex != null)
-                {
-                    var directionType = directionIndex.GetType();
-                    var constructor6 = noteCreateDataType.GetConstructor(
-                        CONSTRUCTOR_FLAGS,
-                        null,
-                        new Type[] { typeof(int), typeof(float), typeof(int), noteTypeId.GetType(), typeof(bool), directionType },
-                        null);
-                    
-                    if (constructor6 != null)
-                    {
-                        var result = constructor6.Invoke(new object[] { bmsNote.Lane, bmsNote.Time, perfectSample, noteTypeId, isLeftBool, directionIndex });
-                        if (EnableConstructorLogging)
-                        {
-                            MelonLogger.Msg("[NoteConstructorHelper] 6개 파라미터 생성자 찾기 성공: 6개 파라미터 (기본 Direction)");
-                        }
-                        return result;
-                    }
-                }
+                if (constructor6 == null) return null;
+
+                var result = constructor6.Invoke(new object[] { bmsNote.Lane, bmsNote.Time, perfectSample, noteTypeId, isLeftBool, directionIndex });
+                if (EnableConstructorLogging)
+                    MelonLogger.Msg("[NoteConstructorHelper] 6개 파라미터 생성자 성공");
+                return result;
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning(ex, "[NoteConstructorHelper]", "6개 파라미터 생성자 호출 실패 (기본 Direction)");
+                ErrorLogger.LogWarning(ex, "[NoteConstructorHelper]", "6개 파라미터 생성자 호출 실패");
+                return null;
             }
-            return null;
         }
     }
 }
