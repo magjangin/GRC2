@@ -77,3 +77,10 @@ As of 2026-07-21:
 - Removed dead, never-called files: `AssetLoader.cs`, `BgmArtworkUpdater.cs`, and the `AudioSourceFinder` cluster (4 files).
 - Removed orphaned XML doc comments left behind by earlier partial-class splits (`MusicScrollViewHooks.cs`, `BgmGameEndMonitor.cs`, `PreviewAudioManager.cs`, `BgmLoader.cs`, `HoldNoteProcessor.cs`).
 - Current managed source count is 108 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
+
+As of 2026-07-21 (file consolidation):
+
+- Merged every partial-class file set into a single file per class (16 classes, 61 files -> 16 files); deleted the empty `NoteArrayHooks.MusicDataAdjust.cs`.
+- Flattened folders that held only one merged class file (e.g. `Harmony/Hooks/GameFlow/` -> `Harmony/Hooks/GameFlowHooks.cs`).
+- Merged the six `Harmony/Registration/*Patcher.cs` files into `Harmony/Registration/Patchers.cs` (class names unchanged).
+- Current managed source count is 57 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).

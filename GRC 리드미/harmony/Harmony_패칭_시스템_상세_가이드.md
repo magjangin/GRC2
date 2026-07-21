@@ -440,7 +440,7 @@ foreach (var m in methods)
 ### 예제 1: 곡 선택 변경 감지
 
 ```csharp
-// Harmony/Registration/AudioClipPatcher.cs - 패치 설정
+// Harmony/Registration/Patchers.cs (AudioClipPatcher 클래스) - 패치 설정
 public static void Patch()
 {
     Type uiUpdaterType = ReflectionHelper.FindType("IntiCreates.cMusicSelectSceneUIUpdater");
@@ -491,7 +491,7 @@ public static void NoticeChangedMusicPostfix(object __instance)
 ### 예제 2: 텍스트 교체
 
 ```csharp
-// Harmony/Registration/TextPatcher.cs - 패치 설정
+// Harmony/Registration/Patchers.cs (TextPatcher 클래스) - 패치 설정
 public static void Patch()
 {
     Type textType = ReflectionHelper.FindType("TMPro.TMP_Text");
@@ -696,13 +696,14 @@ public static void DebugPatchStatus()
 ### 1. 패치 조직화
 
 ```csharp
-// ✅ 좋은 예: 기능별로 Patcher 분리 (실제 경로: GRC2/Harmony/Registration/)
-AudioClipPatcher.cs      // 오디오 관련
-CoverImagePatcher.cs     // 이미지 관련
-TextPatcher.cs           // 텍스트 관련
+// ✅ 좋은 예: 기능별로 Patcher 클래스 분리
+// (실제 위치: GRC2/Harmony/Registration/Patchers.cs 한 파일에 클래스별로 정리)
+AudioClipPatcher         // 오디오 관련
+CoverImagePatcher        // 이미지 관련
+TextPatcher              // 텍스트 관련
 
-// ❌ 나쁜 예: 모든 패치를 하나의 파일에
-AllPatches.cs
+// ❌ 나쁜 예: 모든 패치를 하나의 클래스에
+AllPatches
 ```
 
 ### 2. 에러 처리

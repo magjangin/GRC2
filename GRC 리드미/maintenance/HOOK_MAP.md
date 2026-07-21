@@ -21,7 +21,7 @@ Main startup path. It:
 
 ### `SceneDetector.OnSceneWasLoaded`
 
-File: `GRC2/Core/Scene/SceneDetector.SceneRouting.cs`
+File: `GRC2/Core/Scene/SceneDetector.cs` (scene-routing section)
 
 Scene routing path. It starts or stops custom BGM/BGA/artwork injection depending on
 the loaded scene.
@@ -33,7 +33,7 @@ the loaded scene.
 Owner files:
 
 - `GRC2/Core/Bootstrap/MusicInjector.cs`
-- `GRC2/Harmony/Hooks/MusicScrollView/*`
+- `GRC2/Harmony/Hooks/MusicScrollViewHooks.cs`
 
 Patched game targets:
 
@@ -55,9 +55,8 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Registration/AudioClipPatcher.cs`
-- `GRC2/Harmony/Registration/SelectingMusicUIPatcher.cs`
-- `GRC2/Harmony/Hooks/GameFlow/*`
+- `GRC2/Harmony/Registration/Patchers.cs` (`AudioClipPatcher`, `SelectingMusicUIPatcher`)
+- `GRC2/Harmony/Hooks/GameFlowHooks.cs`
 - `GRC2/Harmony/Handlers/AudioClipPatch.cs`
 
 Patched game targets:
@@ -88,9 +87,8 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Hooks/NoteArray/NoteArrayHooks.cs`
-- `GRC2/Harmony/Hooks/NoteArray/NoteArrayHooks.Patching.cs`
-- `GRC2/Converters/BmsNote/*`
+- `GRC2/Harmony/Hooks/NoteArrayHooks.cs`
+- `GRC2/Converters/BmsNoteConverter.cs`
 - `GRC2/Builders/*`
 - `GRC2/Processors/*`
 
@@ -112,8 +110,7 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Registration/CoverImagePatcher.cs`
-- `GRC2/Harmony/Registration/TextPatcher.cs`
+- `GRC2/Harmony/Registration/Patchers.cs` (`CoverImagePatcher`, `TextPatcher`)
 - `GRC2/Harmony/Handlers/ArtWorkPatch.cs`
 - `GRC2/Harmony/Handlers/MusicTitlePatch.cs`
 - `GRC2/Harmony/Handlers/TextPatch.cs`
@@ -221,6 +218,15 @@ of the current source baseline:
 - Simplified `NoteArrayHooks.Initialize` by removing unused `hwaFolderPath` and `debugMode` parameters.
 - Removed disabled sort/filter/update/get-cell music-scroll logging hooks.
 - Reduced `CharactorLoadPatcher` to the dynamic prefix factory still used by `AudioClipPatcher`.
+
+### 2026-07-21
+
+- Merged all partial-class file sets into one file per class and removed the empty
+  `NoteArrayHooks.MusicDataAdjust.cs`.
+- Flattened single-class folders (`Hooks/GameFlow/`, `Hooks/MusicScrollView/`,
+  `Hooks/NoteArray/`, `Handlers/PreviewAudio/`, and similar folders outside `Harmony/`).
+- Merged the six `Harmony/Registration/*Patcher.cs` files into
+  `Harmony/Registration/Patchers.cs`; class names and hook behavior are unchanged.
 
 ### 2026-05-15
 

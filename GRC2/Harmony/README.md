@@ -11,23 +11,16 @@
 |------|----------------|------|
 | **Hooks** | `GRC2.Harmony.Hooks` | 게임 메서드에 붙는 Prefix/Postfix **진입점** (예: `GameFlowHooks`, `MusicScrollViewHooks`, `NoteArrayHooks`). |
 | **Handlers** | `GRC2.Harmony.Handlers` | Harmony가 호출하는 **패치 본문** 및 그에 딸린 헬퍼 (예: `TextPatch`, `AudioClipPatch`, `PreviewAudioManager`). |
-| **Registration** | `GRC2.Harmony.Registration` | `Harmony.Patch(...)`로 타입·메서드를 **등록**하는 클래스 (예: `*Patcher`). |
+| **Registration** | `GRC2.Harmony.Registration` | `Harmony.Patch(...)`로 타입·메서드를 **등록**하는 클래스. 여섯 개의 `*Patcher` 클래스가 `Registration/Patchers.cs` 한 파일에 모여 있습니다. |
 
 `Core/Bootstrap/MusicInjector.cs` 등에서 위 타입들을 묶어 초기화합니다.
 
-## 하위 폴더 구조
+## 파일 구성
 
-partial 파일이 늘어난 클래스는 같은 네임스페이스를 유지한 채 클래스/기능 단위 하위 폴더로 묶습니다.
-
-| 폴더 | 내용 |
-|------|------|
-| `Hooks/GameFlow/` | `GameFlowHooks` partial 묶음: 시작, pre-start window, navigation, UI window, artist 처리. |
-| `Hooks/MusicScrollView/` | `MusicScrollViewHooks` partial 묶음: 목록 주입, MusicSelectData 생성, custom MusicID, 아티스트 첫 곡 매핑. |
-| `Hooks/NoteArray/` | `NoteArrayHooks` partial 묶음: 노트 배열 주입 및 패칭 엔트리포인트. |
-| `Handlers/AudioSource/` | `AudioSourceFinder` partial 묶음: 싱글턴/프리뷰 AudioSource 탐색, 오디오 교체. |
-| `Handlers/PreviewAudio/` | `PreviewAudioManager` partial 묶음: 원본 프리뷰/환경음 mute, 복원, 모니터링. |
-
-파일의 물리 위치만 바뀌었고, 네임스페이스와 public hook 메서드 이름은 유지됩니다.
+2026-07-21 정리로 partial 분할을 모두 병합해 **클래스당 파일 하나**를 유지합니다.
+`Hooks/`에는 `GameFlowHooks.cs`, `MusicScrollViewHooks.cs`, `NoteArrayHooks.cs`가,
+`Handlers/`에는 패치 본문 클래스들(`AudioClipPatch`, `TextPatch`, `PreviewAudioManager` 등)이 파일 단위로 있습니다.
+네임스페이스와 public hook 메서드 이름은 분할 시절과 동일합니다.
 
 | `GRC2/` 하위 폴더 | 한 줄 |
 |----------------|--------|
