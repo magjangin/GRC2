@@ -62,7 +62,6 @@
     <Compile Include="Core\Album\AlbumManager\AlbumManager.Scanning.cs" />
     <Compile Include="Core\Album\AlbumManager\AlbumManager.Selection.cs" />
     <Compile Include="Core\Assets\ArtworkImageFinder.cs" />
-    <Compile Include="Core\Assets\AssetLoader.cs" />
     <Compile Include="Core\Assets\CustomAssetManager.cs" />
     <Compile Include="Core\Bootstrap\MusicInjector.cs" />
     <Compile Include="Core\Assets\PlaySceneArtworkInjector.cs" />
@@ -94,13 +93,13 @@
     <Compile Include="Harmony\Hooks\MusicScrollView\MusicScrollViewHooks.ListLogging.cs" />
     <Compile Include="Harmony\Hooks\MusicScrollView\MusicScrollViewHooks.MusicSelectData.cs" />
     <Compile Include="Harmony\Hooks\NoteArray\NoteArrayHooks.cs" />
+    <Compile Include="Harmony\Hooks\NoteArray\NoteArrayHooks.MusicDataAdjust.cs" />
     <Compile Include="Harmony\Hooks\NoteArray\NoteArrayHooks.Patching.cs" />
     <Compile Include="Injectors\Bga\BgmSync\BgaBgmSyncManager.cs" />
     <Compile Include="Injectors\Bga\BgmSync\BgaBgmSyncManager.AudioSource.cs" />
     <Compile Include="Injectors\Bga\BgmSync\BgaBgmSyncManager.Runtime.cs" />
     <Compile Include="Injectors\Bga\BgmSync\BgaBgmSyncManager.Sync.cs" />
     <Compile Include="Injectors\Bga\BgaInjector.cs" />
-    <Compile Include="Injectors\Bgm\BgmArtworkUpdater.cs" />
     <Compile Include="Injectors\Bgm\BgmAudioStateChecker.cs" />
     <Compile Include="Injectors\Shared\BgmBgaInjector.cs" />
     <Compile Include="Injectors\GameEnd\BgmFinishTimeManager.cs" />
@@ -137,10 +136,6 @@
     <Compile Include="Harmony\Handlers\ResultSceneUpdaterPatch.cs" />
     <Compile Include="Harmony\Handlers\ArtworkUpdater.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
-    <Compile Include="Harmony\Handlers\AudioSource\AudioSourceFinder.cs" />
-    <Compile Include="Harmony\Handlers\AudioSource\AudioSourceFinder.PreviewSources.cs" />
-    <Compile Include="Harmony\Handlers\AudioSource\AudioSourceFinder.Replacement.cs" />
-    <Compile Include="Harmony\Handlers\AudioSource\AudioSourceFinder.Singleton.cs" />
     <Compile Include="Harmony\Handlers\CharactorLoadPatch.cs" />
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
     <Compile Include="Harmony\Handlers\MusicTitlePatch.cs" />

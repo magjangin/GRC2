@@ -161,14 +161,6 @@ namespace GRC2.Injectors
             
             request.Dispose();
         }
-        
-        /// <summary>
-        /// _sorce 필드를 통해 직접 AudioSource.clip을 설정합니다.
-        /// </summary>
-        
-        /// <summary>
-        /// 파일 확장자에 따라 AudioType을 반환합니다.
-        /// </summary>
-    }
+            }
 }
 

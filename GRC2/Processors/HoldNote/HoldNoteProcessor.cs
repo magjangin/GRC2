@@ -74,11 +74,6 @@ namespace GRC2.Processors
                 }
             }
         }
-
-        /// <summary>
-        /// 홀드 끝 노트를 connectNodeDataArray에 추가합니다.
-        /// 성능 최적화: 루프 외부에서 필드 정보 캐싱
-        /// </summary>
     }
 }
 

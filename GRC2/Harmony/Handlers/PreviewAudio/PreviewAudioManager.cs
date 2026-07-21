@@ -179,22 +179,7 @@ namespace GRC2.Harmony.Handlers
                 MelonLogger.Msg($"[PreviewAudioManager] ⚠️ 프리뷰/환경음 중지 중 오류: {ex.Message}");
             }
         }
-        
-        /// <summary>
-        /// 프리뷰/환경음이 다시 재생되는 것을 지속적으로 모니터링하고 음소거
-        /// </summary>
-        
-        /// <summary>
-        /// 음소거했던 AudioSource들 복원 (일반 곡 선택 시)
-        /// </summary>
-        
-        /// <summary>
-        /// 상태 초기화
-        /// </summary>
-        /// <summary>
-        /// 디버깅: 씬 내 모든 AudioSource 상태 로그 (키음 버그 추적용)
-        /// </summary>
-    }
+            }
 }
 
 

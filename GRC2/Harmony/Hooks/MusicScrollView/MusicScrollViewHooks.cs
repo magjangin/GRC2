@@ -25,42 +25,6 @@ namespace GRC2.Harmony.Hooks
                 MelonLogger.Msg(message);
             }
         }
-
-        /// <summary>
-        /// cMusicSelectScrollViewItem.updateItemData prefix
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.getCellHaviableMusicDataListAll prefix
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.getCellHaviableMusicDataListAll postfix
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.initializeAllItemByCrrentMusicData prefix
-        /// </summary>
-        
-        /// <summary>
-        /// mCellHaviableMusicDataList에 커스텀 곡 주입
-        /// </summary>
-        
-        /// <summary>
-        /// 커스텀 MusicID 생성
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.doSortMusicList prefix
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.doFilterMusicList prefix
-        /// </summary>
-        
-        /// <summary>
-        /// cMusicSelectScrollView.doFilterMusicList postfix
-        /// </summary>
     }
 }
 

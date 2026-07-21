@@ -68,10 +68,12 @@ Use archive documents only when investigating old decisions.
 
 ## Current Cleanup Baseline
 
-As of 2026-05-15:
+As of 2026-07-21:
 
 - Deleted no-op and diagnostic hook files.
 - Removed disabled note-array JSON dumping and field inspection helpers.
 - Removed disabled music-scroll sort/filter/update/get-cell logging hooks.
 - Reduced `CharactorLoadPatcher` to the dynamic prefix factory still used by `AudioClipPatcher`.
-- Current managed source count is 111 files under `GRC2/`, excluding `bin/obj`.
+- Removed dead, never-called files: `AssetLoader.cs`, `BgmArtworkUpdater.cs`, and the `AudioSourceFinder` cluster (4 files).
+- Removed orphaned XML doc comments left behind by earlier partial-class splits (`MusicScrollViewHooks.cs`, `BgmGameEndMonitor.cs`, `PreviewAudioManager.cs`, `BgmLoader.cs`, `HoldNoteProcessor.cs`).
+- Current managed source count is 108 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).

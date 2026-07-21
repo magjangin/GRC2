@@ -178,34 +178,19 @@ namespace GRC2.Injectors
                 
                 // mRythmGameMusicData를 BGM 길이에 맞게 조정 (필드 값은 유지)
                 AdjustMusicDataForBgmLength(__instance, logAdjustment: false);
-                
-                // 원본 메서드 실행 허용 (테스트용)
-                // TODO: 테스트 완료 후 다시 차단하도록 변경
-                return true; // false에서 true로 변경
+
+                // 원본 coMonitorGameEnd 코루틴을 차단 (무한 플레이 모드).
+                // BgmMonitorCoroutine이 BGM 재생 시간을 감시하다가 직접 requestCommonRythmGameEnd()를 호출한다.
+                // 여기서 true를 반환하면 원본도 자체적으로 게임 종료를 요청해 결과 씬 전환이 중복 발생한다.
+                return false;
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[BgmGameEndMonitor] MonitorGameEndPrefix 오류: {ex.Message}");
-                // 오류 발생 시에는 원본 실행 허용
-                return true; // false에서 true로 변경
+                // 오류 발생 시에는 원본 실행 허용 (모니터링 실패보다 게임 진행이 우선)
+                return true;
             }
         }
-        
-        /// <summary>
-        /// 플레이 씬 로드 시 4개 필드를 조정하는 공개 메서드
-        /// </summary>
-        
-        /// <summary>
-        /// mRythmGameMusicData를 BGM 길이에 맞게 조정하고 BGA 관련 필드도 조정
-        /// </summary>
-        
-        /// <summary>
-        /// BGA/비디오 관련 필드 조정
-        /// </summary>
-        
-        /// <summary>
-        /// 일반적인 게임 종료/클리어 관련 코루틴 후킹용 prefix
-        /// </summary>
-    }
+            }
 }
 
