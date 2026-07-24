@@ -112,6 +112,15 @@ namespace GRC2.Core
             }
         }
 
+        public override void OnUpdate()
+        {
+            if (!_isInitialized) return;
+
+            if (BgmBgaInjector.IsPlayScene())
+            {
+                PauseKeyHandler.HandlePauseKeyInput();
+            }
+        }
     }
 
     public partial class SceneDetector

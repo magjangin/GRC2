@@ -72,11 +72,5 @@ namespace GRC2.Injectors
                 MelonLogger.Warning($"[BgmFinishTimeManager] 게임 종료 시간 설정 오류: {ex.Message}");
             }
         }
-
-        public static void Reset()
-        {
-            _targetFinishTime = 0f;
-        }
     }
 }
-

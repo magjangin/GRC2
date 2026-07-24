@@ -137,16 +137,6 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// 현재 선택된 앨범의 BMS 파일 목록 가져오기
-        /// </summary>
-        public static List<string> GetCurrentBmsFiles()
-        {
-            if (_currentAlbum == null || _currentAlbum.BmsFiles == null || _currentAlbum.BmsFiles.Count == 0)
-                return new List<string>();
-            return _currentAlbum.BmsFiles.ToList();
-        }
-
-        /// <summary>
         /// 현재 선택된 앨범의 이미지 파일 가져오기
         /// </summary>
         public static string GetCurrentImageFile()

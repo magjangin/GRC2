@@ -546,9 +546,7 @@ namespace GRC2.Harmony.Hooks
 
         private sealed class MusicListItemSnapshot
         {
-            public object Index;
             public object MusicId;
-            public string MusicIdText = "null";
             public string SongTitle = "null";
             public string ArtistId = "null";
         }
@@ -619,10 +617,8 @@ namespace GRC2.Harmony.Hooks
                 return false;
 
             Type itemType = item.GetType();
-            FieldInfo indexField = itemType.GetField("mIndex", InstanceFieldFlags);
             FieldInfo musicSelectDataField = itemType.GetField("mMusicSelectData", InstanceFieldFlags);
 
-            snapshot.Index = indexField?.GetValue(item);
             object musicSelectData = musicSelectDataField?.GetValue(item);
             if (musicSelectData == null)
                 return false;
@@ -636,7 +632,6 @@ namespace GRC2.Harmony.Hooks
             object songTitle = songTitleField?.GetValue(musicSelectData);
             object artistId = artistIdField?.GetValue(musicSelectData);
 
-            snapshot.MusicIdText = snapshot.MusicId?.ToString() ?? "null";
             snapshot.SongTitle = songTitle?.ToString() ?? "null";
             snapshot.ArtistId = artistId?.ToString() ?? "null";
             return true;

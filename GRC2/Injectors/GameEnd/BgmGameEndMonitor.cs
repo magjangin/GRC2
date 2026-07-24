@@ -13,7 +13,7 @@ namespace GRC2.Injectors
     internal static partial class BgmGameEndMonitor
     {
         private static int _monitorGameEndCallCount = 0;
-        
+
         // Reflection 필드 정보 캐싱 (성능 최적화)
         private static FieldInfo _cachedMusicDataField = null;
         private static FieldInfo _cachedFadeOutEndSampleField = null;
@@ -36,13 +36,6 @@ namespace GRC2.Injectors
         // 메서드 정보 캐싱 (성능 최적화)
         private static MethodInfo _cachedGetAudioClipMethod = null;
         private static MethodInfo _cachedGetCurrentSampleMethod = null;
-        
-        public static int MonitorGameEndCallCount => _monitorGameEndCallCount;
-        
-        public static void IncrementMonitorGameEndCallCount()
-        {
-            _monitorGameEndCallCount++;
-        }
         
         /// <summary>
         /// Reflection 필드 정보를 캐싱 (성능 최적화)
