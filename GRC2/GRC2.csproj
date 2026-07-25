@@ -62,9 +62,7 @@
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
     <Compile Include="Harmony\Handlers\ArtworkUpdater.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
-    <Compile Include="Harmony\Handlers\CharactorLoadPatch.cs" />
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
-    <Compile Include="Harmony\Handlers\MusicTitlePatch.cs" />
     <Compile Include="Harmony\Handlers\PreviewAudioManager.cs" />
     <Compile Include="Harmony\Handlers\ResultSceneUpdaterPatch.cs" />
     <Compile Include="Harmony\Handlers\TextPatch.cs" />
@@ -79,13 +77,9 @@
     <Compile Include="Helpers\SteamApiHijacker.cs" />
     <Compile Include="Injectors\Bga\BgaBgmSyncManager.cs" />
     <Compile Include="Injectors\Bga\BgaInjector.cs" />
-    <Compile Include="Injectors\Bgm\BgmAudioStateChecker.cs" />
-    <Compile Include="Injectors\Bgm\BgmFormattingUtils.cs" />
     <Compile Include="Injectors\Bgm\BgmInjector.cs" />
     <Compile Include="Injectors\Bgm\BgmInjectorHooks.cs" />
     <Compile Include="Injectors\Bgm\BgmLoader.cs" />
-    <Compile Include="Injectors\Bgm\BgmMethodCallHooks.cs" />
-    <Compile Include="Injectors\Bgm\BgmMonitorCoroutine.cs" />
     <Compile Include="Injectors\Bgm\BgmSearcher.cs" />
     <Compile Include="Injectors\GameEnd\BgmFinishTimeManager.cs" />
     <Compile Include="Injectors\GameEnd\BgmGameEndMonitor.cs" />
@@ -103,6 +97,5 @@
     <Compile Include="Processors\HoldNoteProcessor.cs" />
     <Compile Include="Processors\NoteProcessorHelper.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\CustomChartHandler.cs" />
   </ItemGroup>
 </Project>

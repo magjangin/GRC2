@@ -37,15 +37,15 @@ Owner files:
 
 Patched game targets:
 
-- `IntiCreates.cMusicSelectScrollViewDataGetter.getMusicTitle`
-- `IntiCreates.cMusicSelectScrollView.initializeAllItemByCrrentMusicData`
+- `IntiCreates.cMusicSelectScrollView.initializeMusicDataByDefault` (postfix)
 
 Purpose:
 
 - make custom albums appear in the music select list;
-- inject custom items when the music select scroll view initializes its item list;
+- inject custom items after the game rebuilds its default list and before its
+  normal filter/sort pipeline runs;
 - register original artist first-song mappings used by custom artist handling;
-- replace displayed titles for custom music ids.
+- provide a stable original-song template for the pre-play window.
 
 Removal risk:
 
@@ -55,29 +55,25 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Registration/Patchers.cs` (`AudioClipPatcher`, `SelectingMusicUIPatcher`)
+- `GRC2/Harmony/Registration/Patchers.cs` (`AudioClipPatcher`, `PreMusicStartWindowPatcher`)
 - `GRC2/Harmony/Hooks/GameFlowHooks.cs`
 - `GRC2/Harmony/Handlers/AudioClipPatch.cs`
 
 Patched game targets:
 
 - `IntiCreates.cMusicSelectSceneUIUpdater.noticeChangedMusic`
-- `IntiCreates.cMusicSelectSceneUIUpdater.changeDifficulty`
 - `IntiCreates.cMusicSelectSceneUIUpdater.startRythmGame`
-- `IntiCreates.cMusicSelectSceneUIUpdater.coStartRythmGame`
 - `IntiCreates.cMusicSelectSceneUIUpdater.coOpenPreMusicStartWindow`
 - `IntiCreates.cMusicSelectSceneUIUpdater.backToPreScreen`
-- `IntiCreates.cMusicSelectSceneUIUpdater.openSortWindow`
-- `IntiCreates.cMusicSelectSceneUIUpdater.openFilterWindow`
-- `IntiCreates.cMusicSelectSceneSelectingMusicUI.coOpen`
-- `IntiCreates.cMusicSelectSceneSelectingMusicUI.coClose`
+- `IntiCreates.cMusicSelectPreMusicStartWindowManager.requestOpenWindow`
 
 Purpose:
 
 - detect the currently selected custom chart;
-- update preview audio and artwork state;
 - stop preview audio before gameplay;
-- keep custom selection state consistent when returning or opening UI windows.
+- map a custom id to a valid original song only while the game opens its
+  pre-play window;
+- replace the artwork after the real pre-play window has opened.
 
 Removal risk:
 
@@ -112,14 +108,12 @@ Owner files:
 
 - `GRC2/Harmony/Registration/Patchers.cs` (`CoverImagePatcher`, `TextPatcher`)
 - `GRC2/Harmony/Handlers/ArtWorkPatch.cs`
-- `GRC2/Harmony/Handlers/MusicTitlePatch.cs`
 - `GRC2/Harmony/Handlers/TextPatch.cs`
 
 Patched game targets:
 
 - `IntiCreates.cMusicSelectArtWork.requestSetArtworkSprite`
 - UI text setters discovered by `TextPatcher`
-- `IntiCreates.cMusicSelectScrollViewDataGetter.getMusicTitle`
 
 Purpose:
 
@@ -135,29 +129,18 @@ Owner files:
 
 - `GRC2/Injectors/Bgm/BgmInjector.cs`
 - `GRC2/Injectors/Bgm/BgmInjectorHooks.cs`
-- `GRC2/Injectors/Bgm/BgmMethodCallHooks.cs`
 - `GRC2/Injectors/GameEnd/*`
 
 Patched game targets:
 
-- `IntiCreates.cBGMBeatManager.setClip`
-- `IntiCreates.cBGMBeatManager.requestLoadBGM`
-- `IntiCreates.cBGMBeatManager.requestPlayAudio`
-- `IntiCreates.cBGMBeatManager.requestPause`
-- `IntiCreates.cBGMBeatManager.setBPM`
-- `IntiCreates.cBGMBeatManager.setSample`
-- `IntiCreates.cBGMBeatManager.setTime`
-- `IntiCreates.cBGMBeatManager.getAudioClip`
-- `IntiCreates.cBGMBeatManager.isReadyPlay`
-- `IntiCreates.cRythmGameManager.requestCommonRythmGameEnd`
 - `IntiCreates.cRythmGameManager.coMonitorGameEnd`
-- `IntiCreates.cRythmGameManager.coClearRythmGameEnd`
 
 Purpose:
 
 - replace gameplay BGM;
 - keep custom track timing from ending too early;
-- adjust result/game-end behavior for custom audio length.
+- wrap the original game-end coroutine so the game's score, clear animation,
+  fade, and scene transition remain intact.
 
 Removal risk:
 
@@ -204,6 +187,13 @@ of the current source baseline:
 - `MusicInjectionDebugger`
 - `NoteArrayJsonDumper`
 - `ProcessorDebugHarness`
+- `CharactorLoadPatcher`
+- `MusicTitlePatch`
+- `CustomChartHandler`
+- `BgmAudioStateChecker`
+- `BgmFormattingUtils`
+- `BgmMethodCallHooks`
+- `BgmMonitorCoroutine`
 
 ## Cleanup Log
 
@@ -227,6 +217,17 @@ of the current source baseline:
   `Hooks/NoteArray/`, `Handlers/PreviewAudio/`, and similar folders outside `Harmony/`).
 - Merged the six `Harmony/Registration/*Patcher.cs` files into
   `Harmony/Registration/Patchers.cs`; class names and hook behavior are unchanged.
+
+### 2026-07-26
+
+- Reduced every hook-focused source file over 500 lines below that threshold.
+- Moved music-list injection to the default-list postfix so the game's normal
+  filtering and sorting still run.
+- Removed unregistered, logging-only, and no-op selection/BGM hooks.
+- Replaced the game-end prefix override with a postfix coroutine wrapper that
+  preserves the original end-of-song flow.
+- Removed the unreachable character-load/title/custom-chart helpers and the
+  obsolete BGM diagnostic helper cluster.
 
 ### 2026-05-15
 

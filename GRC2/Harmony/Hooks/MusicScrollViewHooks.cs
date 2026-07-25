@@ -1,723 +1,393 @@
-using MelonLoader;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
-using UnityEngine;
 using GRC2.Core;
-using GRC2.Helpers;
+using MelonLoader;
 
 namespace GRC2.Harmony.Hooks
 {
     /// <summary>
-    /// cMusicSelectScrollView 및 cMusicSelectScrollViewItem 메서드 후킹
+    /// 원본 곡 목록이 다시 만들어진 직후 커스텀 곡을 추가합니다.
+    /// 필터/정렬보다 앞에서 실행되므로 커스텀 곡도 원본과 같은 목록 규칙을 따릅니다.
     /// </summary>
-    public static partial class MusicScrollViewHooks
+    public static class MusicScrollViewHooks
     {
-        // 상세 목록/리플렉션 로그는 기본 비활성화해서 런타임 로그 노이즈를 줄입니다.
-        private static bool IsVerboseLoggingEnabled => false;
+        private const BindingFlags InstanceFlags =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
-        private static void LogVerbose(string message)
+        // MusicID 0~53은 실제 곡, 54~511은 SAVEABLE_ID_END(512) 전의 빈 영역입니다.
+        private const int CustomMusicIdStart = 54;
+        private const int CustomMusicIdEnd = 511;
+
+        private static readonly string[] DifficultyOrder =
         {
-            if (IsVerboseLoggingEnabled)
-            {
-                MelonLogger.Msg(message);
-            }
-        }
-    }
+            "easy", "normal", "hard", "expert"
+        };
 
-    public static partial class MusicScrollViewHooks
-    {
-        private static void ApplyCustomMusicIdAndAlbumMappings(
-            MusicScrollInjectContext ctx,
-            AlbumInfo album,
-            int albumIndex,
-            object newMusicSelectData,
-            string templateSongTitleStr)
-        {
-            FieldInfo musicIdField = ctx.MusicIdField;
-            object templateMusicId = ctx.TemplateMusicId;
+        private static readonly Dictionary<object, TemplateSong> TemplateSongs =
+            new Dictionary<object, TemplateSong>();
 
-            object customMusicId = GenerateCustomMusicID(templateMusicId, album, albumIndex, musicIdField?.FieldType);
-
-            if (musicIdField != null && customMusicId != null)
-            {
-                try
-                {
-                    ApplyCompatibleMusicId(musicIdField, templateMusicId, customMusicId, album, newMusicSelectData, templateSongTitleStr);
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning($"[MusicScrollViewHooks]   MusicID 설정 실패: {ex.Message}, 템플릿 MusicID 사용");
-                    musicIdField.SetValue(newMusicSelectData, templateMusicId);
-                }
-            }
-            else if (musicIdField != null)
-            {
-                musicIdField.SetValue(newMusicSelectData, templateMusicId);
-            }
-        }
-
-        private static void ApplyCompatibleMusicId(
-            FieldInfo musicIdField,
-            object templateMusicId,
-            object customMusicId,
-            AlbumInfo album,
-            object newMusicSelectData,
-            string templateSongTitleStr)
-        {
-            Type targetType = musicIdField.FieldType;
-            Type customIdType = customMusicId.GetType();
-
-            if (targetType == customIdType || targetType.IsAssignableFrom(customIdType))
-            {
-                musicIdField.SetValue(newMusicSelectData, customMusicId);
-                AlbumManager.RegisterMusicIDToAlbum(customMusicId, album);
-
-                if (!string.IsNullOrWhiteSpace(templateSongTitleStr))
-                {
-                    AlbumManager.RegisterOriginalTitle(customMusicId, templateSongTitleStr);
-                    LogVerbose($"[MusicScrollViewHooks]   원본 제목 등록: {customMusicId} -> '{templateSongTitleStr}'");
-                }
-
-                LogVerbose($"[MusicScrollViewHooks]   커스텀 MusicID 설정: {customMusicId} (타입: {customIdType.Name}, 앨범: {album.AlbumName})");
-                return;
-            }
-
-            MelonLogger.Warning($"[MusicScrollViewHooks]   MusicID 타입 불일치: {customIdType.Name} -> {targetType.Name}, 템플릿 MusicID 사용");
-            musicIdField.SetValue(newMusicSelectData, templateMusicId);
-        }
-
-        private static object GenerateCustomMusicID(object templateMusicId, AlbumInfo album, int albumIndex, Type targetType)
+        public static void InitializeMusicDataByDefaultPostfix(object __instance)
         {
             try
             {
-                if (templateMusicId == null)
-                    return GenerateFallbackEnumId(targetType);
+                if (__instance == null || CustomAssetManager.IsSceneWhereInjectionDisallowed())
+                    return;
 
-                Type musicIdType = templateMusicId.GetType();
+                if (!TryGetCellList(__instance, out IList cellList) || cellList.Count == 0)
+                    return;
 
-                if (musicIdType.IsEnum || (targetType != null && targetType.IsEnum))
-                    return GenerateCustomEnumMusicId(musicIdType, targetType, albumIndex);
-
-                if (musicIdType == typeof(string) || (targetType != null && targetType == typeof(string)))
-                    return $"CUSTOM_{templateMusicId}_{album.AlbumName}_{albumIndex}";
-
-                if (musicIdType.IsPrimitive || musicIdType == typeof(int) || musicIdType == typeof(long))
-                    return GeneratePrimitiveMusicId(templateMusicId, musicIdType, albumIndex);
-
-                return templateMusicId;
+                // 이 시점의 목록에는 원본 곡만 있으므로 정렬/필터 상태에 흔들리지 않는 매핑이 됩니다.
+                RegisterArtistFirstSongs(cellList);
+                TemplateSongs.Clear();
+                InjectCustomMusic(cellList);
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"[MusicScrollViewHooks]   MusicID 생성 오류: {ex.Message}");
-                return templateMusicId;
+                MelonLogger.Warning($"[MusicScrollViewHooks] 커스텀 곡 목록 주입 오류: {ex.Message}");
             }
         }
 
-        private static object GenerateFallbackEnumId(Type targetType)
+        private static bool TryGetCellList(object instance, out IList cellList)
         {
-            if (targetType == null || !targetType.IsEnum)
-                return null;
+            FieldInfo listField = instance.GetType().GetField(
+                "mCellHaviableMusicDataList",
+                InstanceFlags);
 
-            Array enumValues = Enum.GetValues(targetType);
-            return enumValues.Length > 0 ? enumValues.GetValue(0) : null;
+            cellList = listField?.GetValue(instance) as IList;
+            return cellList != null;
         }
 
-        private static object GenerateCustomEnumMusicId(Type musicIdType, Type targetType, int albumIndex)
+        private static void RegisterArtistFirstSongs(IList cellList)
         {
-            Type enumType = targetType != null && targetType.IsEnum ? targetType : musicIdType;
-            Array enumValues = Enum.GetValues(enumType);
-            if (enumValues.Length == 0)
-                return null;
+            var seenArtists = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            int customIntValue = CustomMusicIdStartValue + albumIndex - 1;
-            if (customIntValue <= CustomMusicIdEndValue)
+            foreach (object item in cellList)
             {
-                LogVerbose($"[MusicScrollViewHooks]   커스텀 enum 값 생성: 숫자 {customIntValue} (범위: {CustomMusicIdStartValue}-{CustomMusicIdEndValue}, 앨범 인덱스: {albumIndex})");
-            }
-            else
-            {
-                int offset = albumIndex - (CustomMusicIdEndValue - CustomMusicIdStartValue + 1);
-                customIntValue = CustomMusicIdOverflowBaseValue + offset;
-                LogVerbose($"[MusicScrollViewHooks]   커스텀 enum 값 생성: 숫자 {customIntValue} (10000 이상, 앨범 인덱스: {albumIndex}, 오프셋: {offset})");
-            }
+                if (!TryGetMusicSelectData(item, out object musicData))
+                    continue;
 
-            object customId = Enum.ToObject(enumType, customIntValue);
-            LogVerbose($"[MusicScrollViewHooks]   최종 커스텀 MusicID: {customId} (숫자: {customIntValue})");
-            return customId;
-        }
+                Type dataType = musicData.GetType();
+                object artistId = GetFieldValue(dataType, musicData, "artistID");
+                object musicId = GetFieldValue(dataType, musicData, "musicID");
+                string title = GetFieldValue(dataType, musicData, "songTitle")?.ToString();
+                string artistKey = artistId?.ToString();
 
-        private static object GeneratePrimitiveMusicId(object templateMusicId, Type musicIdType, int albumIndex)
-        {
-            try
-            {
-                long baseValue = Convert.ToInt64(templateMusicId);
-                long newValue = baseValue + albumIndex;
-                return Convert.ChangeType(newValue, musicIdType);
-            }
-            catch (Exception)
-            {
-                return templateMusicId;
+                if (string.IsNullOrWhiteSpace(artistKey) ||
+                    musicId == null ||
+                    string.IsNullOrWhiteSpace(title) ||
+                    !seenArtists.Add(artistKey))
+                {
+                    continue;
+                }
+
+                AlbumManager.RegisterArtistFirstSong(artistKey, musicId, title);
             }
         }
-    }
 
-    public static partial class MusicScrollViewHooks
-    {
-        /// <summary>InjectCustomMusicToCellList 한 사이클에 필요한 리플렉션/템플릿 상태.</summary>
-        private sealed class MusicScrollInjectContext
+        private static void InjectCustomMusic(IList cellList)
         {
-            public Dictionary<string, AlbumInfo> AllAlbums;
-            public object TemplateItem;
-            public Type ItemType;
-            public FieldInfo IndexField;
-            public FieldInfo MusicSelectDataField;
-            public object TemplateMusicSelectData;
-            public Type MusicSelectDataType;
-            public FieldInfo MusicIdField;
-            public FieldInfo SongTitleField;
-            public object TemplateMusicId;
-            public ConstructorInfo ItemConstructor;
-            public ConstructorInfo MsConstructor;
-        }
+            var albums = AlbumManager.GetAllAlbums();
+            if (albums == null || albums.Count == 0)
+                return;
 
-        private sealed class MusicSelectDataFields
-        {
-            public Type Type;
-            public FieldInfo MusicIdField;
-            public FieldInfo SongTitleField;
-            public object TemplateMusicId;
-        }
+            if (!TryCreateContext(cellList[0], out InjectContext context))
+                return;
 
-        private sealed class ScrollItemTemplate
-        {
-            public object TemplateItem;
-            public Type ItemType;
-            public FieldInfo IndexField;
-            public FieldInfo MusicSelectDataField;
-            public object TemplateMusicSelectData;
-            public ConstructorInfo ItemConstructor;
-        }
-
-        private static bool TryBuildMusicScrollInjectContext(IList cellList, out MusicScrollInjectContext ctx)
-        {
-            ctx = null;
-
-            if (cellList == null || cellList.Count == 0)
+            int injectedCount = 0;
+            foreach (AlbumInfo album in albums.Values)
             {
-                LogVerbose("[MusicScrollViewHooks]   곡 목록이 비어있어 주입할 수 없습니다.");
+                int customIdValue = CustomMusicIdStart + injectedCount;
+                if (customIdValue > CustomMusicIdEnd)
+                {
+                    MelonLogger.Warning(
+                        $"[MusicScrollViewHooks] 커스텀 MusicID 공간이 부족해 나머지 곡을 건너뜁니다. " +
+                        $"최대 {CustomMusicIdEnd - CustomMusicIdStart + 1}곡");
+                    break;
+                }
+
+                if (TryCreateCustomItem(context, album, customIdValue, cellList.Count, out object newItem))
+                {
+                    cellList.Add(newItem);
+                    injectedCount++;
+                }
+            }
+
+            MelonLogger.Msg(
+                $"[MusicScrollViewHooks] 커스텀 곡 주입 완료: {injectedCount}개 (총 {cellList.Count}개)");
+        }
+
+        private static bool TryCreateContext(object templateItem, out InjectContext context)
+        {
+            context = null;
+            if (templateItem == null || !TryGetMusicSelectData(templateItem, out object templateData))
                 return false;
-            }
-
-            var allAlbums = AlbumManager.GetAllAlbums();
-            if (allAlbums == null || allAlbums.Count == 0)
-            {
-                LogVerbose("[MusicScrollViewHooks]   앨범이 없어 주입할 수 없습니다.");
-                return false;
-            }
-
-            if (!TryReadScrollItemTemplate(cellList, out ScrollItemTemplate itemTemplate))
-                return false;
-
-            if (!TryReadMusicSelectDataFields(itemTemplate.TemplateMusicSelectData, out MusicSelectDataFields msFields))
-            {
-                MelonLogger.Warning("[MusicScrollViewHooks]   MusicSelectData의 필수 필드를 찾을 수 없습니다.");
-                return false;
-            }
-
-            LogVerbose($"[MusicScrollViewHooks]   🎵 커스텀 곡 주입 시작 (템플릿 MusicID: {msFields.TemplateMusicId}, 앨범 수: {allAlbums.Count})");
-
-            ctx = CreateInjectContext(allAlbums, itemTemplate, msFields);
-            return true;
-        }
-
-        private static MusicScrollInjectContext CreateInjectContext(
-            Dictionary<string, AlbumInfo> allAlbums,
-            ScrollItemTemplate itemTemplate,
-            MusicSelectDataFields msFields)
-        {
-            return new MusicScrollInjectContext
-            {
-                AllAlbums = allAlbums,
-                TemplateItem = itemTemplate.TemplateItem,
-                ItemType = itemTemplate.ItemType,
-                IndexField = itemTemplate.IndexField,
-                MusicSelectDataField = itemTemplate.MusicSelectDataField,
-                TemplateMusicSelectData = itemTemplate.TemplateMusicSelectData,
-                MusicSelectDataType = msFields.Type,
-                MusicIdField = msFields.MusicIdField,
-                SongTitleField = msFields.SongTitleField,
-                TemplateMusicId = msFields.TemplateMusicId,
-                ItemConstructor = itemTemplate.ItemConstructor,
-                MsConstructor = ResolveMusicSelectDataConstructor(msFields.Type)
-            };
-        }
-
-        private static bool TryReadScrollItemTemplate(IList cellList, out ScrollItemTemplate itemTemplate)
-        {
-            itemTemplate = null;
-            object templateItem = cellList[0];
-            if (templateItem == null)
-            {
-                MelonLogger.Warning("[MusicScrollViewHooks]   템플릿 항목이 null입니다.");
-                return false;
-            }
 
             Type itemType = templateItem.GetType();
-            FieldInfo indexField = itemType.GetField("mIndex", InstanceMemberFlags);
-            FieldInfo musicSelectDataField = itemType.GetField("mMusicSelectData", InstanceMemberFlags);
+            Type dataType = templateData.GetType();
+            FieldInfo indexField = itemType.GetField("mIndex", InstanceFlags);
+            FieldInfo dataField = itemType.GetField("mMusicSelectData", InstanceFlags);
+            FieldInfo musicIdField = dataType.GetField("musicID", InstanceFlags);
 
-            if (indexField == null || musicSelectDataField == null)
+            if (indexField == null || dataField == null || musicIdField == null || !musicIdField.FieldType.IsEnum)
             {
-                MelonLogger.Warning("[MusicScrollViewHooks]   필수 필드를 찾을 수 없습니다.");
+                MelonLogger.Warning("[MusicScrollViewHooks] 곡 목록 필수 필드를 찾지 못했습니다.");
                 return false;
             }
 
-            return TryCreateScrollItemTemplate(templateItem, itemType, indexField, musicSelectDataField, out itemTemplate);
-        }
+            ConstructorInfo itemConstructor = itemType.GetConstructor(
+                InstanceFlags,
+                binder: null,
+                types: new[] { typeof(int), dataType },
+                modifiers: null);
 
-        private static bool TryCreateScrollItemTemplate(
-            object templateItem,
-            Type itemType,
-            FieldInfo indexField,
-            FieldInfo musicSelectDataField,
-            out ScrollItemTemplate itemTemplate)
-        {
-            itemTemplate = null;
-            object templateMusicSelectData = musicSelectDataField.GetValue(templateItem);
-            if (templateMusicSelectData == null)
-            {
-                MelonLogger.Warning("[MusicScrollViewHooks]   템플릿 MusicSelectData가 null입니다.");
-                return false;
-            }
-
-            ConstructorInfo itemConstructor = ResolveScrollItemConstructor(itemType);
             if (itemConstructor == null)
             {
-                MelonLogger.Warning("[MusicScrollViewHooks]   적절한 생성자를 찾을 수 없습니다.");
+                MelonLogger.Warning("[MusicScrollViewHooks] MusicSelectScrollItemData 생성자를 찾지 못했습니다.");
                 return false;
             }
 
-            itemTemplate = new ScrollItemTemplate
+            context = new InjectContext
             {
-                TemplateItem = templateItem,
-                ItemType = itemType,
+                TemplateData = templateData,
+                DataType = dataType,
                 IndexField = indexField,
-                MusicSelectDataField = musicSelectDataField,
-                TemplateMusicSelectData = templateMusicSelectData,
+                MusicIdField = musicIdField,
                 ItemConstructor = itemConstructor
             };
             return true;
         }
 
-        private static bool TryReadMusicSelectDataFields(object templateMusicSelectData, out MusicSelectDataFields fields)
+        private static bool TryCreateCustomItem(
+            InjectContext context,
+            AlbumInfo album,
+            int customIdValue,
+            int newIndex,
+            out object newItem)
         {
-            Type musicSelectDataType = templateMusicSelectData.GetType();
-            FieldInfo musicIdField = musicSelectDataType.GetField("musicID", InstanceMemberFlags);
-            FieldInfo songTitleField = musicSelectDataType.GetField("songTitle", InstanceMemberFlags);
-
-            if (musicIdField == null || songTitleField == null)
-            {
-                fields = null;
+            newItem = null;
+            if (album == null)
                 return false;
-            }
 
-            fields = new MusicSelectDataFields
-            {
-                Type = musicSelectDataType,
-                MusicIdField = musicIdField,
-                SongTitleField = songTitleField,
-                TemplateMusicId = musicIdField.GetValue(templateMusicSelectData)
-            };
+            object musicData = CloneBoxedValue(context.TemplateData);
+            if (musicData == null)
+                return false;
+
+            string title = album.SongInfo?.Title ?? album.AlbumName ?? "커스텀 곡";
+            object customMusicId = Enum.ToObject(context.MusicIdField.FieldType, customIdValue);
+
+            context.MusicIdField.SetValue(musicData, customMusicId);
+            ApplyTitleFields(context.DataType, musicData, title);
+            ApplyDifficultyLevels(context.DataType, musicData, album);
+            ApplyAlbumMetadata(context.DataType, musicData, album, customIdValue);
+            ResetPerSongProgress(context.DataType, musicData);
+
+            newItem = context.ItemConstructor.Invoke(new[] { (object)newIndex, musicData });
+            context.IndexField.SetValue(newItem, newIndex);
+
+            AlbumManager.RegisterMusicIDToAlbum(customMusicId, album);
+            RegisterTemplateSong(context, album, customMusicId);
             return true;
         }
 
-        private static ConstructorInfo ResolveScrollItemConstructor(Type itemType)
+        internal static bool TryGetTemplateSong(
+            object customMusicId,
+            out object templateMusicId,
+            out string templateTitle)
         {
-            ConstructorInfo[] constructors = itemType.GetConstructors(InstanceMemberFlags);
-            foreach (var constructor in constructors)
+            templateMusicId = null;
+            templateTitle = null;
+
+            if (customMusicId == null ||
+                !TemplateSongs.TryGetValue(customMusicId, out TemplateSong song))
             {
-                ParameterInfo[] parameters = constructor.GetParameters();
-                if (parameters.Length == 2)
-                    return constructor;
-            }
-            return null;
-        }
-
-        private static ConstructorInfo ResolveMusicSelectDataConstructor(Type musicSelectDataType)
-        {
-            ConstructorInfo[] msConstructors = musicSelectDataType.GetConstructors(InstanceMemberFlags);
-            LogMusicSelectDataConstructors(msConstructors);
-
-            return FindDefaultMusicSelectDataConstructor(msConstructors) ??
-                FindCopyMusicSelectDataConstructor(msConstructors, musicSelectDataType);
-        }
-
-        private static void LogMusicSelectDataConstructors(ConstructorInfo[] constructors)
-        {
-            LogVerbose($"[MusicScrollViewHooks]   MusicSelectData 생성자 개수: {constructors.Length}");
-
-            foreach (var constructor in constructors)
-            {
-                ParameterInfo[] parameters = constructor.GetParameters();
-                string paramInfo = string.Join(", ", parameters.Select(p => $"{p.ParameterType.Name} {p.Name}"));
-                LogVerbose($"[MusicScrollViewHooks]   생성자: 파라미터 수={parameters.Length}, ({paramInfo})");
-            }
-        }
-
-        private static ConstructorInfo FindDefaultMusicSelectDataConstructor(ConstructorInfo[] constructors)
-        {
-            foreach (var constructor in constructors)
-            {
-                if (constructor.GetParameters().Length == 0)
-                {
-                    LogVerbose("[MusicScrollViewHooks]   ✅ 기본 생성자 발견 (파라미터 0개)");
-                    return constructor;
-                }
-            }
-
-            return null;
-        }
-
-        private static ConstructorInfo FindCopyMusicSelectDataConstructor(ConstructorInfo[] constructors, Type musicSelectDataType)
-        {
-            foreach (var constructor in constructors)
-            {
-                ParameterInfo[] parameters = constructor.GetParameters();
-                if (parameters.Length == 1 && parameters[0].ParameterType == musicSelectDataType)
-                {
-                    LogVerbose("[MusicScrollViewHooks]   ✅ 복사 생성자 발견 (파라미터 1개)");
-                    return constructor;
-                }
-            }
-
-            return null;
-        }
-    }
-
-    public static partial class MusicScrollViewHooks
-    {
-        private static void ProcessSingleAlbumInject(
-            MusicScrollInjectContext ctx,
-            AlbumInfo album,
-            string albumTitle,
-            int albumIndex,
-            int totalAlbums,
-            IList cellList,
-            ref int injectedCount)
-        {
-            object newMusicSelectData = CreateNewMusicSelectData(ctx);
-            if (newMusicSelectData == null)
-            {
-                MelonLogger.Warning("[MusicScrollViewHooks]   MusicSelectData 생성 실패");
-                return;
-            }
-
-            if (ctx.SongTitleField != null)
-                ctx.SongTitleField.SetValue(newMusicSelectData, albumTitle);
-
-            ApplyMusicLvArrayFromAlbumSongInfo(album, newMusicSelectData, ctx);
-
-            object templateSongTitle = ctx.SongTitleField.GetValue(ctx.TemplateMusicSelectData);
-            string templateSongTitleStr = templateSongTitle?.ToString() ?? "";
-            ApplyCustomMusicIdAndAlbumMappings(ctx, album, albumIndex, newMusicSelectData, templateSongTitleStr);
-
-            object newItem = CreateInjectedScrollItem(ctx, newMusicSelectData, cellList, injectedCount);
-            cellList.Add(newItem);
-            injectedCount++;
-
-            LogVerbose($"[MusicScrollViewHooks]   ✅ [{albumIndex}/{totalAlbums}] '{albumTitle}' 추가 완료 (앨범: {album.AlbumName})");
-        }
-
-        private static object CreateInjectedScrollItem(
-            MusicScrollInjectContext ctx,
-            object newMusicSelectData,
-            IList cellList,
-            int injectedCount)
-        {
-            object templateIndex = ctx.IndexField.GetValue(ctx.TemplateItem);
-            object newItem = ctx.ItemConstructor.Invoke(new object[] { templateIndex, newMusicSelectData });
-
-            int newIndex = cellList.Count + injectedCount;
-            ctx.IndexField.SetValue(newItem, newIndex);
-            return newItem;
-        }
-
-        private static void ApplyMusicLvArrayFromAlbumSongInfo(
-            AlbumInfo album,
-            object newMusicSelectData,
-            MusicScrollInjectContext ctx)
-        {
-            if (album.SongInfo?.DifficultyNumbers == null || album.SongInfo.DifficultyNumbers.Count == 0)
-                return;
-
-            try
-            {
-                FieldInfo musicLVArrayField = ctx.MusicSelectDataType.GetField("musicLVArray", InstanceMemberFlags);
-                if (musicLVArrayField == null)
-                    return;
-
-                int[] newLVArray = CreateDifficultyArrayFromTemplate(ctx, musicLVArrayField);
-                ApplyAlbumDifficulties(album, newLVArray);
-                musicLVArrayField.SetValue(newMusicSelectData, newLVArray);
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[MusicScrollViewHooks]   musicLVArray 설정 실패: {ex.Message}");
-            }
-        }
-
-        private static int[] CreateDifficultyArrayFromTemplate(MusicScrollInjectContext ctx, FieldInfo musicLVArrayField)
-        {
-            object templateLVArray = musicLVArrayField.GetValue(ctx.TemplateMusicSelectData);
-            if (templateLVArray is int[] templateArray && templateArray.Length >= 4)
-            {
-                int[] newLVArray = new int[templateArray.Length];
-                Array.Copy(templateArray, newLVArray, templateArray.Length);
-                return newLVArray;
-            }
-
-            return new int[4];
-        }
-
-        private static void ApplyAlbumDifficulties(AlbumInfo album, int[] newLVArray)
-        {
-            for (int i = 0; i < DifficultyOrder.Length && i < newLVArray.Length; i++)
-            {
-                string difficultyName = DifficultyOrder[i];
-                if (album.SongInfo.DifficultyNumbers.ContainsKey(difficultyName))
-                    newLVArray[i] = album.SongInfo.DifficultyNumbers[difficultyName];
-            }
-        }
-
-    }
-
-    public static partial class MusicScrollViewHooks
-    {
-        private const BindingFlags InstanceMemberFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-        private const int CustomMusicIdStartValue = 54;
-        private const int CustomMusicIdEndValue = 511;
-        private const int CustomMusicIdOverflowBaseValue = 10000;
-        private static readonly string[] DifficultyOrder = { "easy", "normal", "hard", "expert" };
-
-        private static void InjectCustomMusicToCellList(object scrollViewInstance, IList cellList)
-        {
-            try
-            {
-                if (!TryBuildMusicScrollInjectContext(cellList, out MusicScrollInjectContext ctx))
-                    return;
-
-                int injectedCount = 0;
-                int albumIndex = 0;
-                int totalAlbums = ctx.AllAlbums.Count;
-
-                foreach (var album in ctx.AllAlbums.Values)
-                {
-                    albumIndex++;
-                    string albumTitle = album.SongInfo?.Title ?? album.AlbumName ?? "커스텀 곡";
-                    LogVerbose($"[MusicScrollViewHooks]   앨범 [{albumIndex}/{totalAlbums}]: '{album.AlbumName}', 곡 제목: '{albumTitle}'");
-
-                    try
-                    {
-                        ProcessSingleAlbumInject(ctx, album, albumTitle, albumIndex, totalAlbums, cellList, ref injectedCount);
-                    }
-                    catch (Exception ex)
-                    {
-                        MelonLogger.Warning($"[MusicScrollViewHooks]   앨범 '{album.AlbumName}' 주입 실패: {ex.Message}");
-                    }
-                }
-
-                MelonLogger.Msg($"[MusicScrollViewHooks] 커스텀 곡 주입 완료: {injectedCount}개 추가 (총 {cellList.Count}개)");
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[MusicScrollViewHooks]   커스텀 곡 주입 오류: {ex.Message}");
-                MelonLogger.Warning($"[MusicScrollViewHooks]   스택 트레이스: {ex.StackTrace}");
-            }
-        }
-
-    }
-
-    public static partial class MusicScrollViewHooks
-    {
-        private const BindingFlags InstanceFieldFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-
-        private sealed class MusicListItemSnapshot
-        {
-            public object MusicId;
-            public string SongTitle = "null";
-            public string ArtistId = "null";
-        }
-
-        public static void InitializeAllItemByCrrentMusicDataPrefix(object __instance, bool isSceneFirst)
-        {
-            try
-            {
-                // SoundPlayerScene / MoviePlayer_MovieSelect는 곡 리스트가 있지만 곡 선택 씬이 아님 → 커스텀 트랙 주입 금지
-                if (CustomAssetManager.IsSceneWhereInjectionDisallowed())
-                {
-                    LogVerbose("[MusicScrollViewHooks] 곡 리스트 씬이지만 곡 선택 씬이 아님 - 커스텀 트랙 주입 건너뜀");
-                    return;
-                }
-
-                LogVerbose("===========================================");
-                LogVerbose("[MusicScrollViewHooks] 🔄 initializeAllItemByCrrentMusicData() 호출됨");
-                LogVerbose($"[MusicScrollViewHooks]   인스턴스: {__instance?.GetType().Name ?? "null"}");
-                LogVerbose($"[MusicScrollViewHooks]   isSceneFirst: {isSceneFirst}");
-                
-                if (TryGetCellList(__instance, out IList list))
-                {
-                    RegisterArtistFirstSongs(list);
-                    InjectCustomMusicToCellList(__instance, list);
-                }
-                
-                LogVerbose("===========================================");
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[MusicScrollViewHooks] initializeAllItemByCrrentMusicData 오류: {ex.Message}");
-            }
-        }
-
-        private static bool TryGetCellList(object instance, out IList list)
-        {
-            list = null;
-            if (instance == null)
                 return false;
+            }
 
-            FieldInfo cellListField = instance.GetType().GetField("mCellHaviableMusicDataList", InstanceFieldFlags);
-            object cellList = cellListField?.GetValue(instance);
-            list = cellList as IList;
-            return list != null;
+            templateMusicId = song.MusicId;
+            templateTitle = song.Title;
+            return templateMusicId != null;
         }
 
-        private static void RegisterArtistFirstSongs(IList list)
+        private static void RegisterTemplateSong(
+            InjectContext context,
+            AlbumInfo album,
+            object customMusicId)
         {
-            HashSet<string> seenArtistIds = new HashSet<string>();
+            object templateMusicId = GetFieldValue(
+                context.DataType,
+                context.TemplateData,
+                "musicID");
+            string templateTitle = GetFieldValue(
+                context.DataType,
+                context.TemplateData,
+                "songTitle")?.ToString();
 
-            for (int i = 0; i < list.Count; i++)
+            string artistId = album.SongInfo?.Character;
+            if (string.IsNullOrWhiteSpace(artistId))
+                artistId = album.SongInfo?.Artist;
+
+            var artistSong = AlbumManager.GetArtistFirstSong(artistId);
+            if (artistSong != null)
             {
-                object item = list[i];
-                if (!TryReadMusicListItemSnapshot(item, out MusicListItemSnapshot snapshot))
-                    continue;
+                templateMusicId = artistSong.Value.musicId;
+                templateTitle = artistSong.Value.title;
+            }
 
-                if (snapshot.ArtistId == "null" || !seenArtistIds.Add(snapshot.ArtistId))
-                    continue;
+            if (templateMusicId == null)
+                return;
 
-                AlbumManager.RegisterArtistFirstSong(snapshot.ArtistId, snapshot.MusicId, snapshot.SongTitle);
+            TemplateSongs[customMusicId] = new TemplateSong
+            {
+                MusicId = templateMusicId,
+                Title = templateTitle
+            };
+
+            if (!string.IsNullOrWhiteSpace(templateTitle))
+                AlbumManager.RegisterOriginalTitle(templateMusicId, templateTitle);
+        }
+
+        private static object CloneBoxedValue(object source)
+        {
+            MethodInfo cloneMethod = typeof(object).GetMethod(
+                "MemberwiseClone",
+                BindingFlags.NonPublic | BindingFlags.Instance);
+            return cloneMethod?.Invoke(source, null);
+        }
+
+        private static void ApplyTitleFields(Type dataType, object data, string title)
+        {
+            SetFieldIfPresent(dataType, data, "songTitle", title);
+            SetFieldIfPresent(dataType, data, "songTitleForSort", title);
+            // 루비는 일본어 제목의 읽기 표기용이며 목록에서 제목 위에 작게 노출됩니다.
+            // 커스텀 곡에는 별도 읽기 표기를 사용하지 않으므로 비워 둡니다.
+            SetFieldIfPresent(dataType, data, "songTitleRuby", string.Empty);
+            SetFieldIfPresent(dataType, data, "songTitleRubyDirect", string.Empty);
+        }
+
+        private static void ApplyDifficultyLevels(Type dataType, object data, AlbumInfo album)
+        {
+            FieldInfo levelField = dataType.GetField("musicLVArray", InstanceFlags);
+            if (levelField == null)
+                return;
+
+            int length = (levelField.GetValue(data) as int[])?.Length ?? DifficultyOrder.Length;
+            var levels = new int[Math.Max(length, DifficultyOrder.Length)];
+
+            for (int i = 0; i < DifficultyOrder.Length; i++)
+            {
+                if (album.SongInfo?.DifficultyNumbers != null &&
+                    album.SongInfo.DifficultyNumbers.TryGetValue(DifficultyOrder[i], out int level))
+                {
+                    levels[i] = level;
+                }
+            }
+
+            levelField.SetValue(data, levels);
+        }
+
+        private static void ApplyAlbumMetadata(Type dataType, object data, AlbumInfo album, int customIdValue)
+        {
+            SetFieldIfPresent(dataType, data, "isFull", false);
+            SetFieldIfPresent(dataType, data, "isCurrentLock", false);
+            SetFieldIfPresent(dataType, data, "isNeedDispNew", false);
+            SetFieldIfPresent(dataType, data, "haveMV", album.BgaFiles != null && album.BgaFiles.Count > 0);
+            SetFieldIfPresent(dataType, data, "defaultSortPrio", 10000f + customIdValue);
+            TrySetEnumField(dataType, data, "sorceTitle", "OTHER");
+
+            string character = album.SongInfo?.Character;
+            if (string.IsNullOrWhiteSpace(character))
+                return;
+
+            TrySetEnumField(dataType, data, "artistID", NormalizeCharacterName(character));
+        }
+
+        private static string NormalizeCharacterName(string value)
+        {
+            string normalized = value?.Trim() ?? string.Empty;
+            if (normalized.Equals("르호", StringComparison.OrdinalIgnoreCase) ||
+                normalized.Equals("Morpho", StringComparison.OrdinalIgnoreCase))
+                return "Morpho";
+            if (normalized.Equals("Roro", StringComparison.OrdinalIgnoreCase))
+                return "Roro";
+            if (normalized.Equals("룩시아", StringComparison.OrdinalIgnoreCase) ||
+                normalized.Equals("Luxair", StringComparison.OrdinalIgnoreCase))
+                return "Luxair";
+            return normalized;
+        }
+
+        private static void ResetPerSongProgress(Type dataType, object data)
+        {
+            ResetArrayField(dataType, data, "highScoreArray");
+            ResetArrayField(dataType, data, "clearBadgeArray");
+        }
+
+        private static void ResetArrayField(Type dataType, object data, string fieldName)
+        {
+            FieldInfo field = dataType.GetField(fieldName, InstanceFlags);
+            if (field == null || !field.FieldType.IsArray)
+                return;
+
+            Array current = field.GetValue(data) as Array;
+            int length = current?.Length ?? DifficultyOrder.Length;
+            Array empty = Array.CreateInstance(field.FieldType.GetElementType(), length);
+            field.SetValue(data, empty);
+        }
+
+        private static void TrySetEnumField(Type dataType, object data, string fieldName, string enumName)
+        {
+            FieldInfo field = dataType.GetField(fieldName, InstanceFlags);
+            if (field == null || !field.FieldType.IsEnum || string.IsNullOrWhiteSpace(enumName))
+                return;
+
+            try
+            {
+                object enumValue = Enum.Parse(field.FieldType, enumName, ignoreCase: true);
+                field.SetValue(data, enumValue);
+            }
+            catch
+            {
+                // 알려지지 않은 캐릭터/시리즈는 안정적인 템플릿 값을 유지합니다.
             }
         }
 
-        private static bool TryReadMusicListItemSnapshot(object item, out MusicListItemSnapshot snapshot)
+        private static bool TryGetMusicSelectData(object item, out object musicData)
         {
-            snapshot = new MusicListItemSnapshot();
+            musicData = null;
             if (item == null)
                 return false;
 
-            Type itemType = item.GetType();
-            FieldInfo musicSelectDataField = itemType.GetField("mMusicSelectData", InstanceFieldFlags);
-
-            object musicSelectData = musicSelectDataField?.GetValue(item);
-            if (musicSelectData == null)
-                return false;
-
-            Type musicSelectDataType = musicSelectData.GetType();
-            FieldInfo musicIdField = musicSelectDataType.GetField("musicID", InstanceFieldFlags);
-            FieldInfo songTitleField = musicSelectDataType.GetField("songTitle", InstanceFieldFlags);
-            FieldInfo artistIdField = FindArtistIdField(musicSelectDataType);
-
-            snapshot.MusicId = musicIdField?.GetValue(musicSelectData);
-            object songTitle = songTitleField?.GetValue(musicSelectData);
-            object artistId = artistIdField?.GetValue(musicSelectData);
-
-            snapshot.SongTitle = songTitle?.ToString() ?? "null";
-            snapshot.ArtistId = artistId?.ToString() ?? "null";
-            return true;
+            FieldInfo field = item.GetType().GetField("mMusicSelectData", InstanceFlags);
+            musicData = field?.GetValue(item);
+            return musicData != null;
         }
 
-        private static FieldInfo FindArtistIdField(Type musicSelectDataType)
+        private static object GetFieldValue(Type type, object instance, string fieldName)
         {
-            return musicSelectDataType.GetField("artistID", InstanceFieldFlags) ??
-                musicSelectDataType.GetField("mArtistID", InstanceFieldFlags) ??
-                musicSelectDataType.GetField("artistId", InstanceFieldFlags) ??
-                musicSelectDataType.GetField("mArtistId", InstanceFieldFlags);
+            return type.GetField(fieldName, InstanceFlags)?.GetValue(instance);
         }
 
-    }
-
-    public static partial class MusicScrollViewHooks
-    {
-        private static object CreateNewMusicSelectData(MusicScrollInjectContext ctx)
+        private static void SetFieldIfPresent(Type type, object instance, string fieldName, object value)
         {
-            ConstructorInfo msConstructor = ctx.MsConstructor;
-
-            if (msConstructor != null)
-                return CreateMusicSelectDataFromConstructor(ctx, msConstructor);
-
-            return CloneTemplateMusicSelectData(ctx.TemplateMusicSelectData);
+            FieldInfo field = type.GetField(fieldName, InstanceFlags);
+            if (field != null && value != null && field.FieldType.IsInstanceOfType(value))
+                field.SetValue(instance, value);
         }
 
-        private static object CreateMusicSelectDataFromConstructor(MusicScrollInjectContext ctx, ConstructorInfo msConstructor)
+        private sealed class InjectContext
         {
-            ParameterInfo[] constructorParams = msConstructor.GetParameters();
-
-            if (constructorParams.Length == 0)
-            {
-                object newMusicSelectData = msConstructor.Invoke(null);
-                CopyMusicSelectDataFieldsFromTemplate(ctx.MusicSelectDataType, ctx.TemplateMusicSelectData, newMusicSelectData);
-                return newMusicSelectData;
-            }
-
-            if (constructorParams.Length == 1 && constructorParams[0].ParameterType == ctx.MusicSelectDataType)
-                return msConstructor.Invoke(new object[] { ctx.TemplateMusicSelectData });
-
-            MelonLogger.Warning($"[MusicScrollViewHooks]   지원하지 않는 생성자 파라미터: {constructorParams.Length}개");
-            return null;
+            public object TemplateData;
+            public Type DataType;
+            public FieldInfo IndexField;
+            public FieldInfo MusicIdField;
+            public ConstructorInfo ItemConstructor;
         }
 
-        private static object CloneTemplateMusicSelectData(object templateMusicSelectData)
+        private sealed class TemplateSong
         {
-            try
-            {
-                MethodInfo memberwiseClone = typeof(object).GetMethod("MemberwiseClone",
-                    BindingFlags.NonPublic | BindingFlags.Instance);
-                if (memberwiseClone != null)
-                {
-                    object cloned = memberwiseClone.Invoke(templateMusicSelectData, null);
-                    LogVerbose("[MusicScrollViewHooks]   ✅ MemberwiseClone으로 MusicSelectData 복사 성공");
-                    return cloned;
-                }
-
-                MelonLogger.Warning("[MusicScrollViewHooks]   MemberwiseClone을 찾을 수 없습니다.");
-                return null;
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[MusicScrollViewHooks]   MemberwiseClone 실패: {ex.Message}");
-                return null;
-            }
-        }
-
-        private static void CopyMusicSelectDataFieldsFromTemplate(
-            Type musicSelectDataType,
-            object templateMusicSelectData,
-            object newMusicSelectData)
-        {
-            FieldInfo[] msFields = musicSelectDataType.GetFields(InstanceMemberFlags);
-            foreach (var field in msFields)
-            {
-                try
-                {
-                    object value = field.GetValue(templateMusicSelectData);
-                    field.SetValue(newMusicSelectData, value);
-                }
-                catch (Exception)
-                {
-                    // 필드 단위 복사 불가(읽기 전용 등) 시 스킵
-                }
-            }
+            public object MusicId;
+            public string Title;
         }
     }
 }

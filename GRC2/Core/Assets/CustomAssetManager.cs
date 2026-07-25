@@ -1,235 +1,421 @@
+using GRC2.Helpers;
 using MelonLoader;
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
-using System;
-using System.Reflection;
-using GRC2.Helpers;
 
 namespace GRC2.Core
 {
     /// <summary>
-    /// 커스텀 아트워크와 BGM 관리
+    /// 커스텀 아트워크와 프리뷰 에셋을 관리합니다.
     /// </summary>
     public static class CustomAssetManager
     {
-        private static Sprite customArtworkSprite = null;
-        private static AudioClip customPreviewBGM = null;
-        private static bool isCustomChartSelected = false;
-        private static object customChartMusicID = null; // 커스텀 차트의 MusicID 저장
-        private static string lastLoadedImagePath = null; // 마지막으로 로드한 이미지 경로 캐싱 (성능 최적화)
-        
+        private const int MaxCachedArtwork = 12;
+        private const float ArtworkSelectionDebounceSeconds = 0.08f;
+
+        private static readonly Dictionary<string, Sprite> ArtworkCache =
+            new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Queue<string> ArtworkCacheOrder = new Queue<string>();
+        private static readonly Dictionary<string, List<Action<Sprite>>> PendingArtworkCallbacks =
+            new Dictionary<string, List<Action<Sprite>>>(StringComparer.OrdinalIgnoreCase);
+
+        private static Sprite customArtworkSprite;
+        private static AudioClip customPreviewBGM;
+        private static bool isCustomChartSelected;
+        private static object customChartMusicID;
+        private static string lastLoadedImagePath;
+        private static string requestedArtworkPath;
 
         /// <summary>
-        /// 커스텀 아트워크 로드 (512x512 이미지는 50% 축소)
+        /// 즉시 아트워크가 필요한 씬 전환용 동기 경로입니다.
+        /// 곡 선택 화면에서는 RequestCustomArtwork를 사용합니다.
         /// </summary>
         public static void LoadCustomArtwork(string imagePath)
         {
+            string normalizedPath = NormalizeExistingPath(imagePath);
+            if (normalizedPath == null)
+            {
+                return;
+            }
+
+            requestedArtworkPath = normalizedPath;
+            if (TryGetCustomArtwork(normalizedPath, out _))
+            {
+                return;
+            }
+
             try
             {
-                if (System.IO.File.Exists(imagePath))
+                byte[] imageData = File.ReadAllBytes(normalizedPath);
+                Texture2D texture = new Texture2D(2, 2);
+                if (!texture.LoadImage(imageData))
                 {
-                    // 성능 최적화: 같은 파일이면 재로드하지 않음
-                    if (lastLoadedImagePath != null && 
-                        lastLoadedImagePath.Equals(imagePath, StringComparison.OrdinalIgnoreCase) &&
-                        customArtworkSprite != null)
-                    {
-                        // 이미 로드된 스프라이트가 있고 경로가 같으면 재로드 생략
-                        return;
-                    }
-
-                    // 기존 스프라이트 해제
-                    if (customArtworkSprite != null)
-                    {
-                        if (customArtworkSprite.texture != null)
-                        {
-                            UnityEngine.Object.Destroy(customArtworkSprite.texture);
-                        }
-                        UnityEngine.Object.Destroy(customArtworkSprite);
-                        customArtworkSprite = null;
-                    }
-                    
-                    byte[] imageData = System.IO.File.ReadAllBytes(imagePath);
-                    Texture2D originalTexture = new Texture2D(2, 2);
-                    // LoadImage는 Texture2D의 인스턴스 메서드
-                    if (originalTexture.LoadImage(imageData))
-                    {
-                        int originalWidth = originalTexture.width;
-                        int originalHeight = originalTexture.height;
-                        
-                        // 리사이즈/리샘플은 하지 않고 원본 해상도 그대로 사용
-                        Texture2D finalTexture = originalTexture;
-                        MelonLogger.Msg($"[CustomAssetManager] ✅ 커스텀 아트워크 로드 완료: {System.IO.Path.GetFileName(imagePath)} ({originalWidth}x{originalHeight})");
-                        
-                        // 스프라이트 생성
-                        customArtworkSprite = Sprite.Create(finalTexture, new Rect(0, 0, finalTexture.width, finalTexture.height), 
-                            new Vector2(0.5f, 0.5f), 51.2f); // 픽셀당 단위 51.2
-                        
-                        // 스프라이트 이름 설정 (중요: Unity에서 이름이 비어있으면 표시 문제 발생 가능)
-                        string spriteName = System.IO.Path.GetFileNameWithoutExtension(imagePath);
-                        customArtworkSprite.name = spriteName;
-                        if (finalTexture != null)
-                        {
-                            finalTexture.name = spriteName;
-                        }
-                        
-                        // 로드한 경로 캐싱
-                        lastLoadedImagePath = imagePath;
-                    }
+                    UnityEngine.Object.Destroy(texture);
+                    return;
                 }
+
+                Sprite sprite = CreateArtworkSprite(normalizedPath, texture);
+                CacheArtwork(normalizedPath, sprite);
+                SelectArtwork(normalizedPath, sprite);
             }
             catch (Exception ex)
             {
-                MelonLogger.Msg($"[CustomAssetManager] ❌ 커스텀 아트워크 로드 실패: {ex.Message}");
+                MelonLogger.Warning($"[CustomAssetManager] 아트워크 로드 실패: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// 커스텀 프리뷰 BGM 로드
+        /// 파일 읽기와 이미지 디코딩을 UnityWebRequest의 작업 경로로 넘깁니다.
+        /// 같은 이미지에 대한 중복 요청은 하나로 합칩니다.
         /// </summary>
-        public static void LoadCustomPreviewBGM(string audioPath)
+        public static void RequestCustomArtwork(
+            string imagePath,
+            Action<Sprite> onLoaded = null)
         {
-            try
+            string normalizedPath = NormalizeExistingPath(imagePath);
+            if (normalizedPath == null)
             {
-                if (System.IO.File.Exists(audioPath))
+                return;
+            }
+
+            requestedArtworkPath = normalizedPath;
+            if (TryGetCustomArtwork(normalizedPath, out Sprite cachedSprite))
+            {
+                onLoaded?.Invoke(cachedSprite);
+                return;
+            }
+
+            if (PendingArtworkCallbacks.TryGetValue(
+                normalizedPath,
+                out List<Action<Sprite>> callbacks))
+            {
+                if (onLoaded != null)
                 {
-                    // UnityWebRequestMultimedia.GetAudioClip 사용
-                    MelonLoader.MelonCoroutines.Start(LoadAudioClipCoroutine(audioPath));
+                    callbacks.Add(onLoaded);
                 }
+
+                return;
             }
-            catch (Exception ex)
+
+            callbacks = new List<Action<Sprite>>();
+            if (onLoaded != null)
             {
-                MelonLogger.Msg($"[CustomAssetManager] 커스텀 프리뷰 BGM 로드 실패: {ex.Message}");
+                callbacks.Add(onLoaded);
             }
+
+            PendingArtworkCallbacks[normalizedPath] = callbacks;
+            MelonCoroutines.Start(LoadArtworkCoroutine(normalizedPath));
         }
 
-        private static System.Collections.IEnumerator LoadAudioClipCoroutine(string audioPath)
+        public static bool TryGetCustomArtwork(string imagePath, out Sprite sprite)
         {
-            using (UnityWebRequest www = UnityWebRequestMultimedia.GetAudioClip(
-                "file://" + audioPath, AudioType.UNKNOWN))
+            sprite = null;
+            string normalizedPath = NormalizePath(imagePath);
+            if (normalizedPath == null ||
+                !ArtworkCache.TryGetValue(normalizedPath, out sprite) ||
+                sprite == null)
             {
-                yield return www.SendWebRequest();
-                if (www.result == UnityWebRequest.Result.Success)
+                if (normalizedPath != null)
                 {
-                    customPreviewBGM = DownloadHandlerAudioClip.GetContent(www);
-                    MelonLogger.Msg($"[CustomAssetManager] ✅ 커스텀 프리뷰 BGM 로드 완료: {audioPath} (길이: {customPreviewBGM.length:F2}초)");
+                    ArtworkCache.Remove(normalizedPath);
+                }
+
+                sprite = null;
+                return false;
+            }
+
+            SelectArtwork(normalizedPath, sprite);
+            return true;
+        }
+
+        private static IEnumerator LoadArtworkCoroutine(string imagePath)
+        {
+            Sprite loadedSprite = null;
+
+            // 연속 스크롤 중 지나간 앨범 이미지는 디스크에서 읽지 않습니다.
+            yield return new WaitForSecondsRealtime(ArtworkSelectionDebounceSeconds);
+            if (!string.Equals(
+                requestedArtworkPath,
+                imagePath,
+                StringComparison.OrdinalIgnoreCase))
+            {
+                CompleteArtworkRequest(imagePath, null);
+                yield break;
+            }
+
+            using (UnityWebRequest request =
+                UnityWebRequestTexture.GetTexture(new Uri(imagePath).AbsoluteUri, true))
+            {
+                yield return request.SendWebRequest();
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    if (!ArtworkCache.TryGetValue(imagePath, out loadedSprite) ||
+                        loadedSprite == null)
+                    {
+                        Texture2D texture = DownloadHandlerTexture.GetContent(request);
+                        if (texture != null)
+                        {
+                            loadedSprite = CreateArtworkSprite(imagePath, texture);
+                            CacheArtwork(imagePath, loadedSprite);
+                        }
+                    }
                 }
                 else
                 {
-                    MelonLogger.Msg($"[CustomAssetManager] 커스텀 프리뷰 BGM 로드 실패: {www.error}");
+                    MelonLogger.Warning(
+                        $"[CustomAssetManager] 비동기 아트워크 로드 실패: {request.error}");
+                }
+            }
+
+            if (loadedSprite != null &&
+                string.Equals(
+                    requestedArtworkPath,
+                    imagePath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                SelectArtwork(imagePath, loadedSprite);
+            }
+
+            CompleteArtworkRequest(imagePath, loadedSprite);
+        }
+
+        private static Sprite CreateArtworkSprite(string imagePath, Texture2D texture)
+        {
+            string assetName = Path.GetFileNameWithoutExtension(imagePath);
+            texture.name = assetName;
+
+            Sprite sprite = Sprite.Create(
+                texture,
+                new Rect(0, 0, texture.width, texture.height),
+                new Vector2(0.5f, 0.5f),
+                51.2f);
+            sprite.name = assetName;
+            return sprite;
+        }
+
+        private static void CacheArtwork(string path, Sprite sprite)
+        {
+            if (sprite == null)
+            {
+                return;
+            }
+
+            if (!ArtworkCache.ContainsKey(path))
+            {
+                ArtworkCacheOrder.Enqueue(path);
+            }
+
+            ArtworkCache[path] = sprite;
+            TrimArtworkCache();
+        }
+
+        private static void TrimArtworkCache()
+        {
+            int attempts = ArtworkCacheOrder.Count;
+            while (ArtworkCache.Count > MaxCachedArtwork &&
+                   ArtworkCacheOrder.Count > 0 &&
+                   attempts-- > 0)
+            {
+                string oldestPath = ArtworkCacheOrder.Dequeue();
+                if (string.Equals(
+                    oldestPath,
+                    requestedArtworkPath,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    ArtworkCacheOrder.Enqueue(oldestPath);
+                    continue;
+                }
+
+                if (!ArtworkCache.TryGetValue(oldestPath, out Sprite oldestSprite))
+                {
+                    continue;
+                }
+
+                ArtworkCache.Remove(oldestPath);
+                if (oldestSprite != null)
+                {
+                    Texture2D texture = oldestSprite.texture;
+                    UnityEngine.Object.Destroy(oldestSprite);
+                    if (texture != null)
+                    {
+                        UnityEngine.Object.Destroy(texture);
+                    }
                 }
             }
         }
 
-        /// <summary>
-        /// MusicID나 MusicData로 커스텀 차트인지 확인
-        /// </summary>
+        private static void SelectArtwork(string path, Sprite sprite)
+        {
+            lastLoadedImagePath = path;
+            customArtworkSprite = sprite;
+        }
+
+        private static void CompleteArtworkRequest(string path, Sprite sprite)
+        {
+            if (!PendingArtworkCallbacks.TryGetValue(
+                path,
+                out List<Action<Sprite>> callbacks))
+            {
+                return;
+            }
+
+            PendingArtworkCallbacks.Remove(path);
+            if (sprite == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < callbacks.Count; i++)
+            {
+                try
+                {
+                    callbacks[i]?.Invoke(sprite);
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning(
+                        $"[CustomAssetManager] 아트워크 완료 콜백 실패: {ex.Message}");
+                }
+            }
+        }
+
+        public static void LoadCustomPreviewBGM(string audioPath)
+        {
+            string normalizedPath = NormalizeExistingPath(audioPath);
+            if (normalizedPath != null)
+            {
+                MelonCoroutines.Start(LoadAudioClipCoroutine(normalizedPath));
+            }
+        }
+
+        private static IEnumerator LoadAudioClipCoroutine(string audioPath)
+        {
+            using (UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(
+                new Uri(audioPath).AbsoluteUri,
+                AudioType.UNKNOWN))
+            {
+                yield return request.SendWebRequest();
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    customPreviewBGM = DownloadHandlerAudioClip.GetContent(request);
+                }
+                else
+                {
+                    MelonLogger.Warning(
+                        $"[CustomAssetManager] 프리뷰 BGM 로드 실패: {request.error}");
+                }
+            }
+        }
+
         public static bool IsCustomChart(object musicID, object musicData)
         {
             try
             {
-                // 1순위: MusicID로 앨범 매핑 확인 (가장 확실한 방법 - 모든 앨범 지원)
-                if (musicID != null)
+                if (musicID != null && AlbumManager.IsCustomChartMusicID(musicID))
                 {
-                    if (AlbumManager.IsCustomChartMusicID(musicID))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
-                
-                // 2순위: 기존 방식 (하위 호환성)
-                if (musicID != null && customChartMusicID != null)
+
+                if (musicID != null &&
+                    customChartMusicID != null &&
+                    musicID.Equals(customChartMusicID))
                 {
-                    if (musicID.Equals(customChartMusicID))
-                    {
-                        return true;
-                    }
+                    return true;
                 }
-                
-                // 3순위: MusicData에서 songTitle 확인 (대체 방법)
+
                 if (musicData != null)
                 {
-                    Type musicDataType = musicData.GetType();
-                    FieldInfo songTitleField = musicDataType.GetField("songTitle", 
-                        BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                    if (songTitleField != null)
-                    {
-                        object songTitle = songTitleField.GetValue(musicData);
-                        string songTitleStr = songTitle?.ToString() ?? "";
-                        if (songTitleStr == "custom chart")
-                        {
-                            return true;
-                        }
-                    }
+                    FieldInfo titleField = musicData.GetType().GetField(
+                        "songTitle",
+                        BindingFlags.Public |
+                        BindingFlags.NonPublic |
+                        BindingFlags.Instance);
+                    string title = titleField?.GetValue(musicData)?.ToString();
+                    return title == "custom chart";
                 }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogWarning(ex, "[CustomAssetManager] IsCustomChartSelectedByTitle", "리플렉션 실패");
+                ErrorLogger.LogWarning(
+                    ex,
+                    "[CustomAssetManager] IsCustomChart",
+                    "커스텀 차트 판별 실패");
             }
+
             return false;
         }
 
         public static Sprite GetCustomArtwork() => customArtworkSprite;
         public static AudioClip GetCustomPreviewBGM() => customPreviewBGM;
-        public static void SetCustomChartSelected(bool selected) => isCustomChartSelected = selected;
+        public static void SetCustomChartSelected(bool selected) =>
+            isCustomChartSelected = selected;
         public static bool IsCustomChartSelected() => isCustomChartSelected;
 
-        /// <summary>
-        /// 이 씬에서는 커스텀 BGM/BGA/노트 주입을 절대 하지 않음 (실행 순서와 무관하게 주입 방지)
-        /// </summary>
         public static bool IsSceneWhereInjectionDisallowed()
         {
             try
             {
-                var scene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                if (!scene.IsValid()) return false;
-                var name = scene.name ?? "";
-                return name == "SoundPlayerScene" || name == "MoviePlayer_MovieSelect";
+                UnityEngine.SceneManagement.Scene scene =
+                    UnityEngine.SceneManagement.SceneManager.GetActiveScene();
+                if (!scene.IsValid())
+                {
+                    return false;
+                }
+
+                string name = scene.name ?? string.Empty;
+                return name == "SoundPlayerScene" ||
+                       name == "MoviePlayer_MovieSelect";
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
         }
 
-        /// <summary>
-        /// 커스텀 주입을 수행해도 되는지 (선택 플래그 + 주입 금지 씬 아님). 주입하는 모든 경로에서 사용.
-        /// </summary>
         public static bool ShouldInjectCustomContent()
         {
-            if (IsSceneWhereInjectionDisallowed()) return false;
-            return IsCustomChartSelected();
+            return !IsSceneWhereInjectionDisallowed() && IsCustomChartSelected();
         }
-        public static void SetCustomChartMusicID(object musicID) => customChartMusicID = musicID;
+
+        public static void SetCustomChartMusicID(object musicID) =>
+            customChartMusicID = musicID;
         public static object GetCustomChartMusicID() => customChartMusicID;
-        
-        
-        /// <summary>
-        /// 현재 로드된 이미지 경로 가져오기 (성능 최적화용)
-        /// </summary>
         public static string GetLoadedImagePath() => lastLoadedImagePath;
-        
-        /// <summary>
-        /// 특정 경로의 이미지가 이미 로드되어 있는지 확인
-        /// </summary>
+
         public static bool IsImageLoaded(string imagePath)
         {
-            return !string.IsNullOrEmpty(imagePath) &&
-                   lastLoadedImagePath != null &&
-                   lastLoadedImagePath.Equals(imagePath, StringComparison.OrdinalIgnoreCase) &&
-                   customArtworkSprite != null;
+            string normalizedPath = NormalizePath(imagePath);
+            return normalizedPath != null &&
+                   ArtworkCache.TryGetValue(normalizedPath, out Sprite sprite) &&
+                   sprite != null;
+        }
+
+        private static string NormalizeExistingPath(string path)
+        {
+            string normalizedPath = NormalizePath(path);
+            return normalizedPath != null && File.Exists(normalizedPath)
+                ? normalizedPath
+                : null;
+        }
+
+        private static string NormalizePath(string path)
+        {
+            try
+            {
+                return string.IsNullOrWhiteSpace(path)
+                    ? null
+                    : Path.GetFullPath(path);
+            }
+            catch
+            {
+                return null;
+            }
         }
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

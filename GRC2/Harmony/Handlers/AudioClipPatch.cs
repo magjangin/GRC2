@@ -1,167 +1,89 @@
-using MelonLoader;
-using UnityEngine;
-using System;
-using System.Reflection;
 using GRC2.Core;
-using GRC2.Helpers;
+using MelonLoader;
+using System;
+using System.IO;
 
 namespace GRC2.Harmony.Handlers
 {
     /// <summary>
-    /// 오디오 관련 패치 - noticeChangedMusic, changeDifficulty 후킹
-    /// 실제 로직은 PreviewAudioManager, CustomBgmPlayer에 위임
+    /// 원본 noticeChangedMusic 완료 후 커스텀 선택 상태와 프리뷰를 동기화합니다.
     /// </summary>
     public static class AudioClipPatch
     {
-        /// <summary>
-        /// noticeChangedMusic 후킹 - 곡 변경 알림 시 호출
-        /// 호출 감지만 수행
-        /// </summary>
-        public static void NoticeChangedMusicPostfix(object __instance, object nextMusicID)
-        {
-            try
-            {
-                MelonLogger.Msg("===========================================");
-                MelonLogger.Msg($"[AudioClipPatch] >>> noticeChangedMusic 호출됨 <<<");
-                MelonLogger.Msg($"[AudioClipPatch]   nextMusicID: {nextMusicID ?? "null"}");
-                MelonLogger.Msg($"[AudioClipPatch]   nextMusicID 타입: {nextMusicID?.GetType().Name ?? "null"}");
-                MelonLogger.Msg("===========================================");
+        private static object _lastHandledMusicId;
 
-                if (nextMusicID != null)
-                {
-                    if (AlbumManager.IsCustomChartMusicID(nextMusicID))
-                    {
-                        MelonLogger.Msg($"[AudioClipPatch] ✅ 곡 변경 - 커스텀 차트 감지: {nextMusicID}");
-                        AlbumManager.SelectAlbumByMusicID(nextMusicID);
-                        CustomAssetManager.SetCustomChartSelected(true);
-                        
-                        // 프리뷰와 환경음 중지
-                        PreviewAudioManager.StopPreviewAndAmbient();
-                        
-                        // 커스텀 BGM 주입
-                        var bgmFile = AlbumManager.GetCurrentBgmFile();
-                        if (!string.IsNullOrEmpty(bgmFile) && System.IO.File.Exists(bgmFile))
-                        {
-                            MelonLogger.Msg($"[AudioClipPatch] 🎵 곡 변경 - 커스텀 프리뷰 BGM 준비: {System.IO.Path.GetFileName(bgmFile)}");
-                            MelonLoader.MelonCoroutines.Start(CustomBgmPlayer.InjectCustomBgm(bgmFile));
-                        }
-                    }
-                    else
-                    {
-                        // 일반 곡 선택 시 커스텀 차트 플래그 해제 및 원래 프리뷰 복원
-                        if (CustomAssetManager.IsCustomChartSelected())
-                        {
-                            MelonLogger.Msg("[AudioClipPatch] ❌ 일반 곡 선택됨 - 커스텀 차트 플래그 해제 및 원래 프리뷰 복원");
-                            CustomAssetManager.SetCustomChartSelected(false);
-                            CustomBgmPlayer.CleanupAndRestore();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Msg($"[AudioClipPatch] ❌ noticeChangedMusic 오류: {ex.Message}");
-            }
-        }
-        
-        /// <summary>
-        /// changeDifficulty 후킹 - 난이도 변경 시 호출
-        /// 커스텀 차트일 때 프리뷰/환경음 중지, BGM 주입 및 아트워크 업데이트
-        /// </summary>
-        public static void ChangeDifficultyPostfix(object __instance)
+        public static void NoticeChangedMusicPostfix(
+            object __instance,
+            object nextMusicID)
         {
             try
             {
-                // 곡 선택 씬이 아닌 곳(SoundPlayerScene, MoviePlayer_MovieSelect 등)에서는 커스텀 차트 처리 안 함
-                if (CustomAssetManager.IsSceneWhereInjectionDisallowed())
+                if (nextMusicID == null)
+                {
                     return;
-
-                // 현재 선택된 MusicID 가져오기
-                object currentMusicID = GetCurrentMusicIDFromInstance(__instance);
-                
-                MelonLogger.Msg($"[AudioClipPatch] changeDifficulty 호출됨 - MusicID: {currentMusicID ?? "null"}");
-                
-                if (currentMusicID != null && AlbumManager.IsCustomChartMusicID(currentMusicID))
-                {
-                    MelonLogger.Msg($"[AudioClipPatch] ✅ 난이도 변경 - 커스텀 차트 감지: {currentMusicID}");
-                    
-                    // 커스텀 차트이면 프리뷰/환경음 중지 및 아트워크 업데이트
-                    AlbumManager.SelectAlbumByMusicID(currentMusicID);
-                    CustomAssetManager.SetCustomChartSelected(true);
-                    
-                    // 프리뷰와 환경음 중지
-                    PreviewAudioManager.StopPreviewAndAmbient();
-                    
-                    // 커스텀 BGM 주입
-                    var bgmFile = AlbumManager.GetCurrentBgmFile();
-                    if (!string.IsNullOrEmpty(bgmFile) && System.IO.File.Exists(bgmFile))
-                    {
-                        MelonLogger.Msg($"[AudioClipPatch] 🎵 난이도 변경 - 커스텀 프리뷰 BGM 준비: {System.IO.Path.GetFileName(bgmFile)}");
-                        MelonLoader.MelonCoroutines.Start(CustomBgmPlayer.InjectCustomBgm(bgmFile));
-                    }
-                    
-                    // 아트워크 업데이트
-                    var imageFile = AlbumManager.GetCurrentImageFile();
-                    if (!string.IsNullOrEmpty(imageFile) && System.IO.File.Exists(imageFile))
-                    {
-                        CustomAssetManager.LoadCustomArtwork(imageFile);
-                        Type instanceType = __instance.GetType();
-                        ArtworkUpdater.UpdateArtwork(__instance, instanceType);
-                        MelonLogger.Msg("[AudioClipPatch] ✅ 난이도 변경 - 아트워크 업데이트 완료");
-                    }
                 }
-                else
+
+                if (!AlbumManager.IsCustomChartMusicID(nextMusicID))
                 {
-                    // 일반 곡 선택 시 커스텀 차트 플래그 해제 및 원래 프리뷰 복원
-                    if (CustomAssetManager.IsCustomChartSelected())
-                    {
-                        MelonLogger.Msg("[AudioClipPatch] ❌ 일반 곡 선택됨 - 커스텀 차트 플래그 해제 및 원래 프리뷰 복원");
-                        CustomAssetManager.SetCustomChartSelected(false);
-                        CustomBgmPlayer.CleanupAndRestore();
-                    }
+                    HandleNormalSongSelection();
+                    return;
+                }
+
+                // 원본 UI가 같은 MusicID를 여러 번 알리는 경우 대용량 에셋 요청을
+                // 반복해서 시작하지 않습니다.
+                if (CustomAssetManager.IsCustomChartSelected() &&
+                    Equals(_lastHandledMusicId, nextMusicID))
+                {
+                    return;
+                }
+
+                if (!AlbumManager.SelectAlbumByMusicID(nextMusicID))
+                {
+                    return;
+                }
+
+                _lastHandledMusicId = nextMusicID;
+                CustomAssetManager.SetCustomChartSelected(true);
+                CustomAssetManager.SetCustomChartMusicID(nextMusicID);
+                TextPatch.EnableTextReplacement(true);
+
+                PreviewAudioManager.StopPreviewAndAmbient();
+                ArtworkUpdater.UpdateArtwork(__instance, __instance?.GetType());
+
+                string bgmFile = AlbumManager.GetCurrentBgmFile();
+                if (!string.IsNullOrEmpty(bgmFile) && File.Exists(bgmFile))
+                {
+                    MelonCoroutines.Start(
+                        CustomBgmPlayer.InjectCustomBgm(bgmFile));
                 }
             }
             catch (Exception ex)
             {
-                MelonLogger.Msg($"[AudioClipPatch] ❌ changeDifficulty 오류: {ex.Message}");
+                MelonLogger.Warning(
+                    $"[AudioClipPatch] 곡 선택 동기화 실패: {ex.Message}");
             }
         }
-        
-        /// <summary>
-        /// 상태 초기화 (씬 변경 시 호출)
-        /// </summary>
+
         public static void ResetState()
         {
+            _lastHandledMusicId = null;
             CustomBgmPlayer.ResetState();
             PreviewAudioManager.Reset();
-            MelonLogger.Msg("[AudioClipPatch] 상태 초기화됨");
         }
-        
-        /// <summary>
-        /// 인스턴스에서 현재 MusicID 가져오기
-        /// </summary>
-        public static object GetCurrentMusicIDFromInstance(object instance)
+
+        private static void HandleNormalSongSelection()
         {
-            try
+            _lastHandledMusicId = null;
+            TextPatch.EnableTextReplacement(false);
+
+            if (!CustomAssetManager.IsCustomChartSelected())
             {
-                if (instance == null) return null;
-                
-                Type instanceType = instance.GetType();
-                
-                // mCurentMusicId 필드 찾기 (오타 주의: Curent)
-                FieldInfo currentMusicIdField = instanceType.GetField("mCurentMusicId", 
-                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (currentMusicIdField != null)
-                {
-                    return currentMusicIdField.GetValue(instance);
-                }
+                return;
             }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(ex, "[AudioClipPatch] GetCurrentMusicIdFromInstance", "리플렉션 실패");
-            }
-            
-            return null;
+
+            CustomAssetManager.SetCustomChartSelected(false);
+            CustomAssetManager.SetCustomChartMusicID(null);
+            CustomBgmPlayer.CleanupAndRestore();
         }
     }
 }

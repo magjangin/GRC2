@@ -17,6 +17,11 @@ namespace GRC2.Injectors
             return _targetFinishTime;
         }
 
+        public static void Reset()
+        {
+            _targetFinishTime = 0f;
+        }
+
         public static void SetFinishTime(float newBgmLength, Type bgmBeatManagerType)
         {
             try

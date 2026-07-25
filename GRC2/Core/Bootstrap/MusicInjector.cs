@@ -1,11 +1,9 @@
 using MelonLoader;
 using UnityEngine;
 using System;
-using System.Linq;
 using System.Reflection;
 using HarmonyLib;
 using GRC2.Injectors;
-using GRC2.Harmony.Handlers;
 using GRC2.Harmony.Hooks;
 
 namespace GRC2.Core
@@ -46,41 +44,14 @@ namespace GRC2.Core
             {
                 MelonLogger.Msg("[MusicInjector] === Harmony 패치 시작 ===");
                 
-                // IntiCreates.cMusicSelectScrollViewDataGetter 타입 찾기 및 메서드 출력
-                Type dataGetterType = ReflectionHelper.FindType("IntiCreates.cMusicSelectScrollViewDataGetter");
-                if (dataGetterType != null)
-                {
-                    MelonLogger.Msg($"[MusicInjector] ✅ cMusicSelectScrollViewDataGetter 타입 발견: {dataGetterType.FullName}");
-                }
-                else
-                {
-                    MelonLogger.Msg("[MusicInjector] ❌ cMusicSelectScrollViewDataGetter 타입을 찾을 수 없습니다.");
-                }
-                
-                // IntiCreates.cMusicSelectScrollViewDataGetter.initalizeDatas 패치는 제거됨
-                // (mCellHaviableMusicDataList에 직접 주입하므로 불필요)
-                
-                // getMusicTitle 메서드 후킹 (제목 테이블에서 제목을 가져올 때 커스텀 차트 처리)
-                var getMusicTitleMethod = ReflectionHelper.FindMethod("IntiCreates.cMusicSelectScrollViewDataGetter", "getMusicTitle", 
-                    BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic, silent: true);
-                if (getMusicTitleMethod != null)
-                {
-                    var getMusicTitlePostfixMethod = typeof(MusicTitlePatch).GetMethod("GetMusicTitlePostfix", BindingFlags.Static | BindingFlags.Public);
-                    if (getMusicTitlePostfixMethod != null)
-                    {
-                        harmonyInstance.Patch(getMusicTitleMethod, null, new HarmonyMethod(getMusicTitlePostfixMethod));
-                        MelonLogger.Msg("[MusicInjector] ✅ cMusicSelectScrollViewDataGetter.getMusicTitle 패치 성공");
-                    }
-                }
-                
                 // 커버 이미지 관련 타입 찾기 및 후킹
                 PatchApplier.PatchCoverImageTypes();
                 
                 // 오디오 클립 관련 타입 찾기 및 후킹
                 PatchApplier.PatchAudioClipTypes();
                 
-                // 곡 선택 UI 관련 타입 찾기 및 후킹
-                PatchApplier.PatchSelectingMusicUITypes();
+                // 곡 시작 전 팝업의 아트워크 직접 후킹
+                PatchApplier.PatchPreMusicStartWindow();
                 
                 // 텍스트 설정 관련 타입 찾기 및 후킹
                 PatchApplier.PatchTextTypes();
@@ -88,11 +59,8 @@ namespace GRC2.Core
                 // 결과 씬 아트워크/곡 제목 직접 주입 후킹
                 PatchApplier.PatchResultSceneUpdater();
                 
-                // cMusicSelectScrollViewItem 및 cMusicSelectScrollView 메서드 후킹
+                // 원본 곡 목록 초기화 직후 커스텀 곡 주입
                 PatchMusicScrollViewMethods();
-                
-                // (롤백) 캐릭터 로딩 패치는 잠시 비활성화.
-                // (정리) startRythmGame() 시점 인스턴스 필드 덤프/그래프 탐색 기반 디버그 로직은 제거됨.
 
             }
             catch (Exception ex)
@@ -103,7 +71,7 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// cMusicSelectScrollViewItem 및 cMusicSelectScrollView 메서드 후킹
+        /// cMusicSelectScrollView의 기본 목록 재생성 직후를 후킹
         /// </summary>
         private static void PatchMusicScrollViewMethods()
         {
@@ -112,16 +80,17 @@ namespace GRC2.Core
                 Type scrollViewType = ReflectionHelper.FindType("IntiCreates.cMusicSelectScrollView");
                 if (scrollViewType != null)
                 {
-                    // initializeAllItemByCrrentMusicData 후킹
-                    MethodInfo initMethod = ReflectionHelper.FindMethod("IntiCreates.cMusicSelectScrollView", "initializeAllItemByCrrentMusicData",
+                    MethodInfo initMethod = ReflectionHelper.FindMethod("IntiCreates.cMusicSelectScrollView", "initializeMusicDataByDefault",
                         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, silent: true);
                     if (initMethod != null)
                     {
-                        var prefixMethod = typeof(MusicScrollViewHooks).GetMethod("InitializeAllItemByCrrentMusicDataPrefix", BindingFlags.Static | BindingFlags.Public);
-                        if (prefixMethod != null)
+                        var postfixMethod = typeof(MusicScrollViewHooks).GetMethod(
+                            nameof(MusicScrollViewHooks.InitializeMusicDataByDefaultPostfix),
+                            BindingFlags.Static | BindingFlags.Public);
+                        if (postfixMethod != null)
                         {
-                            harmonyInstance.Patch(initMethod, new HarmonyMethod(prefixMethod), null);
-                            MelonLogger.Msg("[MusicInjector] ✅ cMusicSelectScrollView.initializeAllItemByCrrentMusicData 패치 성공");
+                            harmonyInstance.Patch(initMethod, null, new HarmonyMethod(postfixMethod));
+                            MelonLogger.Msg("[MusicInjector] ✅ cMusicSelectScrollView.initializeMusicDataByDefault 패치 성공");
                         }
                     }
                 }

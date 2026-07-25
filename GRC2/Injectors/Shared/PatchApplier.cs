@@ -20,7 +20,7 @@ namespace GRC2.Injectors
             // 각 Patcher 초기화
             CoverImagePatcher.Initialize(harmonyInstance);
             AudioClipPatcher.Initialize(harmonyInstance);
-            SelectingMusicUIPatcher.Initialize(harmonyInstance);
+            PreMusicStartWindowPatcher.Initialize(harmonyInstance);
             TextPatcher.Initialize(harmonyInstance);
             ResultSceneUpdaterPatcher.Initialize(harmonyInstance);
         }
@@ -42,11 +42,11 @@ namespace GRC2.Injectors
         }
 
         /// <summary>
-        /// 곡 선택 UI 관련 타입 찾기 및 후킹
+        /// 곡 시작 전 팝업 아트워크 후킹
         /// </summary>
-        public static void PatchSelectingMusicUITypes()
+        public static void PatchPreMusicStartWindow()
         {
-            SelectingMusicUIPatcher.Patch();
+            PreMusicStartWindowPatcher.Patch();
         }
 
         /// <summary>

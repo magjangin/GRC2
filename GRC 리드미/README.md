@@ -73,7 +73,7 @@ As of 2026-07-21:
 - Deleted no-op and diagnostic hook files.
 - Removed disabled note-array JSON dumping and field inspection helpers.
 - Removed disabled music-scroll sort/filter/update/get-cell logging hooks.
-- Reduced `CharactorLoadPatcher` to the dynamic prefix factory still used by `AudioClipPatcher`.
+- Removed the unreachable `CharactorLoadPatcher` and its unregistered dynamic-prefix path.
 - Removed dead, never-called files: `AssetLoader.cs`, `BgmArtworkUpdater.cs`, and the `AudioSourceFinder` cluster (4 files).
 - Removed orphaned XML doc comments left behind by earlier partial-class splits (`MusicScrollViewHooks.cs`, `BgmGameEndMonitor.cs`, `PreviewAudioManager.cs`, `BgmLoader.cs`, `HoldNoteProcessor.cs`).
 - Current managed source count is 108 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
@@ -83,4 +83,10 @@ As of 2026-07-21 (file consolidation):
 - Merged every partial-class file set into a single file per class (16 classes, 61 files -> 16 files); deleted the empty `NoteArrayHooks.MusicDataAdjust.cs`.
 - Flattened folders that held only one merged class file (e.g. `Harmony/Hooks/GameFlow/` -> `Harmony/Hooks/GameFlowHooks.cs`).
 - Merged the six `Harmony/Registration/*Patcher.cs` files into `Harmony/Registration/Patchers.cs` (class names unchanged).
-- Current managed source count is 57 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
+- Current managed source count is 51 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
+
+As of 2026-07-26 (v0.2.0 Refactoring & Performance Update):
+
+- **Hook Cleanup**: Removed unregistered, empty, and logging-only hooks (Music Select, Sort, Filter, BGM state monitoring). Removed 7 unused diagnostic and helper files (`CharactorLoadPatch.cs`, `MusicTitlePatch.cs`, `CustomChartHandler.cs`, `BgmAudioStateChecker.cs`, `BgmFormattingUtils.cs`, `BgmMethodCallHooks.cs`, `BgmMonitorCoroutine.cs`). Registered only required Harmony patches. Wrapped original game-end coroutine instead of replacing it. Reduced key file line counts: `MusicScrollViewHooks.cs` (~390 lines), `GameFlowHooks.cs` (~160 lines), `Patchers.cs` (243 lines), `BgmGameEndMonitor.cs` (164 lines).
+- **Custom Song Select Performance Optimization**: Removed scene-wide `AudioSource` searches, targeting preview and ambience sources directly. Replaced synchronous cover image file reading & main-thread decoding with async loading and a 12-image cache. Added 80ms image debounce and 150ms preview BGM debounce on fast scroll. Added cancellation of in-flight audio requests on song change. Applied streaming load & 3-song cache for preview BGM. Reused preview `GameObject` and `AudioSource`. Added duplicate `MusicID` check.
+- **Ruby Text Fix**: Cleared `songTitleRuby` and `songTitleRubyDirect` fields to eliminate small text above custom titles while maintaining full title display and sorting functionality.
