@@ -10,7 +10,10 @@ This folder is the current home for project documentation. Documents are grouped
 
 `HOOK_MAP.md`, the Harmony layer README, and the cleanup baseline below are the
 current source of truth. Topic guides that still mention removed runtime type
-searchers or scene injectors describe older implementations.
+searchers, scene injectors, or reflection helpers describe older
+implementations. In particular `harmony/리플렉션_및_필드_접근_시스템.md` is
+deprecated in full: the mod now uses compile-time typed access to
+`Assembly-CSharp` and retains a single reflection call.
 
 ## Folders
 
@@ -111,3 +114,35 @@ As of 2026-07-26 (Harmony automatic patch migration):
   `Assembly-CSharp` types.
 - Current managed source count is 45 files under `GRC2/`, excluding `bin/obj`
   (`GRC2.Tests`: 2 files).
+
+As of 2026-07-26 (reflection removal / lightweighting):
+
+Every remaining string-based member lookup was replaced with compile-time typed
+access, validated field by field against `Decompiled/`. The mod now contains a
+single reflection call in total.
+
+- Removed dead fallback paths that the decompiled source proved unreachable:
+  `NoteConstructorHelper.cs` (`NoteCreateData` has no explicit constructor, so
+  all 8 signature probes failed on every note before falling back to
+  `Activator`), writes to the nonexistent `mSample`/`sample` fields, and
+  `BgmLoader`'s `_sorce` fallback for a missing `setClip`.
+- Note pipeline: deleted `FieldAccessHelper.cs` and `Loaders/GameTypeLoader.cs`;
+  reduced `EnumValueHelper.cs` to typed mapping switches (no `Enum.Parse`, no
+  value cache). `NoteCreateData` fields are now assigned directly, and the
+  pipeline currency changed from `object` to `NoteCreateData`. Reverse mapping
+  no longer parses `ToString()` output.
+- BGM layer: `cBGMBeatManager`'s public methods (`setClip`, `getAudioClip`,
+  `getAudioSorce`, `requestPlayAudio`) are called directly; two `GetFields()`
+  sweeps were removed.
+- UI/scene hooks: private game fields are reached through cached
+  `AccessTools.FieldRefAccess` delegates (`mCellHaviableMusicDataList`,
+  `mFairyNoteCreateDataArray`, `mPreviewAudioSorce`, `mArtWorkImage`, etc.).
+  `MusicSelectData` is a struct, so the `MemberwiseClone` reflection became a
+  plain assignment.
+- The only remaining reflection is `AudioClip.m_Name` in `BgmLoader.cs`, a Unity
+  internal field with no typed alternative.
+- `PlaySceneArtworkInjector`'s name-based lookup is intentionally kept: no
+  decompiled type owns the play-scene artwork object, and the result is cached
+  per scene.
+- Current managed source count is 42 files (~6,600 lines) under `GRC2/`,
+  excluding `bin/obj` (`GRC2.Tests`: 2 files).

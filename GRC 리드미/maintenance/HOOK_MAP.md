@@ -287,6 +287,25 @@ of the current source baseline:
   `FairyNoteEditorLoader.NoteCreateData` and the actual game enums.
 - Made `StopInjection()` reset BGM/BGA injection state so the next song can be
   injected after leaving the result scene.
+- Removed every remaining string-based member lookup from the hook surface.
+  Private game fields are now reached through cached
+  `AccessTools.FieldRefAccess` delegates created once per field, and public
+  members are called directly:
+  - `cMusicSelectScrollView.mCellHaviableMusicDataList` (music list injection)
+  - `cFairyModeNotesManager.mFairyNoteCreateDataArray` (note array replacement,
+    also used for the last-note time)
+  - `cMusicSelectSceneUIUpdater.mPreviewAudioSorce` / `mAmbientAudioSorce`
+    (preview muting) and `mArtWorkAndMusicDetail` -> `mArtWork` (artwork)
+  - `cRythmGameResultSceneUpdater.mSceneInitializeParam`, `mMusicLVUI`,
+    `mMusicNameText`, `mArtWorkImage` (result scene)
+  - `cRythmGameManager.mPauseMenuWork` and `mRythmGameMusicData`; `mIsPausing`
+    and `requestPause()` are public and used directly
+  - `cMusicSelectPreMusicStartWindowManager.mArtworkImage`
+- Removed `NoteConstructorHelper.cs`, `Helpers/FieldAccessHelper.cs`, and
+  `Loaders/GameTypeLoader.cs`; removed `BgmLoader`'s `_sorce` fallback path
+  (unreachable because `cBGMBeatManager.setClip` always exists).
+- Every Harmony patch method now receives `__instance` as its concrete game
+  type instead of `object`.
 
 ### 2026-05-15
 
