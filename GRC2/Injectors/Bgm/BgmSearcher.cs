@@ -1,5 +1,4 @@
-using System;
-using System.Reflection;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 
@@ -7,38 +6,19 @@ namespace GRC2.Injectors
 {
     internal static class BgmSearcher
     {
-        public static bool TryFindBeatManager(Type bgmBeatManagerType, out object instance)
+        public static bool TryFindBeatManager(out cBGMBeatManager instance)
         {
-            instance = null;
-            if (bgmBeatManagerType == null)
-            {
-                return false;
-            }
-
-            var singleManager = UnityEngine.Object.FindObjectOfType(bgmBeatManagerType);
-            if (singleManager != null)
-            {
-                instance = singleManager;
-                return true;
-            }
-
-            var bgmManagers = UnityEngine.Object.FindObjectsOfType(bgmBeatManagerType);
-            if (bgmManagers != null && bgmManagers.Length > 0)
-            {
-                instance = bgmManagers[0];
-                return true;
-            }
-
-            return false;
+            instance = UnityEngine.Object.FindObjectOfType<cBGMBeatManager>();
+            return instance != null;
         }
 
-        public static bool TryFindBeatManagerFromAudioSource(Type bgmBeatManagerType, out object instance)
+        /// <summary>
+        /// FindObjectOfType이 놓치는 비활성 컴포넌트를 위해 AudioSource 쪽에서 역으로 찾습니다.
+        /// cBGMBeatManager는 [RequireComponent(typeof(AudioSource))]이므로 항상 같은 GameObject에 있습니다.
+        /// </summary>
+        public static bool TryFindBeatManagerFromAudioSource(out cBGMBeatManager instance)
         {
             instance = null;
-            if (bgmBeatManagerType == null)
-            {
-                return false;
-            }
 
             var audioSources = UnityEngine.Object.FindObjectsOfType<AudioSource>();
             if (audioSources == null || audioSources.Length == 0)
@@ -48,62 +28,39 @@ namespace GRC2.Injectors
 
             foreach (var audioSource in audioSources)
             {
-                var components = audioSource.GetComponents<Component>();
-                foreach (var component in components)
+                var beatManager = audioSource.GetComponent<cBGMBeatManager>();
+                if (beatManager != null)
                 {
-                    if (component != null && component.GetType() == bgmBeatManagerType)
-                    {
-                        instance = component;
-                        return true;
-                    }
+                    instance = beatManager;
+                    return true;
                 }
             }
 
             return false;
         }
 
-        public static void LogOriginalAudioInfo(Type bgmBeatManagerType, object instance, string logPrefix)
+        public static void LogOriginalAudioInfo(cBGMBeatManager instance, string logPrefix)
         {
-            if (bgmBeatManagerType == null || instance == null)
+            if (instance == null)
             {
                 return;
             }
 
-            var getAudioClipMethod = bgmBeatManagerType.GetMethod("getAudioClip", 
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            if (getAudioClipMethod != null)
+            var originalClip = instance.getAudioClip();
+            if (originalClip != null)
             {
-                try
-                {
-                    var originalClip = getAudioClipMethod.Invoke(instance, null) as AudioClip;
-                    if (originalClip != null)
-                    {
-                        MelonLogger.Msg($"[{logPrefix}] 원본 AudioClip: {originalClip.name}, 길이: {originalClip.length:F3}초 ({originalClip.samples} 샘플)");
-                    }
-                    else
-                    {
-                        MelonLogger.Msg($"[{logPrefix}] 원본 AudioClip: null");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning($"[{logPrefix}] 원본 AudioClip 확인 실패: {ex.Message}");
-                }
+                MelonLogger.Msg($"[{logPrefix}] 원본 AudioClip: {originalClip.name}, 길이: {originalClip.length:F3}초 ({originalClip.samples} 샘플)");
+            }
+            else
+            {
+                MelonLogger.Msg($"[{logPrefix}] 원본 AudioClip: null");
             }
 
-            var fields = bgmBeatManagerType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach (var field in fields)
+            var audioSource = instance.getAudioSorce();
+            if (audioSource != null && audioSource.clip != null)
             {
-                if (field.FieldType == typeof(AudioSource))
-                {
-                    var audioSource = field.GetValue(instance) as AudioSource;
-                    if (audioSource != null && audioSource.clip != null)
-                    {
-                        MelonLogger.Msg($"[{logPrefix}] AudioSource ({field.Name}) 원본 클립: {audioSource.clip.name}, 길이: {audioSource.clip.length:F3}초 ({audioSource.clip.samples} 샘플)");
-                    }
-                }
+                MelonLogger.Msg($"[{logPrefix}] AudioSource 원본 클립: {audioSource.clip.name}, 길이: {audioSource.clip.length:F3}초 ({audioSource.clip.samples} 샘플)");
             }
         }
     }
 }
-

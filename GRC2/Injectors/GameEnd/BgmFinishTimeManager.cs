@@ -1,7 +1,7 @@
 using System;
-using System.Reflection;
+using HarmonyLib;
+using IntiCreates;
 using MelonLoader;
-using UnityEngine;
 
 namespace GRC2.Injectors
 {
@@ -10,6 +10,11 @@ namespace GRC2.Injectors
     /// </summary>
     internal static class BgmFinishTimeManager
     {
+        private const float SampleRate = 48000f;
+
+        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
+            AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
+
         private static float _targetFinishTime = 0f;
 
         public static float GetTargetFinishTime()
@@ -22,60 +27,51 @@ namespace GRC2.Injectors
             _targetFinishTime = 0f;
         }
 
-        public static void SetFinishTime(float newBgmLength, Type bgmBeatManagerType)
+        public static void SetFinishTime(float newBgmLength)
         {
             try
             {
-                // 노트 배열에서 마지막 노트 시간 계산
-                float lastNoteTime = 0f;
-                var assembly = bgmBeatManagerType.Assembly;
-                var notesManagerType = assembly.GetType("IntiCreates.cFairyModeNotesManager");
-                if (notesManagerType != null)
-                {
-                    var notesManagers = UnityEngine.Object.FindObjectsOfType(notesManagerType);
-                    if (notesManagers != null && notesManagers.Length > 0)
-                    {
-                        var notesManagerInstance = notesManagers[0];
-                        var noteArrayField = notesManagerType.GetField("mFairyNoteCreateDataArray", 
-                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (noteArrayField != null)
-                        {
-                            var noteArray = noteArrayField.GetValue(notesManagerInstance) as Array;
-                            if (noteArray != null && noteArray.Length > 0)
-                            {
-                                int lastNoteSample = 0;
-                                foreach (var noteObj in noteArray)
-                                {
-                                    if (noteObj != null)
-                                    {
-                                        var perfectSampleField = noteObj.GetType().GetField("perfectSample", 
-                                            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                                        if (perfectSampleField != null)
-                                        {
-                                            var sample = perfectSampleField.GetValue(noteObj);
-                                            if (sample is int intSample && intSample > lastNoteSample)
-                                            {
-                                                lastNoteSample = intSample;
-                                            }
-                                        }
-                                    }
-                                }
-                                lastNoteTime = lastNoteSample / 48000f;
-                            }
-                        }
-                    }
-                }
-                
+                float lastNoteTime = GetLastNoteTime();
+
                 // 종료 시간은 BGM 길이와 마지막 노트 시간 중 더 큰 값 사용
                 float finishTime = Math.Max(newBgmLength, lastNoteTime);
                 _targetFinishTime = finishTime;
-                
+
                 MelonLogger.Msg($"[BgmFinishTimeManager] 게임 종료 시간 설정: {finishTime:F3}초 (BGM: {newBgmLength:F3}초, 마지막 노트: {lastNoteTime:F3}초)");
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[BgmFinishTimeManager] 게임 종료 시간 설정 오류: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 노트 배열에서 마지막 노트 시간을 계산합니다.
+        /// </summary>
+        private static float GetLastNoteTime()
+        {
+            var notesManager = UnityEngine.Object.FindObjectOfType<cFairyModeNotesManager>();
+            if (notesManager == null)
+            {
+                return 0f;
+            }
+
+            var noteArray = NoteArrayRef(notesManager);
+            if (noteArray == null || noteArray.Length == 0)
+            {
+                return 0f;
+            }
+
+            int lastNoteSample = 0;
+            foreach (var note in noteArray)
+            {
+                if (note != null && note.perfectSample > lastNoteSample)
+                {
+                    lastNoteSample = note.perfectSample;
+                }
+            }
+
+            return lastNoteSample / SampleRate;
         }
     }
 }

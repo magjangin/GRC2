@@ -1,11 +1,7 @@
 using System;
 using System.Collections;
-using System.IO;
-using System.Linq;
-using System.Reflection;
 using IntiCreates;
 using MelonLoader;
-using UnityEngine;
 using GRC2.Helpers;
 
 namespace GRC2.Injectors
@@ -15,10 +11,12 @@ namespace GRC2.Injectors
     /// </summary>
     internal static class BgmInjector
     {
+        private const int MaxAttemptCount = 10;
+
         private static bool _bgmInjected = false;
         private static int _bgmAttemptCount = 0;
         private static bool _bgmLogShown = false;
-        private static object _bgmBeatManagerInstance = null;
+        private static cBGMBeatManager _bgmBeatManagerInstance = null;
 
         public static bool IsInjected => _bgmInjected;
         public static int AttemptCount => _bgmAttemptCount;
@@ -35,11 +33,10 @@ namespace GRC2.Injectors
         public static IEnumerator TryInjectBgmCoroutine(string bgmFilePath)
         {
             MelonLogger.Msg("[BgmInjector] TryInjectBgmCoroutine 시작");
-            Type bgmBeatManagerType = typeof(cBGMBeatManager);
-            
+
             // 시도 횟수 제한
             _bgmAttemptCount++;
-            if (_bgmAttemptCount > 10)
+            if (_bgmAttemptCount > MaxAttemptCount)
             {
                 if (!_bgmLogShown)
                 {
@@ -49,136 +46,55 @@ namespace GRC2.Injectors
                 yield break;
             }
 
-            MelonLogger.Msg($"[BgmInjector] BGM 주입 시도 횟수: {_bgmAttemptCount}/10");
+            MelonLogger.Msg($"[BgmInjector] BGM 주입 시도 횟수: {_bgmAttemptCount}/{MaxAttemptCount}");
 
             // ⚡ 성능 최적화: 캐시된 인스턴스 확인 (이미 발견되었으면 재검색 생략)
-            if (bgmBeatManagerType != null && _bgmBeatManagerInstance == null)
-            {
-                try
-                {
-                    if (BgmSearcher.TryFindBeatManager(bgmBeatManagerType, out var beatManager))
-                    {
-                        _bgmBeatManagerInstance = beatManager;
-                        MelonLogger.Msg("[BgmInjector] cBGMBeatManager 인스턴스 발견");
-                        BgmSearcher.LogOriginalAudioInfo(bgmBeatManagerType, _bgmBeatManagerInstance, "BgmInjector");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogWarning(ex, "[BgmInjector] FindBgmBeatManagerCoroutine", "FindObjectOfType(cBGMBeatManager) 실패");
-                }
-            }
-
-            // cBGMBeatManager를 찾지 못한 경우, AudioSource에서만 찾기 (단 한 번)
             if (_bgmBeatManagerInstance == null)
             {
-                try
-                {
-                    if (BgmSearcher.TryFindBeatManagerFromAudioSource(bgmBeatManagerType, out var beatManagerFromAudio))
-                    {
-                        _bgmBeatManagerInstance = beatManagerFromAudio;
-                        MelonLogger.Msg("[BgmInjector] AudioSource에서 cBGMBeatManager 발견");
-                        BgmSearcher.LogOriginalAudioInfo(bgmBeatManagerType, _bgmBeatManagerInstance, "BgmInjector");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    ErrorLogger.LogWarning(ex, "[BgmInjector] FindBgmBeatManagerCoroutine", "AudioSource 경로 검색 실패");
-                }
+                FindBeatManager();
             }
 
             // cBGMBeatManager 메서드로 BGM 주입 시도 (이미 주입되지 않은 경우만)
-            if (!_bgmInjected && _bgmBeatManagerInstance != null && bgmBeatManagerType != null)
+            if (!_bgmInjected && _bgmBeatManagerInstance != null)
             {
-                yield return TryInjectBgmToManager(bgmFilePath, bgmBeatManagerType);
+                yield return BgmLoader.LoadAndInjectAudioClip(
+                    bgmFilePath,
+                    _bgmBeatManagerInstance,
+                    (injected) => _bgmInjected = injected);
             }
         }
 
-        private static IEnumerator TryInjectBgmToManager(string bgmFilePath, Type bgmBeatManagerType)
+        private static void FindBeatManager()
         {
-            // 이미 주입되었으면 중복 주입 방지
-            if (_bgmInjected)
-            {
-                yield break;
-            }
-            
-            if (_bgmBeatManagerInstance == null || bgmBeatManagerType == null)
-            {
-                yield break;
-            }
-
-            // setClip 메서드 찾기
-            MethodInfo setClipMethod = null;
             try
             {
-                setClipMethod = bgmBeatManagerType.GetMethod("setClip", 
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                if (BgmSearcher.TryFindBeatManager(out var beatManager))
+                {
+                    _bgmBeatManagerInstance = beatManager;
+                    MelonLogger.Msg("[BgmInjector] cBGMBeatManager 인스턴스 발견");
+                    BgmSearcher.LogOriginalAudioInfo(_bgmBeatManagerInstance, "BgmInjector");
+                    return;
+                }
             }
             catch (Exception ex)
             {
-                if (!_bgmLogShown)
+                ErrorLogger.LogWarning(ex, "[BgmInjector] FindBeatManager", "FindObjectOfType(cBGMBeatManager) 실패");
+            }
+
+            // 활성 컴포넌트에서 찾지 못한 경우 AudioSource 쪽에서 역으로 찾기
+            try
+            {
+                if (BgmSearcher.TryFindBeatManagerFromAudioSource(out var beatManagerFromAudio))
                 {
-                    MelonLogger.Warning($"[BgmInjector] setClip 메서드 찾기 실패: {ex.Message}");
-                    _bgmLogShown = true;
+                    _bgmBeatManagerInstance = beatManagerFromAudio;
+                    MelonLogger.Msg("[BgmInjector] AudioSource에서 cBGMBeatManager 발견");
+                    BgmSearcher.LogOriginalAudioInfo(_bgmBeatManagerInstance, "BgmInjector");
                 }
             }
-            
-            if (setClipMethod != null)
+            catch (Exception ex)
             {
-                MelonLogger.Msg("[BgmInjector] setClip 메서드 발견, BGM 로드 시도");
-                
-                var parameters = setClipMethod.GetParameters();
-                
-                // 파일 경로를 받는지 확인
-                if (parameters.Length > 0 && parameters[0].ParameterType == typeof(string))
-                {
-                    // 파일 경로를 직접 전달
-                    try
-                    {
-                        if (parameters.Length == 2 && parameters[1].ParameterType == typeof(bool))
-                        {
-                            setClipMethod.Invoke(_bgmBeatManagerInstance, new object[] { bgmFilePath, false });
-                        }
-                        else
-                        {
-                            setClipMethod.Invoke(_bgmBeatManagerInstance, new object[] { bgmFilePath });
-                        }
-                        MelonLogger.Msg("[BgmInjector] BGM 주입 성공 (setClip with file path)");
-                        _bgmInjected = true;
-                        yield break;
-                    }
-                    catch (Exception ex)
-                    {
-                        if (!_bgmLogShown)
-                        {
-                            MelonLogger.Warning($"[BgmInjector] setClip 호출 실패: {ex.Message}");
-                            _bgmLogShown = true;
-                        }
-                    }
-                }
-                else if (parameters.Length > 0 && parameters[0].ParameterType == typeof(AudioClip))
-                {
-                    // AudioClip을 받는 경우 - BgmLoader로 위임
-                    yield return BgmLoader.LoadAndInjectAudioClip(
-                        bgmFilePath, 
-                        setClipMethod, 
-                        parameters, 
-                        bgmBeatManagerType,
-                        _bgmBeatManagerInstance,
-                        (injected) => _bgmInjected = injected);
-                }
-            }
-            else
-            {
-                // setClip이 없으면 _sorce 필드에 직접 접근 시도
-                yield return BgmLoader.TryInjectViaSorceField(
-                    bgmFilePath, 
-                    bgmBeatManagerType,
-                    _bgmBeatManagerInstance,
-                    (injected) => _bgmInjected = injected,
-                    (shown) => _bgmLogShown = shown);
+                ErrorLogger.LogWarning(ex, "[BgmInjector] FindBeatManager", "AudioSource 경로 검색 실패");
             }
         }
-
     }
 }
