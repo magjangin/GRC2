@@ -20,7 +20,6 @@ namespace GRC2.Builders
 
         public static object CreateNoteCreateData(BmsNote bmsNote)
         {
-// ... (skipping for a moment to replace the actual method content instead of the whole file, wait I should use line numbers correctly)
             try
             {
                 if (GameTypeLoader.NoteCreateDataType == null)
@@ -55,34 +54,16 @@ namespace GRC2.Builders
                     return null;
                 }
                 
-                // Boolean 값 (Left/Right)
-                bool isLeftBool = bmsNote.IsLeft;
-                
-                // 생성자 찾기 시도
-                object noteCreateData = NoteConstructorHelper.TryFindConstructor(
-                    GameTypeLoader.NoteCreateDataType,
-                    bmsNote,
-                    perfectSample,
-                    noteTypeId,
-                    isLeftBool);
-                
-                // 기본 생성자 사용 여부 추적
-                bool usedDefaultConstructor = false;
-                
-                // 생성자를 찾지 못한 경우 기본 생성자 사용
+                // NoteCreateData는 명시적 생성자가 없으므로 기본 생성자로 만들고 필드를 채웁니다.
+                object noteCreateData = Activator.CreateInstance(GameTypeLoader.NoteCreateDataType);
                 if (noteCreateData == null)
                 {
-                    noteCreateData = Activator.CreateInstance(GameTypeLoader.NoteCreateDataType);
-                    if (noteCreateData == null)
-                    {
-                        MelonLogger.Error("[NoteCreateDataBuilder] NoteCreateData 인스턴스 생성 실패");
-                        return null;
-                    }
-                    usedDefaultConstructor = true;
+                    MelonLogger.Error("[NoteCreateDataBuilder] NoteCreateData 인스턴스 생성 실패");
+                    return null;
                 }
 
                 // perfectSample 설정
-                SetPerfectSample(noteCreateData, perfectSample, usedDefaultConstructor);
+                SetSampleFields(noteCreateData, perfectSample);
 
                 // laneLeftRightID 설정
                 FieldAccessHelper.SetFieldValue(noteCreateData, FieldAccessHelper.FIELD_LANE_LEFT_RIGHT_ID, laneLeftRight);
@@ -254,32 +235,6 @@ namespace GRC2.Builders
     public static partial class NoteCreateDataBuilder
     {
         /// <summary>
-        /// perfectSample 필드를 설정합니다.
-        /// </summary>
-        private static void SetPerfectSample(object noteCreateData, int perfectSample, bool usedDefaultConstructor)
-        {
-            var existingPerfectSample = FieldAccessHelper.GetFieldValue(noteCreateData, FieldAccessHelper.FIELD_PERFECT_SAMPLE);
-            var existingMSample = FieldAccessHelper.GetFieldValue(noteCreateData, "mSample");
-
-            bool needsManualSet = usedDefaultConstructor ||
-                (existingPerfectSample == null && existingMSample == null) ||
-                (existingPerfectSample != null && (int)existingPerfectSample == 0) ||
-                (existingMSample != null && (int)existingMSample == 0);
-
-            if (needsManualSet)
-            {
-                SetSampleFields(noteCreateData, perfectSample);
-                return;
-            }
-
-            var actualSample = existingPerfectSample ?? existingMSample;
-            if (actualSample != null && !actualSample.Equals(perfectSample))
-            {
-                MelonLogger.Warning($"[NoteCreateDataBuilder] perfectSample 불일치: 생성자={actualSample}, 예상={perfectSample}");
-            }
-        }
-
-        /// <summary>
         /// 최종 perfectSample 값을 검증합니다.
         /// </summary>
         private static void ValidatePerfectSample(object noteCreateData, int perfectSample, BmsNote bmsNote)
@@ -304,8 +259,6 @@ namespace GRC2.Builders
         private static void SetSampleFields(object noteCreateData, int perfectSample)
         {
             FieldAccessHelper.SetFieldValue(noteCreateData, FieldAccessHelper.FIELD_PERFECT_SAMPLE, perfectSample);
-            FieldAccessHelper.SetFieldValue(noteCreateData, "mSample", perfectSample);
-            FieldAccessHelper.SetFieldValue(noteCreateData, "sample", perfectSample);
         }
     }
 }

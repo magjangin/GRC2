@@ -54,7 +54,6 @@
     <Reference Include="$(GameManaged)\Unity.*.dll" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Builders\NoteConstructorHelper.cs" />
     <Compile Include="Builders\NoteCreateDataBuilder.cs" />
     <Compile Include="Builders\NoteFieldInitializer.cs" />
     <Compile Include="Converters\BmsNoteConverter.cs" />

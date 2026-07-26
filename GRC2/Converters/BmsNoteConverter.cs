@@ -337,12 +337,6 @@ namespace GRC2.Converters
             if (TryGetIntField(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE, out int perfectSample) && perfectSample == 0)
                 return true;
 
-            if (TryGetIntField(note, "mSample", out int mSample) && mSample == 0)
-                return true;
-
-            if (TryGetFloatField(note, "Time", out float time) && Math.Abs(time) < 0.0001f)
-                return true;
-
             return false;
         }
 
@@ -352,15 +346,6 @@ namespace GRC2.Converters
             var raw = Helpers.FieldAccessHelper.GetFieldValue(obj, fieldName);
             if (raw == null) return false;
             try { value = Convert.ToInt32(raw); return true; }
-            catch { return false; }
-        }
-
-        private static bool TryGetFloatField(object obj, string fieldName, out float value)
-        {
-            value = 0f;
-            var raw = Helpers.FieldAccessHelper.GetFieldValue(obj, fieldName);
-            if (raw == null) return false;
-            try { value = Convert.ToSingle(raw); return true; }
             catch { return false; }
         }
 
