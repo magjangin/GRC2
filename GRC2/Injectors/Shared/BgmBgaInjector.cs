@@ -20,9 +20,6 @@ namespace GRC2.Injectors
         {
             _hwaFolderPath = hwaFolderPath;
             
-            // 게임 타입 찾기
-            GameTypeSearcher.SearchGameTypes();
-            
             // BGA 파일 검색 (mp4)
             var bgaFiles = Directory.GetFiles(_hwaFolderPath, "*.mp4", SearchOption.TopDirectoryOnly)
                 .ToList();
@@ -84,7 +81,6 @@ namespace GRC2.Injectors
             {
                 MelonLogger.Msg($"[BgmBgaInjector] 기존 코루틴 중지 및 상태 리셋 (재시작)");
                 StopInjection();
-                ResetInjectionState();
                 
                 // 재시작 시 아트워크 캐시도 리셋 (플레이 씬 재로드 시 새로운 GameObject를 찾기 위해)
                 Core.PlaySceneArtworkInjector.ResetCache();
@@ -108,6 +104,8 @@ namespace GRC2.Injectors
                 MelonCoroutines.Stop(_injectionCoroutine);
                 _injectionCoroutine = null;
             }
+
+            ResetInjectionState();
         }
 
         public static void ResetPlaySceneState()
@@ -163,7 +161,7 @@ namespace GRC2.Injectors
                 if (!BgmInjector.IsInjected && !string.IsNullOrEmpty(_bgmFilePath) && _isPlayScene)
                 {
                     MelonLogger.Msg("[BgmBgaInjector] BGM 주입 시도 시작");
-                    yield return BgmInjector.TryInjectBgmCoroutine(_bgmFilePath, GameTypeSearcher.BgmBeatManagerType, _isPlayScene);
+                    yield return BgmInjector.TryInjectBgmCoroutine(_bgmFilePath);
                     if (BgmInjector.IsInjected)
                     {
                         MelonLogger.Msg("[BgmBgaInjector] BGM 주입 완료");
@@ -184,13 +182,6 @@ namespace GRC2.Injectors
                     break;
                 }
             }
-        }
-
-        public static void Reset()
-        {
-            BgaInjector.Reset();
-            BgmInjector.Reset();
-            _isPlayScene = false;
         }
     }
 }

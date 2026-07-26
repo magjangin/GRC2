@@ -1,5 +1,6 @@
 using System;
 using System.Reflection;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 
@@ -10,7 +11,8 @@ namespace GRC2.Helpers
     /// </summary>
     public static class PauseKeyHandler
     {
-        private static Type _rythmGameManagerType = null;
+        private static readonly Type RythmGameManagerType =
+            typeof(cRythmGameManager);
         private static MethodInfo _requestPauseMethod = null;
         private static MethodInfo _setPauseButtonPushableMethod = null;
         private static FieldInfo _pauseMenuWorkField = null;
@@ -30,15 +32,8 @@ namespace GRC2.Helpers
 
             try
             {
-                if (_rythmGameManagerType == null)
-                {
-                    _rythmGameManagerType = Core.ReflectionHelper.FindType("IntiCreates.cRythmGameManager");
-                }
-
-                if (_rythmGameManagerType == null)
-                    return;
-
-                var managers = UnityEngine.Object.FindObjectsOfType(_rythmGameManagerType);
+                var managers =
+                    UnityEngine.Object.FindObjectsOfType(RythmGameManagerType);
                 if (managers == null || managers.Length == 0)
                     return;
 
@@ -46,12 +41,12 @@ namespace GRC2.Helpers
 
                 if (_isPausingField == null)
                 {
-                    _isPausingField = _rythmGameManagerType.GetField("mIsPausing", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    _isPausingField = RythmGameManagerType.GetField("mIsPausing", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 }
 
                 if (_pauseMenuWorkField == null)
                 {
-                    _pauseMenuWorkField = _rythmGameManagerType.GetField("mPauseMenuWork", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                    _pauseMenuWorkField = RythmGameManagerType.GetField("mPauseMenuWork", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                 }
 
                 bool isPausing = false;
@@ -102,12 +97,12 @@ namespace GRC2.Helpers
                     // 일시정지 메뉴 열기 시도
                     if (_setPauseButtonPushableMethod == null)
                     {
-                        _setPauseButtonPushableMethod = _rythmGameManagerType.GetMethod("setPauseButtonPusable", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                        _setPauseButtonPushableMethod = RythmGameManagerType.GetMethod("setPauseButtonPusable", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
                     }
 
                     if (_requestPauseMethod == null)
                     {
-                        _requestPauseMethod = _rythmGameManagerType.GetMethod("requestPause", BindingFlags.Public | BindingFlags.Instance);
+                        _requestPauseMethod = RythmGameManagerType.GetMethod("requestPause", BindingFlags.Public | BindingFlags.Instance);
                     }
 
                     // 일시정지 버튼 활성화 상태 강제

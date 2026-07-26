@@ -8,6 +8,10 @@ This folder is the current home for project documentation. Documents are grouped
 - [Harmony Layer README](../GRC2/Harmony/README.md): source-folder-level guide for `GRC2/Harmony`.
 - [Legacy README](archive/README_legacy.md): older comprehensive notes kept for reference only.
 
+`HOOK_MAP.md`, the Harmony layer README, and the cleanup baseline below are the
+current source of truth. Topic guides that still mention removed runtime type
+searchers or scene injectors describe older implementations.
+
 ## Folders
 
 ### `architecture`
@@ -90,3 +94,20 @@ As of 2026-07-26 (v0.2.0 Refactoring & Performance Update):
 - **Hook Cleanup**: Removed unregistered, empty, and logging-only hooks (Music Select, Sort, Filter, BGM state monitoring). Removed 7 unused diagnostic and helper files (`CharactorLoadPatch.cs`, `MusicTitlePatch.cs`, `CustomChartHandler.cs`, `BgmAudioStateChecker.cs`, `BgmFormattingUtils.cs`, `BgmMethodCallHooks.cs`, `BgmMonitorCoroutine.cs`). Registered only required Harmony patches. Wrapped original game-end coroutine instead of replacing it. Reduced key file line counts: `MusicScrollViewHooks.cs` (~390 lines), `GameFlowHooks.cs` (~160 lines), `Patchers.cs` (243 lines), `BgmGameEndMonitor.cs` (164 lines).
 - **Custom Song Select Performance Optimization**: Removed scene-wide `AudioSource` searches, targeting preview and ambience sources directly. Replaced synchronous cover image file reading & main-thread decoding with async loading and a 12-image cache. Added 80ms image debounce and 150ms preview BGM debounce on fast scroll. Added cancellation of in-flight audio requests on song change. Applied streaming load & 3-song cache for preview BGM. Reused preview `GameObject` and `AudioSource`. Added duplicate `MusicID` check.
 - **Ruby Text Fix**: Cleared `songTitleRuby` and `songTitleRubyDirect` fields to eliminate small text above custom titles while maintaining full title display and sorting functionality.
+
+As of 2026-07-26 (Harmony automatic patch migration):
+
+- Added direct compile-time references to `Assembly-CSharp.dll` and the
+  Steamworks managed assembly without copying them to fresh build output.
+- Replaced delayed reflection registration and manual `Harmony.Patch(...)`
+  calls with `[HarmonyPatch]` declarations and one `PatchAll()` startup call.
+- Removed `Harmony/Registration/Patchers.cs` and
+  `Injectors/Shared/PatchApplier.cs`.
+- Removed obsolete runtime type search and duplicate scene injection paths after
+  validating their owners against `Decompiled/`: `ReflectionHelper.cs`,
+  `GameTypeSearcher.cs`, `SceneHandler.cs`, and `ResultSceneInjector.cs`.
+- Bound preview audio to `cMusicSelectSceneUIUpdater`, result UI to
+  `initializePreFade`, BGM sync to `cBGMBeatManager`, and note types to direct
+  `Assembly-CSharp` types.
+- Current managed source count is 45 files under `GRC2/`, excluding `bin/obj`
+  (`GRC2.Tests`: 2 files).

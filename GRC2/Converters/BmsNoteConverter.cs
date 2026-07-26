@@ -16,11 +16,6 @@ namespace GRC2.Converters
         // 상세 로깅 플래그 (성능 최적화용, 기본 비활성화)
         private static readonly bool EnableDetailedHoldNoteLogging = false;
 
-        public static void Initialize()
-        {
-            Loaders.GameTypeLoader.Initialize();
-        }
-
         /// <summary>
         /// BMS 노트를 게임의 NoteCreateData 배열로 변환합니다.
         /// </summary>
@@ -31,7 +26,7 @@ namespace GRC2.Converters
             // 타입 안전성: 초기화 검증
             if (Loaders.GameTypeLoader.NoteCreateDataType == null)
             {
-                MelonLogger.Error("[BmsNoteConverter] 초기화되지 않았습니다. Initialize()를 먼저 호출하세요.");
+                MelonLogger.Error("[BmsNoteConverter] NoteCreateData 타입을 확인할 수 없습니다.");
                 return null;
             }
 

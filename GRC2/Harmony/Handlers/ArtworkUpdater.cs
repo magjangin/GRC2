@@ -1,4 +1,5 @@
 using GRC2.Core;
+using IntiCreates;
 using MelonLoader;
 using System;
 using System.IO;
@@ -12,10 +13,10 @@ namespace GRC2.Harmony.Handlers
     /// </summary>
     public static class ArtworkUpdater
     {
-        public static void UpdateArtwork(object instance, Type instanceType)
+        public static void UpdateArtwork(
+            cMusicSelectSceneUIUpdater instance)
         {
             if (instance == null ||
-                instanceType == null ||
                 !CustomAssetManager.IsCustomChartSelected())
             {
                 return;
@@ -31,7 +32,7 @@ namespace GRC2.Harmony.Handlers
                 imagePath,
                 out Sprite cachedSprite))
             {
-                ApplyArtwork(instance, instanceType, cachedSprite);
+                ApplyArtwork(instance, cachedSprite);
                 return;
             }
 
@@ -51,13 +52,12 @@ namespace GRC2.Harmony.Handlers
                         return;
                     }
 
-                    ApplyArtwork(instance, instanceType, sprite);
+                    ApplyArtwork(instance, sprite);
                 });
         }
 
         private static void ApplyArtwork(
-            object sceneUpdater,
-            Type sceneUpdaterType,
+            cMusicSelectSceneUIUpdater sceneUpdater,
             Sprite sprite)
         {
             if (sprite == null)
@@ -73,19 +73,16 @@ namespace GRC2.Harmony.Handlers
                     BindingFlags.Instance;
 
                 FieldInfo managerField =
-                    sceneUpdaterType.GetField("mArtWorkAndMusicDetail", flags);
+                    typeof(cMusicSelectSceneUIUpdater).GetField(
+                        "mArtWorkAndMusicDetail",
+                        flags);
                 object artworkManager = managerField?.GetValue(sceneUpdater);
                 if (artworkManager == null)
                 {
                     return;
                 }
 
-                Type artworkType =
-                    ReflectionHelper.FindType("IntiCreates.cMusicSelectArtWork");
-                if (artworkType == null)
-                {
-                    return;
-                }
+                Type artworkType = typeof(cMusicSelectArtWork);
 
                 object artworkInstance = FindArtworkInstance(
                     artworkManager,

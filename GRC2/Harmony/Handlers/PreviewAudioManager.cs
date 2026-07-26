@@ -1,4 +1,4 @@
-using GRC2.Core;
+using IntiCreates;
 using MelonLoader;
 using System;
 using System.Collections;
@@ -17,29 +17,33 @@ namespace GRC2.Harmony.Handlers
         private static readonly Dictionary<AudioSource, float> MutedSources =
             new Dictionary<AudioSource, float>();
 
-        private static Type _soundManagerType;
-        private static FieldInfo _previewSourceField;
-        private static FieldInfo _ambientSourceField;
-        private static object _soundManagerInstance;
+        private const BindingFlags InstanceFlags =
+            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        private static readonly FieldInfo PreviewSourceField =
+            typeof(cMusicSelectSceneUIUpdater).GetField(
+                "mPreviewAudioSorce",
+                InstanceFlags);
+        private static readonly FieldInfo AmbientSourceField =
+            typeof(cMusicSelectSceneUIUpdater).GetField(
+                "mAmbientAudioSorce",
+                InstanceFlags);
         private static bool _isMonitoring;
 
-        public static bool IsMonitoring => _isMonitoring;
-        public static int MutedCount => MutedSources.Count;
-
-        public static void StopPreviewAndAmbient()
+        public static void StopPreviewAndAmbient(
+            cMusicSelectSceneUIUpdater updater)
         {
             try
             {
-                AudioSource[] sources = GetSoundManagerSources();
+                AudioSource[] sources = GetUpdaterSources(updater);
                 for (int i = 0; i < sources.Length; i++)
                 {
                     MuteSource(sources[i]);
                 }
 
-                if (!_isMonitoring && MutedSources.Count > 0)
+                if (!_isMonitoring && updater != null)
                 {
                     _isMonitoring = true;
-                    MelonCoroutines.Start(KeepMutedCoroutine());
+                    MelonCoroutines.Start(KeepMutedCoroutine(updater));
                 }
             }
             catch (Exception ex)
@@ -76,14 +80,14 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        public static void Reset()
+        public static void DiscardMutedSourceState()
         {
             _isMonitoring = false;
             MutedSources.Clear();
-            _soundManagerInstance = null;
         }
 
-        private static IEnumerator KeepMutedCoroutine()
+        private static IEnumerator KeepMutedCoroutine(
+            cMusicSelectSceneUIUpdater updater)
         {
             const float duration = 2f;
             const float interval = 0.1f;
@@ -93,6 +97,12 @@ namespace GRC2.Harmony.Handlers
                    elapsed < duration &&
                    Core.CustomAssetManager.IsCustomChartSelected())
             {
+                AudioSource[] currentSources = GetUpdaterSources(updater);
+                for (int i = 0; i < currentSources.Length; i++)
+                {
+                    MuteSource(currentSources[i]);
+                }
+
                 foreach (KeyValuePair<AudioSource, float> entry in MutedSources)
                 {
                     MuteSourceWithoutRecording(entry.Key);
@@ -136,17 +146,18 @@ namespace GRC2.Harmony.Handlers
             source.mute = true;
         }
 
-        private static AudioSource[] GetSoundManagerSources()
+        private static AudioSource[] GetUpdaterSources(
+            cMusicSelectSceneUIUpdater updater)
         {
-            EnsureSoundManagerMetadata();
-            object manager = GetSoundManagerInstance();
-            if (manager == null)
+            if (updater == null)
             {
                 return Array.Empty<AudioSource>();
             }
 
-            AudioSource preview = _previewSourceField?.GetValue(manager) as AudioSource;
-            AudioSource ambient = _ambientSourceField?.GetValue(manager) as AudioSource;
+            AudioSource preview =
+                PreviewSourceField?.GetValue(updater) as AudioSource;
+            AudioSource ambient =
+                AmbientSourceField?.GetValue(updater) as AudioSource;
 
             if (preview == null)
             {
@@ -161,48 +172,6 @@ namespace GRC2.Harmony.Handlers
             }
 
             return new[] { preview, ambient };
-        }
-
-        private static void EnsureSoundManagerMetadata()
-        {
-            if (_soundManagerType != null)
-            {
-                return;
-            }
-
-            _soundManagerType = ReflectionHelper.FindType("IntiCreates.cSoundManager");
-            if (_soundManagerType == null)
-            {
-                return;
-            }
-
-            const BindingFlags flags =
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-            _previewSourceField = _soundManagerType.GetField("mPreviewAudioSorce", flags);
-            _ambientSourceField = _soundManagerType.GetField("mAmbientAudioSorce", flags);
-        }
-
-        private static object GetSoundManagerInstance()
-        {
-            UnityEngine.Object cachedUnityObject = _soundManagerInstance as UnityEngine.Object;
-            if (cachedUnityObject != null)
-            {
-                return _soundManagerInstance;
-            }
-
-            _soundManagerInstance = null;
-            if (_soundManagerType == null)
-            {
-                return null;
-            }
-
-            UnityEngine.Object[] managers = UnityEngine.Object.FindObjectsOfType(_soundManagerType);
-            if (managers != null && managers.Length > 0)
-            {
-                _soundManagerInstance = managers[0];
-            }
-
-            return _soundManagerInstance;
         }
     }
 }

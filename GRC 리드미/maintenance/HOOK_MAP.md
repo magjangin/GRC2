@@ -11,12 +11,10 @@ File: `GRC2/Core/Scene/SceneDetector.cs`
 
 Main startup path. It:
 
-- locks the Steam manifest;
-- initializes music-list hooks through `MusicInjector.Initialize()`;
+- applies every `[HarmonyPatch]` in the mod assembly through `MusicInjector.Initialize()`;
 - locates the game `hwa` folder;
-- scans albums, song metadata, custom assets, and BMS files;
-- initializes BMS note conversion;
-- initializes note-array replacement hooks;
+- scans albums, song metadata, custom artwork, and BMS files;
+- supplies parsed BMS data to the already-registered note-array hook;
 - initializes BGM/BGA injectors.
 
 ### `SceneDetector.OnSceneWasLoaded`
@@ -55,7 +53,6 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Registration/Patchers.cs` (`AudioClipPatcher`, `PreMusicStartWindowPatcher`)
 - `GRC2/Harmony/Hooks/GameFlowHooks.cs`
 - `GRC2/Harmony/Handlers/AudioClipPatch.cs`
 
@@ -70,6 +67,8 @@ Patched game targets:
 Purpose:
 
 - detect the currently selected custom chart;
+- mute the `mPreviewAudioSorce` and `mAmbientAudioSorce` fields owned by the
+  active `cMusicSelectSceneUIUpdater`;
 - stop preview audio before gameplay;
 - map a custom id to a valid original song only while the game opens its
   pre-play window;
@@ -91,7 +90,6 @@ Owner files:
 Patched game targets:
 
 - `IntiCreates.cFairyModeNotesManager.createAllNote`
-- `IntiCreates.cFairyModeNotesManager.loadFairyNoteDatasJsonToArray`
 
 Purpose:
 
@@ -106,14 +104,14 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Registration/Patchers.cs` (`CoverImagePatcher`, `TextPatcher`)
 - `GRC2/Harmony/Handlers/ArtWorkPatch.cs`
 - `GRC2/Harmony/Handlers/TextPatch.cs`
 
 Patched game targets:
 
 - `IntiCreates.cMusicSelectArtWork.requestSetArtworkSprite`
-- UI text setters discovered by `TextPatcher`
+- `UnityEngine.UI.Text.set_text`
+- `TMPro.TMP_Text.set_text`
 
 Purpose:
 
@@ -145,6 +143,47 @@ Purpose:
 Removal risk:
 
 - custom audio may not play correctly or the song may end at the original timing.
+
+### Result scene replacement
+
+Owner file:
+
+- `GRC2/Harmony/Handlers/ResultSceneUpdaterPatch.cs`
+
+Patched game target:
+
+- `IntiCreates.cRythmGameResultSceneUpdater.initializePreFade`
+
+Purpose:
+
+- replace the result title, difficulty level, and artwork at the updater's real
+  initialization point.
+
+Removal risk:
+
+- the result screen may show the original song metadata and artwork.
+
+### Steam and DLC bypass
+
+Owner file:
+
+- `GRC2/Helpers/SteamApiHijacker.cs`
+
+Patched targets:
+
+- `Steamworks.SteamAPI` initialization/lifecycle methods;
+- `Steamworks.SteamApps.BIsDlcInstalled`;
+- `IntiCreates.Application.isDLCEnable`;
+- `IntiCreates.sAddressableDirector` DLC checks;
+- `IntiCreates.cDlcDirector` purchase check and initialization.
+
+Purpose:
+
+- preserve the existing Steam fallback and local `DataAddon` mount behavior.
+
+Removal risk:
+
+- startup without Steam or local DLC asset mounting may stop working.
 
 ### BGA and BGM sync
 
@@ -228,6 +267,26 @@ of the current source baseline:
   preserves the original end-of-song flow.
 - Removed the unreachable character-load/title/custom-chart helpers and the
   obsolete BGM diagnostic helper cluster.
+- Added a direct non-copying `Assembly-CSharp.dll` project reference.
+- Replaced delayed reflection registration and every manual `Harmony.Patch(...)`
+  call with `[HarmonyPatch]` declarations and one `PatchAll()` startup call.
+- Removed `Harmony/Registration/Patchers.cs` and
+  `Injectors/Shared/PatchApplier.cs`.
+- Removed the invalid
+  `cFairyModeNotesManager.loadFairyNoteDatasJsonToArray` target; that method
+  belongs to `FairyNoteEditorLoader`, while note injection is correctly owned by
+  the `createAllNote` prefix.
+- Removed `SceneHandler.cs`; its `cSoundManager` target does not exist in the
+  current `Assembly-CSharp.dll`, and play-scene preview cleanup already belongs
+  to `SceneDetector`.
+- Removed the polling `ResultSceneInjector.cs`; its async artwork preparation is
+  now retained inside the direct `initializePreFade` patch.
+- Removed `ReflectionHelper.cs` and `GameTypeSearcher.cs`; their remaining
+  targets are direct compile-time `Assembly-CSharp` references.
+- Replaced dynamic note type discovery with direct mappings to
+  `FairyNoteEditorLoader.NoteCreateData` and the actual game enums.
+- Made `StopInjection()` reset BGM/BGA injection state so the next song can be
+  injected after leaving the result scene.
 
 ### 2026-05-15
 

@@ -28,10 +28,7 @@ namespace GRC2.Core
         {
             MelonLogger.Msg("[SceneDetector] 모드 초기화 시작");
             
-            // 스팀 API 하이재킹 및 DLC 활성화 패치
-            Helpers.SteamApiHijacker.ApplyPatches();
-            
-            // 곡 주입 시스템 초기화 (곡목록에 커스텀 차트 추가)
+            // 모드 어셈블리의 HarmonyPatch 특성을 한 번에 등록합니다.
             MusicInjector.Initialize();
             
             try
@@ -50,11 +47,6 @@ namespace GRC2.Core
                     Directory.CreateDirectory(_hwaFolderPath);
                     MelonLogger.Msg("[SceneDetector] hwa 폴더 생성 완료");
                 }
-
-                // BmsNoteConverter 초기화
-                MelonLogger.Msg("[SceneDetector] BmsNoteConverter 초기화 시작...");
-                BmsNoteConverter.Initialize();
-                MelonLogger.Msg("[SceneDetector] BmsNoteConverter 초기화 완료");
 
                 // 앨범 폴더 스캔 (먼저 앨범들을 스캔)
                 MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 시작...");
@@ -80,23 +72,17 @@ namespace GRC2.Core
                     }
                 }
                 
-                // 커스텀 아트워크 및 프리뷰 BGM 로드 (앨범별)
-                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 및 프리뷰 BGM 스캔 시작...");
-                LoadCustomAssets();
+                // 커스텀 아트워크 로드 (앨범별)
+                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 스캔 시작...");
+                LoadCustomArtwork();
                 
                 // BMS 파일 스캔 및 파싱 (앨범별)
                 MelonLogger.Msg("[SceneDetector] BMS 파일 스캔 시작...");
                 ScanAndParseBmsFiles();
                 MelonLogger.Msg($"[SceneDetector] BMS 파일 스캔 완료: {ParsedBmsNotesByFile.Count}개 파일, 현재 선택 파일 노트 {ParsedBmsNotes.Count}개");
 
-                // NoteArrayHooks 초기화 (BMS 노트 주입)
-                NoteArrayHooks.Initialize(ParsedBmsNotes);
-
-
-                // BgmInjector 초기화 (Harmony 후킹)
-                MelonLogger.Msg("[SceneDetector] BgmInjector 초기화 시작...");
-                BgmInjector.Initialize();
-                MelonLogger.Msg("[SceneDetector] BgmInjector 초기화 완료");
+                // 자동 패치는 이미 적용되어 있으므로 주입할 BMS 데이터만 갱신합니다.
+                NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
                 
                 // BgmBgaInjector 초기화
                 MelonLogger.Msg("[SceneDetector] BgmBgaInjector 초기화 시작...");
@@ -308,11 +294,11 @@ namespace GRC2.Core
             }
         }
 
-        private void LoadCustomAssets()
+        private void LoadCustomArtwork()
         {
             try
             {
-                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 및 프리뷰 BGM 파일 스캔 시작");
+                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 파일 스캔 시작");
 
                 var imageFile = AlbumManager.GetCurrentImageFile();
                 if (!string.IsNullOrEmpty(imageFile))
@@ -325,20 +311,10 @@ namespace GRC2.Core
                     MelonLogger.Msg("[SceneDetector] 현재 선택된 앨범에 커스텀 아트워크 이미지 파일이 없습니다.");
                 }
 
-                var currentBgmFile = AlbumManager.GetCurrentBgmFile();
-                if (!string.IsNullOrEmpty(currentBgmFile) && File.Exists(currentBgmFile))
-                {
-                    MelonLogger.Msg($"[SceneDetector] 프리뷰 BGM 파일 발견: {Path.GetFileName(currentBgmFile)}");
-                    CustomAssetManager.LoadCustomPreviewBGM(currentBgmFile);
-                }
-                else
-                {
-                    MelonLogger.Msg("[SceneDetector] 프리뷰 BGM 파일(music.ogg)을 찾을 수 없습니다.");
-                }
             }
             catch (Exception ex)
             {
-                ErrorLogger.LogException(ex, "[SceneDetector]", "커스텀 아트워크 및 프리뷰 BGM 로드 오류");
+                ErrorLogger.LogException(ex, "[SceneDetector]", "커스텀 아트워크 로드 오류");
             }
         }
     }
@@ -388,7 +364,6 @@ namespace GRC2.Core
                     MelonLogger.Msg($"[SceneDetector] 결과 씬 감지: {sceneName} - BGM 주입 중지");
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
-                    ResultSceneInjector.StartInjection();
                 }
                 else if (sceneName == "MusicSelectScene")
                 {
@@ -428,13 +403,11 @@ namespace GRC2.Core
 
         private void HandleFairyModeScene()
         {
-            SceneHandler.HandleFairyModeScene();
             HandlePlayScene("FairyModeScene");
         }
 
         private void HandlePlayMovieScene()
         {
-            SceneHandler.HandlePlayMovieScene();
             HandlePlayScene("PlayMovieScene");
         }
 

@@ -27,7 +27,6 @@ namespace GRC2.Harmony.Handlers
         private static string _currentPath;
         private static int _requestVersion;
 
-        public static AudioSource CurrentAudioSource => _customBgmAudioSource;
         public static bool IsPlaying =>
             _customBgmAudioSource != null && _customBgmAudioSource.isPlaying;
 
@@ -130,11 +129,6 @@ namespace GRC2.Harmony.Handlers
         {
             Cleanup();
             PreviewAudioManager.RestoreMutedAudioSources();
-        }
-
-        public static void ResetState()
-        {
-            CleanupAndRestore();
         }
 
         private static void EnsureAudioSource()

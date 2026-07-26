@@ -1,4 +1,6 @@
 using GRC2.Core;
+using HarmonyLib;
+using IntiCreates;
 using MelonLoader;
 using System;
 using System.IO;
@@ -8,12 +10,14 @@ namespace GRC2.Harmony.Handlers
     /// <summary>
     /// 원본 noticeChangedMusic 완료 후 커스텀 선택 상태와 프리뷰를 동기화합니다.
     /// </summary>
+    [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "noticeChangedMusic")]
     public static class AudioClipPatch
     {
         private static object _lastHandledMusicId;
 
+        [HarmonyPostfix]
         public static void NoticeChangedMusicPostfix(
-            object __instance,
+            cMusicSelectSceneUIUpdater __instance,
             object nextMusicID)
         {
             try
@@ -44,11 +48,10 @@ namespace GRC2.Harmony.Handlers
 
                 _lastHandledMusicId = nextMusicID;
                 CustomAssetManager.SetCustomChartSelected(true);
-                CustomAssetManager.SetCustomChartMusicID(nextMusicID);
                 TextPatch.EnableTextReplacement(true);
 
-                PreviewAudioManager.StopPreviewAndAmbient();
-                ArtworkUpdater.UpdateArtwork(__instance, __instance?.GetType());
+                PreviewAudioManager.StopPreviewAndAmbient(__instance);
+                ArtworkUpdater.UpdateArtwork(__instance);
 
                 string bgmFile = AlbumManager.GetCurrentBgmFile();
                 if (!string.IsNullOrEmpty(bgmFile) && File.Exists(bgmFile))
@@ -64,13 +67,6 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        public static void ResetState()
-        {
-            _lastHandledMusicId = null;
-            CustomBgmPlayer.ResetState();
-            PreviewAudioManager.Reset();
-        }
-
         private static void HandleNormalSongSelection()
         {
             _lastHandledMusicId = null;
@@ -82,7 +78,6 @@ namespace GRC2.Harmony.Handlers
             }
 
             CustomAssetManager.SetCustomChartSelected(false);
-            CustomAssetManager.SetCustomChartMusicID(null);
             CustomBgmPlayer.CleanupAndRestore();
         }
     }

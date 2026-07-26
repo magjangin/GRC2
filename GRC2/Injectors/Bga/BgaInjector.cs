@@ -220,11 +220,5 @@ namespace GRC2.Injectors
                 MelonLogger.Warning("[BgaInjector] BGA 재생 실패 - VideoPlayer가 재생되지 않습니다");
             }
         }
-
-        public static void ResetSync()
-        {
-            BgaBgmSyncManager.Reset();
-        }
     }
 }
-

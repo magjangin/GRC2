@@ -8,25 +8,33 @@
 - 게임 버전: 1.1.0
 
 | 폴더 | 네임스페이스 | 역할 |
-|------|----------------|------|
-| **Hooks** | `GRC2.Harmony.Hooks` | 게임 메서드에 붙는 Prefix/Postfix **진입점** (예: `GameFlowHooks`, `MusicScrollViewHooks`, `NoteArrayHooks`). |
-| **Handlers** | `GRC2.Harmony.Handlers` | Harmony가 호출하는 **패치 본문** 및 그에 딸린 헬퍼 (예: `TextPatch`, `AudioClipPatch`, `PreviewAudioManager`). |
-| **Registration** | `GRC2.Harmony.Registration` | `Harmony.Patch(...)`로 타입·메서드를 **등록**하는 클래스. 여섯 개의 `*Patcher` 클래스가 `Registration/Patchers.cs` 한 파일에 모여 있습니다. |
+|------|--------------|------|
+| **Hooks** | `GRC2.Harmony.Hooks` | 게임 메서드에 붙는 `[HarmonyPatch]` Prefix/Postfix 진입점 |
+| **Handlers** | `GRC2.Harmony.Handlers` | `[HarmonyPatch]` 패치 본문과 관련 헬퍼 |
 
-`Core/Bootstrap/MusicInjector.cs` 등에서 위 타입들을 묶어 초기화합니다.
+`GRC2.csproj`가 게임의 `Assembly-CSharp.dll`을 직접 참조합니다.
+`Core/Bootstrap/MusicInjector.cs`는 모드 초기화 때 `PatchAll()`을 한 번 호출해
+모드 어셈블리에 선언된 모든 Harmony 특성을 자동 등록합니다.
 
 ## 파일 구성
 
-2026-07-21 정리로 partial 분할을 모두 병합해 **클래스당 파일 하나**를 유지합니다.
-`Hooks/`에는 `GameFlowHooks.cs`, `MusicScrollViewHooks.cs`, `NoteArrayHooks.cs`가,
-`Handlers/`에는 패치 본문 클래스들(`AudioClipPatch`, `TextPatch`, `PreviewAudioManager` 등)이 파일 단위로 있습니다.
-네임스페이스와 public hook 메서드 이름은 분할 시절과 동일합니다.
+`Hooks/`에는 `GameFlowHooks.cs`, `MusicScrollViewHooks.cs`,
+`NoteArrayHooks.cs`가 있습니다. `Handlers/`에는 `AudioClipPatch`,
+`TextPatch`, `ResultSceneUpdaterPatch` 등의 패치 본문과 보조 클래스가
+있습니다.
+
+2026-07-26부터 별도 `Registration/` 계층, 지연 등록 코루틴, 수동
+`Harmony.Patch(...)` 호출은 사용하지 않습니다. BGM 종료와 Steam/DLC
+패치는 각 기능 폴더의 `[HarmonyPatch]` 클래스가 같은 `PatchAll()` 호출로
+등록합니다.
 
 | `GRC2/` 하위 폴더 | 한 줄 |
-|----------------|--------|
-| **`Core/Bootstrap`** | 모드 기동 시 Harmony·주입을 **연결·초기화** (`MusicInjector`). 실제 Prefix/Postfix 구현은 아래 **`Harmony/`** 에 있습니다. |
-| **`Harmony/`** | 게임 메서드 후킹: Hooks → Handlers → Registration. |
-| **`Injectors/`** | BGM/BGA 등 **런타임 리소스 주입** (Harmony 훅 본문과는 다른 축). |
-| **`Loaders/`** | 게임 타입 로딩 등 진입 보조. |
+|-------------------|-------|
+| **`Core/Bootstrap`** | 모드 기동 시 `PatchAll()`로 Harmony 특성을 자동 등록 |
+| **`Harmony/`** | 게임 메서드 후킹 대상과 Prefix/Postfix 구현 |
+| **`Injectors/`** | BGM/BGA 등 런타임 리소스 주입 |
+| **`Loaders/`** | 직접 참조한 게임 노트 타입 매핑 |
 
-현재 훅 목록과 정리 이력은 [`docs/maintenance/HOOK_MAP.md`](../../docs/maintenance/HOOK_MAP.md)를 기준으로 봅니다.
+현재 훅 목록과 정리 이력은
+[`GRC 리드미/maintenance/HOOK_MAP.md`](../../GRC%20리드미/maintenance/HOOK_MAP.md)를
+기준으로 봅니다.

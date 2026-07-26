@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using GRC2.Core;
+using HarmonyLib;
+using IntiCreates;
 using MelonLoader;
 
 namespace GRC2.Harmony.Hooks
@@ -11,6 +13,7 @@ namespace GRC2.Harmony.Hooks
     /// 원본 곡 목록이 다시 만들어진 직후 커스텀 곡을 추가합니다.
     /// 필터/정렬보다 앞에서 실행되므로 커스텀 곡도 원본과 같은 목록 규칙을 따릅니다.
     /// </summary>
+    [HarmonyPatch(typeof(cMusicSelectScrollView), "initializeMusicDataByDefault")]
     public static class MusicScrollViewHooks
     {
         private const BindingFlags InstanceFlags =
@@ -28,6 +31,7 @@ namespace GRC2.Harmony.Hooks
         private static readonly Dictionary<object, TemplateSong> TemplateSongs =
             new Dictionary<object, TemplateSong>();
 
+        [HarmonyPostfix]
         public static void InitializeMusicDataByDefaultPostfix(object __instance)
         {
             try

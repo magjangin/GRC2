@@ -120,54 +120,6 @@ namespace GRC2.Builders
                         MelonLogger.Warning("[NoteFieldInitializer] slideEndFlickDirection에 CENTER_MIDDLE을 설정할 수 없습니다.");
                     }
                 }
-                // 필드 타입이 SlideEndFlickDirection Enum인 경우
-                else if (GameTypeLoader.SlideEndFlickDirectionEnum != null && fieldType == GameTypeLoader.SlideEndFlickDirectionEnum)
-                {
-                    var numFlick = EnumValueHelper.GetEnumValue(GameTypeLoader.SlideEndFlickDirectionEnum, EnumValueHelper.GetEnumNum());
-                    if (numFlick != null)
-                    {
-                        FieldAccessHelper.SetFieldValue(noteCreateData, FieldAccessHelper.FIELD_SLIDE_END_FLICK_DIRECTION, numFlick);
-                    }
-                    else
-                    {
-                        // NUM을 찾지 못한 경우 다른 값들 시도
-                        var alternativeNames = new[] { "None", "NONE", "Num", "Default", "DEFAULT" };
-                        object enumValue = null;
-                        
-                        foreach (var name in alternativeNames)
-                        {
-                            enumValue = EnumValueHelper.GetEnumValue(GameTypeLoader.SlideEndFlickDirectionEnum, name);
-                            if (enumValue != null)
-                            {
-                                MelonLogger.Msg($"[NoteFieldInitializer] slideEndFlickDirection '{name}' 값 사용");
-                                break;
-                            }
-                        }
-                        
-                        if (enumValue == null)
-                        {
-                            // 모든 대안 실패 시 첫 번째 값 사용
-                            try
-                            {
-                                var values = Enum.GetValues(GameTypeLoader.SlideEndFlickDirectionEnum);
-                                if (values.Length > 0)
-                                {
-                                    enumValue = values.GetValue(0);
-                                    MelonLogger.Warning($"[NoteFieldInitializer] slideEndFlickDirection 'NUM'을 찾을 수 없어 첫 번째 값 사용: {enumValue}");
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                ErrorLogger.LogWarning(ex, "[NoteFieldInitializer]", "slideEndFlickDirection Enum 값 가져오기 실패");
-                            }
-                        }
-                        
-                        if (enumValue != null)
-                        {
-                            FieldAccessHelper.SetFieldValue(noteCreateData, FieldAccessHelper.FIELD_SLIDE_END_FLICK_DIRECTION, enumValue);
-                        }
-                    }
-                }
                 else
                 {
                     MelonLogger.Warning($"[NoteFieldInitializer] slideEndFlickDirection 필드 타입을 인식할 수 없습니다: {fieldType?.FullName ?? "null"}");
@@ -199,7 +151,6 @@ namespace GRC2.Builders
         }
     }
 }
-
 
 
 

@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 using GRC2.Helpers;
@@ -18,21 +19,10 @@ namespace GRC2.Injectors
         private static int _bgmAttemptCount = 0;
         private static bool _bgmLogShown = false;
         private static object _bgmBeatManagerInstance = null;
-        private static float _bgmLength = 0f; // BGM 길이 (초)
 
         public static bool IsInjected => _bgmInjected;
         public static int AttemptCount => _bgmAttemptCount;
         public static bool LogShown => _bgmLogShown;
-        public static object BgmBeatManagerInstance 
-        { 
-            get => _bgmBeatManagerInstance; 
-            set => _bgmBeatManagerInstance = value; 
-        }
-
-        public static void Initialize()
-        {
-            BgmInjectorHooks.Initialize();
-        }
 
         public static void Reset()
         {
@@ -40,44 +30,12 @@ namespace GRC2.Injectors
             _bgmAttemptCount = 0;
             _bgmLogShown = false;
             _bgmBeatManagerInstance = null;
-            _bgmLength = 0f;
-        }
-        
-        /// <summary>
-        /// BGM 길이 설정
-        /// </summary>
-        public static void SetBgmLength(float length)
-        {
-            _bgmLength = length;
-            MelonLogger.Msg($"[BgmInjector] BGM 길이 설정: {length:F3}초");
-        }
-        
-        /// <summary>
-        /// BGM 길이 가져오기
-        /// </summary>
-        public static float GetBgmLength()
-        {
-            return _bgmLength;
         }
 
-        public static void IncrementAttemptCount()
-        {
-            _bgmAttemptCount++;
-        }
-
-        public static void SetLogShown(bool value)
-        {
-            _bgmLogShown = value;
-        }
-
-        public static void SetInjected(bool value)
-        {
-            _bgmInjected = value;
-        }
-
-        public static IEnumerator TryInjectBgmCoroutine(string bgmFilePath, Type bgmBeatManagerType, bool isPlayScene)
+        public static IEnumerator TryInjectBgmCoroutine(string bgmFilePath)
         {
             MelonLogger.Msg("[BgmInjector] TryInjectBgmCoroutine 시작");
+            Type bgmBeatManagerType = typeof(cBGMBeatManager);
             
             // 시도 횟수 제한
             _bgmAttemptCount++;

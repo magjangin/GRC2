@@ -30,7 +30,6 @@ namespace GRC2.Helpers
         private const string ENUM_FLICK = "Flick";
         private const string ENUM_FAIRY = "Fairy";
         private const string ENUM_SCALE1 = "Scale1";
-        private const string ENUM_NUM = "NUM";
 
         // 성능 최적화: Enum 값 캐시 (Type + valueName을 키로 사용)
         private static Dictionary<string, object> _enumValueCache = new Dictionary<string, object>();
@@ -180,7 +179,5 @@ namespace GRC2.Helpers
         public static string GetEnumCenterMiddle() => ENUM_CENTER_MIDDLE;
         public static string GetEnumCenterTop() => ENUM_CENTER_TOP;
         public static string GetEnumScale1() => ENUM_SCALE1;
-        public static string GetEnumNum() => ENUM_NUM;
     }
 }
-

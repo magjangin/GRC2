@@ -4,14 +4,13 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using UnityEngine;
 using UnityEngine.Networking;
 
 namespace GRC2.Core
 {
     /// <summary>
-    /// 커스텀 아트워크와 프리뷰 에셋을 관리합니다.
+    /// 커스텀 아트워크를 캐시하고 선택 상태를 관리합니다.
     /// </summary>
     public static class CustomAssetManager
     {
@@ -25,10 +24,7 @@ namespace GRC2.Core
             new Dictionary<string, List<Action<Sprite>>>(StringComparer.OrdinalIgnoreCase);
 
         private static Sprite customArtworkSprite;
-        private static AudioClip customPreviewBGM;
         private static bool isCustomChartSelected;
-        private static object customChartMusicID;
-        private static string lastLoadedImagePath;
         private static string requestedArtworkPath;
 
         /// <summary>
@@ -61,7 +57,7 @@ namespace GRC2.Core
 
                 Sprite sprite = CreateArtworkSprite(normalizedPath, texture);
                 CacheArtwork(normalizedPath, sprite);
-                SelectArtwork(normalizedPath, sprite);
+                SelectArtwork(sprite);
             }
             catch (Exception ex)
             {
@@ -129,7 +125,7 @@ namespace GRC2.Core
                 return false;
             }
 
-            SelectArtwork(normalizedPath, sprite);
+            SelectArtwork(sprite);
             return true;
         }
 
@@ -179,7 +175,7 @@ namespace GRC2.Core
                     imagePath,
                     StringComparison.OrdinalIgnoreCase))
             {
-                SelectArtwork(imagePath, loadedSprite);
+                SelectArtwork(loadedSprite);
             }
 
             CompleteArtworkRequest(imagePath, loadedSprite);
@@ -250,9 +246,8 @@ namespace GRC2.Core
             }
         }
 
-        private static void SelectArtwork(string path, Sprite sprite)
+        private static void SelectArtwork(Sprite sprite)
         {
-            lastLoadedImagePath = path;
             customArtworkSprite = sprite;
         }
 
@@ -285,74 +280,7 @@ namespace GRC2.Core
             }
         }
 
-        public static void LoadCustomPreviewBGM(string audioPath)
-        {
-            string normalizedPath = NormalizeExistingPath(audioPath);
-            if (normalizedPath != null)
-            {
-                MelonCoroutines.Start(LoadAudioClipCoroutine(normalizedPath));
-            }
-        }
-
-        private static IEnumerator LoadAudioClipCoroutine(string audioPath)
-        {
-            using (UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(
-                new Uri(audioPath).AbsoluteUri,
-                AudioType.UNKNOWN))
-            {
-                yield return request.SendWebRequest();
-                if (request.result == UnityWebRequest.Result.Success)
-                {
-                    customPreviewBGM = DownloadHandlerAudioClip.GetContent(request);
-                }
-                else
-                {
-                    MelonLogger.Warning(
-                        $"[CustomAssetManager] 프리뷰 BGM 로드 실패: {request.error}");
-                }
-            }
-        }
-
-        public static bool IsCustomChart(object musicID, object musicData)
-        {
-            try
-            {
-                if (musicID != null && AlbumManager.IsCustomChartMusicID(musicID))
-                {
-                    return true;
-                }
-
-                if (musicID != null &&
-                    customChartMusicID != null &&
-                    musicID.Equals(customChartMusicID))
-                {
-                    return true;
-                }
-
-                if (musicData != null)
-                {
-                    FieldInfo titleField = musicData.GetType().GetField(
-                        "songTitle",
-                        BindingFlags.Public |
-                        BindingFlags.NonPublic |
-                        BindingFlags.Instance);
-                    string title = titleField?.GetValue(musicData)?.ToString();
-                    return title == "custom chart";
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(
-                    ex,
-                    "[CustomAssetManager] IsCustomChart",
-                    "커스텀 차트 판별 실패");
-            }
-
-            return false;
-        }
-
         public static Sprite GetCustomArtwork() => customArtworkSprite;
-        public static AudioClip GetCustomPreviewBGM() => customPreviewBGM;
         public static void SetCustomChartSelected(bool selected) =>
             isCustomChartSelected = selected;
         public static bool IsCustomChartSelected() => isCustomChartSelected;
@@ -381,19 +309,6 @@ namespace GRC2.Core
         public static bool ShouldInjectCustomContent()
         {
             return !IsSceneWhereInjectionDisallowed() && IsCustomChartSelected();
-        }
-
-        public static void SetCustomChartMusicID(object musicID) =>
-            customChartMusicID = musicID;
-        public static object GetCustomChartMusicID() => customChartMusicID;
-        public static string GetLoadedImagePath() => lastLoadedImagePath;
-
-        public static bool IsImageLoaded(string imagePath)
-        {
-            string normalizedPath = NormalizePath(imagePath);
-            return normalizedPath != null &&
-                   ArtworkCache.TryGetValue(normalizedPath, out Sprite sprite) &&
-                   sprite != null;
         }
 
         private static string NormalizeExistingPath(string path)

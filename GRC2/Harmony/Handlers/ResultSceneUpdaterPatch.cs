@@ -1,10 +1,13 @@
 using System;
 using System.Collections;
+using System.IO;
 using System.Reflection;
 using MelonLoader;
 using UnityEngine;
 using GRC2.Core;
 using GRC2.Helpers;
+using HarmonyLib;
+using IntiCreates;
 
 namespace GRC2.Harmony.Handlers
 {
@@ -13,10 +16,12 @@ namespace GRC2.Harmony.Handlers
     /// 씬 로드 이벤트 이후 GameObject 경로를 탐색하며 재시도 폴링하던 기존 ResultSceneInjector 방식과 달리,
     /// 게임이 실제로 필드를 세팅하는 시점(__instance)에 직접 접근하므로 타이밍 경쟁이 없습니다.
     /// </summary>
+    [HarmonyPatch(typeof(cRythmGameResultSceneUpdater), "initializePreFade")]
     public static class ResultSceneUpdaterPatch
     {
         private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
+        [HarmonyPostfix]
         public static void InitializePreFadePostfix(object __instance)
         {
             try
@@ -28,7 +33,7 @@ namespace GRC2.Harmony.Handlers
 
                 ApplyMusicNameText(__instance);
                 ApplyDifficultyLevel(__instance);
-                MelonCoroutines.Start(WaitAndApplyArtwork(__instance));
+                QueueArtwork(__instance);
             }
             catch (Exception ex)
             {
@@ -108,15 +113,49 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        private static IEnumerator WaitAndApplyArtwork(object updater)
+        private static void QueueArtwork(object updater)
         {
             string imageFile = AlbumManager.GetCurrentImageFile();
-            if (string.IsNullOrEmpty(imageFile) || !System.IO.File.Exists(imageFile))
-                yield break;
+            if (string.IsNullOrEmpty(imageFile) || !File.Exists(imageFile))
+                return;
 
-            CustomAssetManager.LoadCustomArtwork(imageFile);
-            Sprite customSprite = CustomAssetManager.GetCustomArtwork();
-            if (customSprite == null) yield break;
+            string requestedPath = Path.GetFullPath(imageFile);
+            if (CustomAssetManager.TryGetCustomArtwork(
+                requestedPath,
+                out Sprite cachedSprite))
+            {
+                MelonCoroutines.Start(
+                    WaitAndApplyArtwork(updater, cachedSprite));
+                return;
+            }
+
+            CustomAssetManager.RequestCustomArtwork(
+                requestedPath,
+                sprite =>
+                {
+                    string currentPath = AlbumManager.GetCurrentImageFile();
+                    if (sprite == null ||
+                        !CustomAssetManager.IsCustomChartSelected() ||
+                        string.IsNullOrEmpty(currentPath) ||
+                        !string.Equals(
+                            Path.GetFullPath(currentPath),
+                            requestedPath,
+                            StringComparison.OrdinalIgnoreCase))
+                    {
+                        return;
+                    }
+
+                    MelonCoroutines.Start(
+                        WaitAndApplyArtwork(updater, sprite));
+                });
+        }
+
+        private static IEnumerator WaitAndApplyArtwork(
+            object updater,
+            Sprite customSprite)
+        {
+            if (updater == null || customSprite == null)
+                yield break;
 
             Type type = updater.GetType();
             MethodInfo isReadyMethod = type.GetMethod("isAbleFadeOpenOnSceneStart", InstanceFlags);
@@ -125,6 +164,12 @@ namespace GRC2.Harmony.Handlers
             float timeout = 10f;
             while (isReadyMethod != null && timeout > 0f)
             {
+                if (updater is UnityEngine.Object unityObject &&
+                    unityObject == null)
+                {
+                    yield break;
+                }
+
                 bool isReady;
                 try { isReady = (bool)isReadyMethod.Invoke(updater, null); }
                 catch { isReady = true; } // 리플렉션 호출 실패 시 더 기다리지 않고 바로 적용 시도
@@ -133,6 +178,12 @@ namespace GRC2.Harmony.Handlers
 
                 timeout -= Time.deltaTime;
                 yield return null;
+            }
+
+            if (updater is UnityEngine.Object finalUnityObject &&
+                finalUnityObject == null)
+            {
+                yield break;
             }
 
             var image = artworkField?.GetValue(updater) as UnityEngine.UI.Image;

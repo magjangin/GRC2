@@ -1,14 +1,18 @@
 using UnityEngine;
 using System;
 using GRC2.Core;
+using HarmonyLib;
+using IntiCreates;
 
 namespace GRC2.Harmony.Handlers
 {
     /// <summary>
     /// cMusicSelectArtWork.requestSetArtworkSprite 메서드 후킹 - 커버 이미지 교체
     /// </summary>
+    [HarmonyPatch(typeof(cMusicSelectArtWork), "requestSetArtworkSprite")]
     public static class ArtWorkPatch
     {
+        [HarmonyPrefix]
         public static void RequestSetArtworkSpritePrefix(object __instance, ref Sprite useSprite, bool isInstant)
         {
             try

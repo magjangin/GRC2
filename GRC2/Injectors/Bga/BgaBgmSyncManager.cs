@@ -1,9 +1,8 @@
 using System;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.Video;
-using System.Linq;
-using System.Reflection;
 using System.Collections;
 
 namespace GRC2.Injectors
@@ -60,7 +59,7 @@ namespace GRC2.Injectors
         /// <summary>
         /// BGM 오디오 소스 찾기 (cBGMBeatManager 우선, 그 다음 일반 검색)
         /// </summary>
-        public static AudioSource GetCurrentAudioSource()
+        private static AudioSource GetCurrentAudioSource()
         {
             try
             {
@@ -139,23 +138,8 @@ namespace GRC2.Injectors
         {
             try
             {
-                var gameAssembly = AppDomain.CurrentDomain.GetAssemblies()
-                    .FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
-                var bgmBeatManagerType = gameAssembly?.GetType("IntiCreates.cBGMBeatManager");
-                if (bgmBeatManagerType == null)
-                {
-                    return null;
-                }
-
-                var bgmManagers = UnityEngine.Object.FindObjectsOfType(bgmBeatManagerType);
-                if (bgmManagers == null || bgmManagers.Length == 0)
-                {
-                    return null;
-                }
-
-                var bgmManager = bgmManagers[0];
-                return FindAudioSourceField(bgmBeatManagerType, bgmManager) ??
-                    FindAudioSourceComponent(bgmManager as MonoBehaviour);
+                cBGMBeatManager manager = GetBgmBeatManager();
+                return manager?.getAudioSorce();
             }
             catch (Exception ex)
             {
@@ -164,176 +148,39 @@ namespace GRC2.Injectors
 
             return null;
         }
-
-        private static AudioSource FindAudioSourceField(Type bgmBeatManagerType, object bgmManager)
-        {
-            var fields = bgmBeatManagerType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            foreach (var field in fields)
-            {
-                if (field.FieldType == typeof(AudioSource))
-                {
-                    var audioSource = field.GetValue(bgmManager) as AudioSource;
-                    if (audioSource != null)
-                    {
-                        return audioSource;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private static AudioSource FindAudioSourceComponent(MonoBehaviour bgmManager)
-        {
-            var components = bgmManager?.GetComponents<Component>();
-            if (components == null)
-            {
-                return null;
-            }
-
-            foreach (var component in components)
-            {
-                if (component is AudioSource audioSource)
-                {
-                    return audioSource;
-                }
-            }
-
-            return null;
-        }
     }
 
     internal static partial class BgaBgmSyncManager
     {
-    
+        private static cBGMBeatManager _cachedBgmManager;
 
-        private static MethodInfo _getCurrentSampleMethod = null;
-
-        private static MethodInfo _getTimeMethod = null;
-
-        private static Assembly _cachedGameAssembly = null;
-        private static Type _cachedBgmBeatManagerType = null;
-        private static object _cachedBgmManagerInstance = null;
-
-        private static bool _methodsCached = false;
-
-        private static int _consecutiveInvokeFailures = 0;
-        private const int MaxInvokeFailuresBeforeDisable = 3;
-        private static bool _invokeDisabledThisSession = false;
-
-        private static void CacheMethods(Type bgmBeatManagerType)
+        private static cBGMBeatManager GetBgmBeatManager()
         {
-            if (_methodsCached || bgmBeatManagerType == null) return;
-
-            try
+            if (_cachedBgmManager != null)
             {
-                _getCurrentSampleMethod = bgmBeatManagerType.GetMethod("getCurrentSample",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                
-                _getTimeMethod = bgmBeatManagerType.GetMethod("getAudioSorceCurrentTime",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                return _cachedBgmManager;
+            }
 
-                _methodsCached = true;
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[BGAPlayerHook] 메서드 캐싱 실패: {ex.Message}");
-            }
+            cBGMBeatManager[] managers =
+                UnityEngine.Object.FindObjectsOfType<cBGMBeatManager>();
+            _cachedBgmManager =
+                managers != null && managers.Length > 0 ? managers[0] : null;
+            return _cachedBgmManager;
         }
 
         private static float GetBgmTimeFromManager()
         {
-            if (_invokeDisabledThisSession) return 0f;
-
             try
             {
-                if (_cachedGameAssembly == null)
-                {
-                    var loadedAssemblies = AppDomain.CurrentDomain.GetAssemblies();
-                    _cachedGameAssembly = loadedAssemblies.FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
-                }
-
-                if (_cachedGameAssembly == null)
-                {
-                    return 0f;
-                }
-
-                if (_cachedBgmBeatManagerType == null)
-                {
-                    _cachedBgmBeatManagerType = _cachedGameAssembly.GetType("IntiCreates.cBGMBeatManager");
-                }
-
-                var bgmBeatManagerType = _cachedBgmBeatManagerType;
-                if (bgmBeatManagerType == null)
-                {
-                    return 0f;
-                }
-
-                // 메서드 캐싱 시도
-                if (!_methodsCached)
-                {
-                    CacheMethods(bgmBeatManagerType);
-                }
-
-                object bgmManager = _cachedBgmManagerInstance;
-                if (bgmManager == null || ReferenceEquals(bgmManager, null))
-                {
-                    var bgmManagers = UnityEngine.Object.FindObjectsOfType(bgmBeatManagerType);
-                    if (bgmManagers == null || bgmManagers.Length == 0)
-                    {
-                        _cachedBgmManagerInstance = null;
-                        return 0f;
-                    }
-
-                    bgmManager = bgmManagers[0];
-                    _cachedBgmManagerInstance = bgmManager;
-                }
-
-                // getCurrentSample 메서드로 샘플 가져오기
-                if (_getCurrentSampleMethod != null)
-                {
-                    var currentSample = _getCurrentSampleMethod.Invoke(bgmManager, null);
-                    _consecutiveInvokeFailures = 0;
-
-                    if (currentSample is int intSample && intSample > 0)
-                    {
-                        return intSample / 48000f;
-                    }
-                    else if (currentSample is long longSample && longSample > 0)
-                    {
-                        return longSample / 48000f;
-                    }
-                }
-
-                // getAudioSorceCurrentTime 메서드로 시간 가져오기
-                if (_getTimeMethod != null)
-                {
-                    var time = _getTimeMethod.Invoke(bgmManager, null);
-                    _consecutiveInvokeFailures = 0;
-
-                    if (time is float floatTime && floatTime > 0f)
-                    {
-                        return floatTime;
-                    }
-                    else if (time is double doubleTime && doubleTime > 0.0)
-                    {
-                        return (float)doubleTime;
-                    }
-                }
+                cBGMBeatManager manager = GetBgmBeatManager();
+                return manager == null
+                    ? 0f
+                    : manager.getAudioSorceCurrentTime();
             }
             catch (Exception ex)
             {
-                _consecutiveInvokeFailures++;
-                if (_consecutiveInvokeFailures <= MaxInvokeFailuresBeforeDisable)
-                {
-                    MelonLogger.Warning($"[BGAPlayerHook] GetBgmTimeFromManager 오류 ({_consecutiveInvokeFailures}/{MaxInvokeFailuresBeforeDisable}): {ex.Message}");
-                }
-
-                if (_consecutiveInvokeFailures == MaxInvokeFailuresBeforeDisable)
-                {
-                    _invokeDisabledThisSession = true;
-                    MelonLogger.Warning("[BGAPlayerHook] GetBgmTimeFromManager이 반복 실패하여 이번 곡에서는 더 이상 시도하지 않습니다 (BGA 없는 곡일 수 있음).");
-                }
+                MelonLogger.Warning(
+                    $"[BGAPlayerHook] GetBgmTimeFromManager 오류: {ex.Message}");
             }
 
             return 0f;
@@ -444,7 +291,7 @@ namespace GRC2.Injectors
             }
         }
 
-        public static void StopSync()
+        private static void StopSync()
         {
             if (_syncCoroutine != null)
             {
@@ -455,9 +302,7 @@ namespace GRC2.Injectors
             _isSyncing = false;
             _bgmAudioSource = null;
             _videoPlayers = null;
-            _cachedBgmManagerInstance = null;
-            _consecutiveInvokeFailures = 0;
-            _invokeDisabledThisSession = false;
+            _cachedBgmManager = null;
 
             MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
         }
@@ -558,7 +403,15 @@ namespace GRC2.Injectors
                 return;
             }
 
-            int preparedCount = _videoPlayers.Count(vp => vp != null && vp.isPrepared);
+            int preparedCount = 0;
+            for (int i = 0; i < _videoPlayers.Length; i++)
+            {
+                VideoPlayer videoPlayer = _videoPlayers[i];
+                if (videoPlayer != null && videoPlayer.isPrepared)
+                {
+                    preparedCount++;
+                }
+            }
             MelonLogger.Warning($"[BGAPlayerHook] ⚠️ 동기화된 VideoPlayer가 없습니다 (준비된 VideoPlayer: {preparedCount}/{_videoPlayers.Length})");
         }
     }

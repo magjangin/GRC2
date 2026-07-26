@@ -5,6 +5,7 @@ using UnityEngine;
 using GRC2.Core;
 using GRC2.Helpers;
 using GRC2.Injectors;
+using HarmonyLib;
 
 namespace GRC2.Harmony.Handlers
 {
@@ -93,6 +94,27 @@ namespace GRC2.Harmony.Handlers
             catch (Exception ex)
             {
                 MelonLogger.Error($"[TextPatch] 치명적 오류: {ex.Message}");
+            }
+        }
+
+        [HarmonyPatch(typeof(UnityEngine.UI.Text), "set_text")]
+        private static class UnityTextSetterPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(object __instance, ref string value)
+            {
+                SetTextPrefix(__instance, ref value);
+            }
+        }
+
+        // TextMeshPro와 TextMeshProUGUI는 TMP_Text의 동일한 setter를 공유합니다.
+        [HarmonyPatch(typeof(TMPro.TMP_Text), "set_text")]
+        private static class TmpTextSetterPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(object __instance, ref string value)
+            {
+                SetTextPrefix(__instance, ref value);
             }
         }
     }

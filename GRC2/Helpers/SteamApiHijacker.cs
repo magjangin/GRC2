@@ -3,8 +3,9 @@ using System.IO;
 using System.Collections;
 using System.Reflection;
 using HarmonyLib;
+using IntiCreates;
 using MelonLoader;
-using GRC2.Core;
+using Steamworks;
 
 namespace GRC2.Helpers
 {
@@ -13,172 +14,10 @@ namespace GRC2.Helpers
     /// </summary>
     public static class SteamApiHijacker
     {
-        private static HarmonyLib.Harmony _harmonyInstance;
-
         /// <summary>
         /// Steam API 초기화 실패 여부
         /// </summary>
         public static bool IsBypassed { get; private set; } = false;
-
-        public static void ApplyPatches()
-        {
-            try
-            {
-                _harmonyInstance = new HarmonyLib.Harmony("GRC2.SteamApiHijacker");
-                MelonLogger.Msg("[SteamApiHijacker] 하이재킹 패치 시작...");
-
-                // 1. Steamworks.SteamAPI 패치
-                PatchSteamAPI();
-
-                // 2. Steamworks.SteamApps 패치 (DLC 구매 체크 우회)
-                PatchSteamApps();
-
-                // 3. 게임 내부(IntiCreates) DLC 검증 패치
-                PatchGameDlcLogic();
-
-                MelonLogger.Msg("[SteamApiHijacker] 모든 하이재킹 패치 프로세스 완료.");
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"[SteamApiHijacker] 패치 중 예기치 못한 치명적 오류: {ex.Message}");
-            }
-        }
-
-        private static void PatchSteamAPI()
-        {
-            Type steamApiType = ReflectionHelper.FindType("Steamworks.SteamAPI");
-            if (steamApiType == null)
-            {
-                MelonLogger.Warning("[SteamApiHijacker] Steamworks.SteamAPI 타입을 찾을 수 없습니다.");
-                return;
-            }
-
-            // RestartAppIfNecessary 패치 (스팀 강제 재시작 방지)
-            MethodInfo restartMethod = steamApiType.GetMethod("RestartAppIfNecessary", BindingFlags.Public | BindingFlags.Static);
-            if (restartMethod != null)
-            {
-                MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(RestartAppIfNecessaryPrefix), BindingFlags.Public | BindingFlags.Static);
-                _harmonyInstance.Patch(restartMethod, new HarmonyMethod(prefixMethod), null);
-                MelonLogger.Msg("[SteamApiHijacker] ✅ SteamAPI.RestartAppIfNecessary 패치 성공 (재시작 우회)");
-            }
-
-            // Init 패치 (스팀 미실행 시에도 강제로 true 반환하여 게임 유지)
-            MethodInfo initMethod = steamApiType.GetMethod("Init", BindingFlags.Public | BindingFlags.Static);
-            if (initMethod != null)
-            {
-                MethodInfo postfixMethod = typeof(SteamApiHijacker).GetMethod(nameof(InitPostfix), BindingFlags.Public | BindingFlags.Static);
-                _harmonyInstance.Patch(initMethod, null, new HarmonyMethod(postfixMethod));
-                MelonLogger.Msg("[SteamApiHijacker] ✅ SteamAPI.Init 패치 성공 (실패 시 강제 우회)");
-            }
-
-            // RunCallbacks 패치 (우회 모드 시 무시)
-            MethodInfo runCallbacksMethod = steamApiType.GetMethod("RunCallbacks", BindingFlags.Public | BindingFlags.Static);
-            if (runCallbacksMethod != null)
-            {
-                MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(RunCallbacksPrefix), BindingFlags.Public | BindingFlags.Static);
-                _harmonyInstance.Patch(runCallbacksMethod, new HarmonyMethod(prefixMethod), null);
-                MelonLogger.Msg("[SteamApiHijacker] ✅ SteamAPI.RunCallbacks 패치 성공");
-            }
-
-            // Shutdown 패치 (우회 모드 시 무시)
-            MethodInfo shutdownMethod = steamApiType.GetMethod("Shutdown", BindingFlags.Public | BindingFlags.Static);
-            if (shutdownMethod != null)
-            {
-                MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(ShutdownPrefix), BindingFlags.Public | BindingFlags.Static);
-                _harmonyInstance.Patch(shutdownMethod, new HarmonyMethod(prefixMethod), null);
-                MelonLogger.Msg("[SteamApiHijacker] ✅ SteamAPI.Shutdown 패치 성공");
-            }
-        }
-
-        private static void PatchSteamApps()
-        {
-            Type steamAppsType = ReflectionHelper.FindType("Steamworks.SteamApps");
-            if (steamAppsType == null)
-            {
-                MelonLogger.Warning("[SteamApiHijacker] Steamworks.SteamApps 타입을 찾을 수 없습니다.");
-                return;
-            }
-
-            // BIsDlcInstalled 패치 (항상 true 반환)
-            MethodInfo isDlcInstalledMethod = steamAppsType.GetMethod("BIsDlcInstalled", BindingFlags.Public | BindingFlags.Static);
-            if (isDlcInstalledMethod != null)
-            {
-                MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(BIsDlcInstalledPrefix), BindingFlags.Public | BindingFlags.Static);
-                _harmonyInstance.Patch(isDlcInstalledMethod, new HarmonyMethod(prefixMethod), null);
-                MelonLogger.Msg("[SteamApiHijacker] ✅ SteamApps.BIsDlcInstalled 패치 성공 (항상 true)");
-            }
-        }
-
-        private static void PatchGameDlcLogic()
-        {
-            // 1. IntiCreates.Application.isDLCEnable 패치 (항상 true 반환)
-            Type appType = ReflectionHelper.FindType("IntiCreates.Application");
-            if (appType != null)
-            {
-                MethodInfo isDlcEnableMethod = appType.GetMethod("isDLCEnable", BindingFlags.Public | BindingFlags.Static | BindingFlags.NonPublic);
-                if (isDlcEnableMethod != null)
-                {
-                    MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(IsDlcEnablePrefix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(isDlcEnableMethod, new HarmonyMethod(prefixMethod), null);
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ IntiCreates.Application.isDLCEnable 패치 성공 (항상 true)");
-                }
-            }
-
-            // 2. IntiCreates.sAddressableDirector 패치
-            Type addressableDirectorType = ReflectionHelper.FindType("IntiCreates.sAddressableDirector");
-            if (addressableDirectorType != null)
-            {
-                // isUsableDlc 패치 (항상 true 반환)
-                MethodInfo isUsableDlcMethod = addressableDirectorType.GetMethod("isUsableDlc", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (isUsableDlcMethod != null)
-                {
-                    MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(IsUsableDlcPrefix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(isUsableDlcMethod, new HarmonyMethod(prefixMethod), null);
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ sAddressableDirector.isUsableDlc 패치 성공 (항상 true)");
-                }
-
-                // isNotYetPurchased 패치 (항상 false 반환)
-                MethodInfo isNotYetPurchasedMethod = addressableDirectorType.GetMethod("isNotYetPurchased", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (isNotYetPurchasedMethod != null)
-                {
-                    MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(IsNotYetPurchasedPrefix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(isNotYetPurchasedMethod, new HarmonyMethod(prefixMethod), null);
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ sAddressableDirector.isNotYetPurchased 패치 성공 (항상 false)");
-                }
-
-                // coCheckDLC 패치 (실행 확인 로깅)
-                MethodInfo coCheckDLCMethod = addressableDirectorType.GetMethod("coCheckDLC", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (coCheckDLCMethod != null)
-                {
-                    MethodInfo postfixMethod = typeof(SteamApiHijacker).GetMethod(nameof(CoCheckDLCPostfix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(coCheckDLCMethod, null, new HarmonyMethod(postfixMethod));
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ sAddressableDirector.coCheckDLC 로깅 패치 성공");
-                }
-            }
-
-            // 3. IntiCreates.cDlcDirector 패치
-            Type dlcDirectorType = ReflectionHelper.FindType("IntiCreates.cDlcDirector");
-            if (dlcDirectorType != null)
-            {
-                // IsNotYetPurchased 패치 (항상 false 반환)
-                MethodInfo isNotYetPurchasedMethod = dlcDirectorType.GetMethod("IsNotYetPurchased", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (isNotYetPurchasedMethod != null)
-                {
-                    MethodInfo prefixMethod = typeof(SteamApiHijacker).GetMethod(nameof(IsNotYetPurchasedPrefix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(isNotYetPurchasedMethod, new HarmonyMethod(prefixMethod), null);
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ cDlcDirector.IsNotYetPurchased 패치 성공 (항상 false)");
-                }
-
-                // Initialize 패치 (로컬 DataAddon 폴더 감지 및 동적 mDlcList 주입)
-                MethodInfo initializeMethod = dlcDirectorType.GetMethod("Initialize", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
-                if (initializeMethod != null)
-                {
-                    MethodInfo postfixMethod = typeof(SteamApiHijacker).GetMethod(nameof(InitializePostfix), BindingFlags.Public | BindingFlags.Static);
-                    _harmonyInstance.Patch(initializeMethod, null, new HarmonyMethod(postfixMethod));
-                    MelonLogger.Msg("[SteamApiHijacker] ✅ cDlcDirector.Initialize 패치 성공 (동적 폴더 마운트 준비)");
-                }
-            }
-        }
 
         #region Harmony Patches
 
@@ -279,6 +118,116 @@ namespace GRC2.Helpers
             catch (Exception ex)
             {
                 MelonLogger.Error($"[SteamApiHijacker] cDlcDirector.Initialize Postfix error: {ex}");
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamAPI), "RestartAppIfNecessary")]
+        private static class RestartAppIfNecessaryPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return RestartAppIfNecessaryPrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamAPI), "Init")]
+        private static class SteamApiInitPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(ref bool __result)
+            {
+                InitPostfix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamAPI), "RunCallbacks")]
+        private static class RunCallbacksPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix()
+            {
+                return RunCallbacksPrefix();
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamAPI), "Shutdown")]
+        private static class ShutdownPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix()
+            {
+                return ShutdownPrefix();
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamApps), "BIsDlcInstalled")]
+        private static class IsDlcInstalledPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return BIsDlcInstalledPrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(IntiCreates.Application), "isDLCEnable")]
+        private static class IsDlcEnablePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return IsDlcEnablePrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(sAddressableDirector), "isUsableDlc")]
+        private static class IsUsableDlcPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return IsUsableDlcPrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(sAddressableDirector), "isNotYetPurchased")]
+        private static class AddressableIsNotYetPurchasedPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return IsNotYetPurchasedPrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(sAddressableDirector), "coCheckDLC")]
+        private static class CheckDlcPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix()
+            {
+                CoCheckDLCPostfix();
+            }
+        }
+
+        [HarmonyPatch(typeof(cDlcDirector), "IsNotYetPurchased")]
+        private static class DlcDirectorIsNotYetPurchasedPatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref bool __result)
+            {
+                return IsNotYetPurchasedPrefix(ref __result);
+            }
+        }
+
+        [HarmonyPatch(typeof(cDlcDirector), "Initialize")]
+        private static class DlcDirectorInitializePatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(object __instance)
+            {
+                InitializePostfix(__instance);
             }
         }
 

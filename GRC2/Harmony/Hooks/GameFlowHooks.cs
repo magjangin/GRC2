@@ -3,6 +3,8 @@ using System.Reflection;
 using GRC2.Core;
 using GRC2.Harmony.Handlers;
 using GRC2.Injectors;
+using HarmonyLib;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.UI;
@@ -23,7 +25,7 @@ namespace GRC2.Harmony.Hooks
             {
                 // 곧 씬이 폐기되므로 원본 AudioSource를 전역 복원하지 않고 캐시만 비웁니다.
                 CustomBgmPlayer.Cleanup();
-                PreviewAudioManager.Reset();
+                PreviewAudioManager.DiscardMutedSourceState();
             }
             catch (Exception ex)
             {
@@ -36,7 +38,7 @@ namespace GRC2.Harmony.Hooks
             try
             {
                 CustomBgmPlayer.Cleanup();
-                PreviewAudioManager.Reset();
+                PreviewAudioManager.DiscardMutedSourceState();
 
                 // 직전 커스텀 곡의 종료 시간이 다음 플레이에 적용되지 않도록 초기화합니다.
                 BgmFinishTimeManager.Reset();
@@ -97,8 +99,6 @@ namespace GRC2.Harmony.Hooks
                 if (!Equals(previousMusicId, firstMusicId))
                     currentMusicIdField.SetValue(__instance, firstMusicId);
 
-                if (!string.IsNullOrWhiteSpace(artistId))
-                    AlbumManager.SetCurrentArtistId(artistId);
                 AlbumManager.RegisterOriginalTitle(firstMusicId, firstTitle);
             }
             catch (Exception ex)
@@ -156,6 +156,46 @@ namespace GRC2.Harmony.Hooks
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[GameFlowHooks] 시작 전 아트워크 적용 오류: {ex.Message}");
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "backToPreScreen")]
+        private static class BackToPreScreenPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix()
+            {
+                BackToPreScreenPrefix();
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "startRythmGame")]
+        private static class StartRythmGamePatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix()
+            {
+                StartRythmGamePrefix();
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "coOpenPreMusicStartWindow")]
+        private static class OpenPreMusicStartWindowPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix(object __instance)
+            {
+                CoOpenPreMusicStartWindowPrefix(__instance);
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectPreMusicStartWindowManager), "requestOpenWindow")]
+        private static class PreMusicStartWindowOpenedPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(object __instance)
+            {
+                PreMusicStartWindowOpenedPostfix(__instance);
             }
         }
     }

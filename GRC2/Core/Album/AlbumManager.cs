@@ -36,8 +36,6 @@ namespace GRC2.Core
         /// 아티스트 ID별 첫 곡 정보 저장 (아티스트ID -> (MusicID, 제목))
         /// </summary>
         private static Dictionary<string, (object musicId, string title)> _artistIdToFirstSong = new Dictionary<string, (object, string)>();
-        private static string _currentArtistId = null;
-
     }
 
     public static partial class AlbumManager
@@ -113,15 +111,6 @@ namespace GRC2.Core
             return null;
         }
 
-        public static void SetCurrentArtistId(string artistId)
-        {
-            _currentArtistId = artistId;
-        }
-
-        public static string GetCurrentArtistId()
-        {
-            return _currentArtistId;
-        }
     }
 
     public static partial class AlbumManager

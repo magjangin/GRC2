@@ -1,225 +1,24 @@
 using System;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using GRC2.Helpers;
-using MelonLoader;
-using UnityEngine;
+using IntiCreates;
+using IntiCreates.RythmGame;
+using IntiCreates.RythmGame.FairyMode;
 
 namespace GRC2.Loaders
 {
     /// <summary>
-    /// 게임 타입 로딩 및 초기화를 담당하는 클래스
+    /// Assembly-CSharp에 직접 참조된 게임 노트 타입을 제공합니다.
     /// </summary>
     public static class GameTypeLoader
     {
-        // 타입 캐시
-        public static Type NoteCreateDataType { get; private set; }
-        public static Type NoteTypeIdEnum { get; private set; }
-        public static Type NoteLaneLeftRightEnum { get; private set; }
-        public static Type NoteSubLaneTypeEnum { get; private set; }
-        public static Type NoteDirectionIndexEnum { get; private set; }
-        public static Type NoteSizeEnum { get; private set; }
-        public static Type SlideEndFlickDirectionEnum { get; private set; }
-
-        public static void Initialize()
-        {
-            try
-            {
-                var assembly = LoadGameAssembly();
-                if (assembly == null)
-                {
-                    MelonLogger.Error("[GameTypeLoader] Assembly-CSharp를 찾을 수 없습니다.");
-                    return;
-                }
-
-                // NoteCreateData 타입 찾기
-                FindNoteCreateDataType(assembly);
-                if (NoteCreateDataType == null)
-                {
-                    MelonLogger.Error("[GameTypeLoader] NoteCreateData 타입을 찾을 수 없습니다.");
-                    return;
-                }
-
-                // Enum 타입들 찾기
-                FindEnumTypes(assembly);
-
-                // 초기화 완료 로그
-                LogInitializationStatus();
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"[GameTypeLoader] 초기화 오류: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// 게임 Assembly를 로드합니다.
-        /// </summary>
-        private static Assembly LoadGameAssembly()
-        {
-            var assemblyPath = Path.Combine(
-                Path.GetDirectoryName(Application.dataPath),
-                "GUNVOLT_RECORDS_Cychronicle_Data",
-                "Managed",
-                "Assembly-CSharp.dll"
-            );
-
-            if (File.Exists(assemblyPath))
-            {
-                return Assembly.LoadFrom(assemblyPath);
-            }
-
-            return AppDomain.CurrentDomain.GetAssemblies()
-                .FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
-        }
-
-        /// <summary>
-        /// NoteCreateData 타입을 찾습니다.
-        /// </summary>
-        private static void FindNoteCreateDataType(Assembly assembly)
-        {
-            // 1. 직접 타입 검색
-            NoteCreateDataType = assembly.GetType("IntiCreates.RythmGame.FairyMode.NoteCreateData");
-            
-            if (NoteCreateDataType == null)
-            {
-                // 2. 이름으로 검색
-                NoteCreateDataType = FindTypeByName(assembly, "NoteCreateData");
-            }
-
-            // 3. createNote 메서드에서 파라미터 타입 확인
-            if (NoteCreateDataType == null)
-            {
-                NoteCreateDataType = FindNoteCreateDataTypeFromMethod(assembly);
-            }
-        }
-
-        /// <summary>
-        /// createNote 메서드나 mFairyNoteCreateDataArray 필드에서 NoteCreateData 타입을 찾습니다.
-        /// </summary>
-        private static Type FindNoteCreateDataTypeFromMethod(Assembly assembly)
-        {
-            try
-            {
-                var managerType = assembly.GetType("IntiCreates.cFairyModeNotesManager");
-                if (managerType == null)
-                {
-                    return null;
-                }
-
-                // createNote 메서드에서 파라미터 타입 확인
-                var createNoteMethod = managerType.GetMethod("createNote", 
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                
-                if (createNoteMethod != null)
-                {
-                    var parameters = createNoteMethod.GetParameters();
-                    if (parameters.Length > 0 && parameters[0].ParameterType.Name == "NoteCreateData")
-                    {
-                        return parameters[0].ParameterType;
-                    }
-                }
-                
-                // mFairyNoteCreateDataArray 필드 타입 확인
-                var arrayField = managerType.GetField("mFairyNoteCreateDataArray",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                
-                if (arrayField?.FieldType.IsArray == true)
-                {
-                    var elementType = arrayField.FieldType.GetElementType();
-                    if (elementType?.Name == "NoteCreateData")
-                    {
-                        return elementType;
-                    }
-                }
-            }
-            catch
-            {
-                // 오류 발생 시 무시
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// NoteCreateData 필드에서 SlideEndFlickDirection Enum을 찾습니다.
-        /// </summary>
-        private static Type FindSlideEndFlickDirectionFromField(Assembly assembly)
-        {
-            try
-            {
-                var slideEndFlickField = NoteCreateDataType.GetField(FieldAccessHelper.FIELD_SLIDE_END_FLICK_DIRECTION,
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                
-                if (slideEndFlickField?.FieldType.IsEnum == true)
-                {
-                    var fieldType = slideEndFlickField.FieldType;
-                    // SlideEndFlickDirection이거나 NoteDirectionIndex인 경우
-                    if (fieldType.Name.Contains("SlideEndFlick") || fieldType.Name.Contains("FlickDirection"))
-                    {
-                        return fieldType;
-                    }
-                    // NoteDirectionIndex를 사용하는 경우 null 반환
-                    if (fieldType.Name == "NoteDirectionIndex" || fieldType == NoteDirectionIndexEnum)
-                    {
-                        return null;
-                    }
-                }
-            }
-            catch
-            {
-                // 오류 발생 시 무시
-            }
-            
-            return null;
-        }
-
-        private static void LogInitializationStatus()
-        {
-            MelonLogger.Msg("[GameTypeLoader] 초기화 완료 - 로드된 타입:");
-            var types = new Type[]
-            {
-                NoteCreateDataType, NoteTypeIdEnum, NoteLaneLeftRightEnum,
-                NoteSubLaneTypeEnum, NoteDirectionIndexEnum, NoteSizeEnum, SlideEndFlickDirectionEnum
-            };
-            foreach (var t in types)
-            {
-                if (t != null)
-                    MelonLogger.Msg($"  - {t.Name} ({t.Namespace})");
-            }
-        }
-
-        private static void FindEnumTypes(Assembly assembly)
-        {
-            NoteTypeIdEnum          = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteTypeId",         "NoteTypeId");
-            NoteLaneLeftRightEnum   = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteLaneLeftRight",  "NoteLaneLeftRight");
-            NoteSubLaneTypeEnum     = FindEnumType(assembly, "IntiCreates.RythmGame.FairyMode.NoteSubLaneType",    "NoteSubLaneType");
-            NoteDirectionIndexEnum  = FindEnumType(assembly, "IntiCreates.RythmGame.NoteDirectionIndex",           "NoteDirectionIndex");
-            NoteSizeEnum            = FindEnumType(assembly, "IntiCreates.RythmGame.NoteSize",                     "NoteSize");
-            SlideEndFlickDirectionEnum = FindEnumType(assembly, "IntiCreates.RythmGame.SlideEndFlickDirection",    "SlideEndFlickDirection");
-
-            if (SlideEndFlickDirectionEnum == null && NoteCreateDataType != null)
-                SlideEndFlickDirectionEnum = FindSlideEndFlickDirectionFromField(assembly);
-        }
-
-        private static Type FindEnumType(Assembly assembly, string fullName, string shortName)
-            => assembly.GetType(fullName) ?? FindTypeByName(assembly, shortName);
-
-        /// <summary>
-        /// 이름으로 타입을 찾습니다.
-        /// </summary>
-        private static Type FindTypeByName(Assembly assembly, string typeName)
-        {
-            try
-            {
-                return assembly.GetTypes().FirstOrDefault(t => t.Name == typeName);
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        public static Type NoteCreateDataType { get; } =
+            typeof(FairyNoteEditorLoader.NoteCreateData);
+        public static Type NoteTypeIdEnum { get; } = typeof(NoteTypeId);
+        public static Type NoteLaneLeftRightEnum { get; } =
+            typeof(NoteLaneLeftRight);
+        public static Type NoteSubLaneTypeEnum { get; } =
+            typeof(NoteSubLaneType);
+        public static Type NoteDirectionIndexEnum { get; } =
+            typeof(NoteDirectionIndex);
+        public static Type NoteSizeEnum { get; } = typeof(NoteSize);
     }
 }
-
