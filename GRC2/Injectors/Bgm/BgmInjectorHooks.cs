@@ -11,7 +11,7 @@ namespace GRC2.Injectors
     internal static class BgmInjectorHooks
     {
         [HarmonyPostfix]
-        private static void Postfix(object __instance, ref IEnumerator __result)
+        private static void Postfix(cRythmGameManager __instance, ref IEnumerator __result)
         {
             BgmGameEndMonitor.MonitorGameEndPostfix(__instance, ref __result);
         }

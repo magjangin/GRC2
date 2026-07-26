@@ -1,5 +1,5 @@
 using System;
-using System.Reflection;
+using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
 using UnityEngine;
@@ -11,14 +11,13 @@ namespace GRC2.Helpers
     /// </summary>
     public static class PauseKeyHandler
     {
-        private static readonly Type RythmGameManagerType =
-            typeof(cRythmGameManager);
-        private static MethodInfo _requestPauseMethod = null;
-        private static MethodInfo _setPauseButtonPushableMethod = null;
-        private static FieldInfo _pauseMenuWorkField = null;
-        private static FieldInfo _isPausingField = null;
-        private static MethodInfo _getStateMethod = null;
-        private static MethodInfo _requestPushContinueButtonMethod = null;
+        private static readonly AccessTools.FieldRef<cRythmGameManager, cRythmGamePauseMenuHud> PauseMenuWorkRef =
+            AccessTools.FieldRefAccess<cRythmGameManager, cRythmGamePauseMenuHud>("mPauseMenuWork");
+
+        // setPauseButtonPusable은 private이므로 열린 인스턴스 델리게이트로 한 번만 바인딩합니다.
+        private static readonly Action<cRythmGameManager, bool> SetPauseButtonPusable =
+            AccessTools.MethodDelegate<Action<cRythmGameManager, bool>>(
+                AccessTools.Method(typeof(cRythmGameManager), "setPauseButtonPusable"));
 
         /// <summary>
         /// 플레이 씬 OnUpdate에서 호출되어 Space / ESC 키 입력을 감지하고 일시정지 메뉴를 전환합니다.
@@ -32,90 +31,30 @@ namespace GRC2.Helpers
 
             try
             {
-                var managers =
-                    UnityEngine.Object.FindObjectsOfType(RythmGameManagerType);
-                if (managers == null || managers.Length == 0)
+                var manager = UnityEngine.Object.FindObjectOfType<cRythmGameManager>();
+                if (manager == null)
                     return;
 
-                object managerInstance = managers[0];
-
-                if (_isPausingField == null)
-                {
-                    _isPausingField = RythmGameManagerType.GetField("mIsPausing", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                }
-
-                if (_pauseMenuWorkField == null)
-                {
-                    _pauseMenuWorkField = RythmGameManagerType.GetField("mPauseMenuWork", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                }
-
-                bool isPausing = false;
-                if (_isPausingField != null && _isPausingField.GetValue(managerInstance) is bool b)
-                {
-                    isPausing = b;
-                }
-
-                object pauseMenuWork = _pauseMenuWorkField?.GetValue(managerInstance);
+                bool isPausing = manager.mIsPausing;
+                var pauseMenuWork = PauseMenuWorkRef(manager);
 
                 if (isPausing && pauseMenuWork != null)
                 {
                     // 이미 일시정지 메뉴가 열린 상태라면 계속하기(Unpause) 시도
-                    if (_getStateMethod == null)
+                    if (pauseMenuWork.getState() == cRythmGamePauseMenuHud.State.Active)
                     {
-                        _getStateMethod = pauseMenuWork.GetType().GetMethod("getState", BindingFlags.Public | BindingFlags.Instance);
-                    }
-
-                    int stateInt = 0;
-                    if (_getStateMethod != null)
-                    {
-                        object stateObj = _getStateMethod.Invoke(pauseMenuWork, null);
-                        if (stateObj != null)
-                        {
-                            stateInt = Convert.ToInt32(stateObj);
-                        }
-                    }
-
-                    // cRythmGamePauseMenuHud.State.Active == 2
-                    if (stateInt == 2)
-                    {
-                        if (_requestPushContinueButtonMethod == null)
-                        {
-                            _requestPushContinueButtonMethod = pauseMenuWork.GetType().GetMethod("requestPushContinueButton", BindingFlags.Public | BindingFlags.Instance);
-                        }
-
-                        if (_requestPushContinueButtonMethod != null)
-                        {
-                            _requestPushContinueButtonMethod.Invoke(pauseMenuWork, null);
-                            MelonLogger.Msg("[PauseKeyHandler] ⏯️ 키 입력 (Space/ESC) -> 일시정지 해제 (Continue)");
-                            return;
-                        }
+                        pauseMenuWork.requestPushContinueButton();
+                        MelonLogger.Msg("[PauseKeyHandler] ⏯️ 키 입력 (Space/ESC) -> 일시정지 해제 (Continue)");
+                        return;
                     }
                 }
 
                 if (!isPausing)
                 {
-                    // 일시정지 메뉴 열기 시도
-                    if (_setPauseButtonPushableMethod == null)
-                    {
-                        _setPauseButtonPushableMethod = RythmGameManagerType.GetMethod("setPauseButtonPusable", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-                    }
-
-                    if (_requestPauseMethod == null)
-                    {
-                        _requestPauseMethod = RythmGameManagerType.GetMethod("requestPause", BindingFlags.Public | BindingFlags.Instance);
-                    }
-
-                    // 일시정지 버튼 활성화 상태 강제
-                    if (_setPauseButtonPushableMethod != null)
-                    {
-                        _setPauseButtonPushableMethod.Invoke(managerInstance, new object[] { true });
-                    }
-
-                    if (_requestPauseMethod != null)
-                    {
-                        _requestPauseMethod.Invoke(managerInstance, null);
-                        MelonLogger.Msg("[PauseKeyHandler] ⏸️ 키 입력 (Space/ESC) -> 일시정지 메뉴 오픈 (requestPause)");
-                    }
+                    // 일시정지 버튼 활성화 상태 강제 후 메뉴 열기
+                    SetPauseButtonPusable?.Invoke(manager, true);
+                    manager.requestPause();
+                    MelonLogger.Msg("[PauseKeyHandler] ⏸️ 키 입력 (Space/ESC) -> 일시정지 메뉴 오픈 (requestPause)");
                 }
             }
             catch (Exception ex)

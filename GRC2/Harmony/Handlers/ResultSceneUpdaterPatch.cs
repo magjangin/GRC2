@@ -1,13 +1,13 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Reflection;
 using MelonLoader;
 using UnityEngine;
 using GRC2.Core;
 using GRC2.Helpers;
 using HarmonyLib;
 using IntiCreates;
+using TMPro;
 
 namespace GRC2.Harmony.Handlers
 {
@@ -19,10 +19,22 @@ namespace GRC2.Harmony.Handlers
     [HarmonyPatch(typeof(cRythmGameResultSceneUpdater), "initializePreFade")]
     public static class ResultSceneUpdaterPatch
     {
-        private const BindingFlags InstanceFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam> SceneInitParamRef =
+            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam>("mSceneInitializeParam");
+
+        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage> MusicLvUiRef =
+            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage>("mMusicLVUI");
+
+        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, TextMeshProUGUI> MusicNameTextRef =
+            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, TextMeshProUGUI>("mMusicNameText");
+
+        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, UnityEngine.UI.Image> ArtworkImageRef =
+            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, UnityEngine.UI.Image>("mArtWorkImage");
+
+        private static readonly string[] DifficultyOrder = { "easy", "normal", "hard", "expert" };
 
         [HarmonyPostfix]
-        public static void InitializePreFadePostfix(object __instance)
+        public static void InitializePreFadePostfix(cRythmGameResultSceneUpdater __instance)
         {
             try
             {
@@ -41,42 +53,30 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        private static readonly string[] DifficultyOrder = { "easy", "normal", "hard", "expert" };
-
         /// <summary>
         /// 실제로 플레이한 난이도 "하나"의 레벨 숫자만 mMusicLVUI.setLV(int)로 덮어씁니다.
         /// (기존 ResultSceneInjector 폴백은 4개 난이도를 모두 이어붙여 mDifficultyText에 덮어쓰는 버그가 있었음)
         /// </summary>
-        private static void ApplyDifficultyLevel(object updater)
+        private static void ApplyDifficultyLevel(cRythmGameResultSceneUpdater updater)
         {
             try
             {
                 var songInfo = AlbumManager.GetCurrentSongInfo();
                 if (songInfo?.DifficultyNumbers == null || songInfo.DifficultyNumbers.Count == 0) return;
 
-                Type type = updater.GetType();
-                var sceneInitParamField = type.GetField("mSceneInitializeParam", InstanceFlags);
-                object sceneInitParam = sceneInitParamField?.GetValue(updater);
+                var sceneInitParam = SceneInitParamRef(updater);
                 if (sceneInitParam == null) return;
 
-                var difficultyField = sceneInitParam.GetType().GetField("difficulty", InstanceFlags);
-                object difficultyValue = difficultyField?.GetValue(sceneInitParam);
-                if (difficultyValue == null) return;
-
-                int difficultyIndex = Convert.ToInt32(difficultyValue);
+                int difficultyIndex = (int)sceneInitParam.difficulty;
                 if (difficultyIndex < 0 || difficultyIndex >= DifficultyOrder.Length) return;
 
                 string key = DifficultyOrder[difficultyIndex];
                 if (!songInfo.DifficultyNumbers.TryGetValue(key, out int level)) return;
 
-                var musicLvUiField = type.GetField("mMusicLVUI", InstanceFlags);
-                object musicLvUi = musicLvUiField?.GetValue(updater);
+                var musicLvUi = MusicLvUiRef(updater);
                 if (musicLvUi == null) return;
 
-                var setLvMethod = musicLvUi.GetType().GetMethod("setLV", InstanceFlags);
-                if (setLvMethod == null) return;
-
-                setLvMethod.Invoke(musicLvUi, new object[] { level });
+                musicLvUi.setLV(level);
                 MelonLogger.Msg($"[ResultSceneUpdaterPatch] ✅ 난이도 레벨 직접 적용: {key} = {level}");
             }
             catch (Exception ex)
@@ -85,27 +85,22 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        private static void ApplyMusicNameText(object updater)
+        private static void ApplyMusicNameText(cRythmGameResultSceneUpdater updater)
         {
             try
             {
                 var songInfo = AlbumManager.GetCurrentSongInfo();
                 if (songInfo == null || string.IsNullOrEmpty(songInfo.Title)) return;
 
-                var field = updater.GetType().GetField("mMusicNameText", InstanceFlags);
-                var textComponent = field?.GetValue(updater);
+                var textComponent = MusicNameTextRef(updater);
                 if (textComponent == null)
                 {
-                    MelonLogger.Warning("[ResultSceneUpdaterPatch] mMusicNameText 필드를 찾을 수 없습니다.");
+                    MelonLogger.Warning("[ResultSceneUpdaterPatch] mMusicNameText가 아직 설정되지 않았습니다.");
                     return;
                 }
 
-                var textProp = textComponent.GetType().GetProperty("text", BindingFlags.Public | BindingFlags.Instance);
-                if (textProp != null && textProp.CanWrite)
-                {
-                    textProp.SetValue(textComponent, songInfo.Title);
-                    MelonLogger.Msg($"[ResultSceneUpdaterPatch] ✅ 곡 제목 직접 적용: {songInfo.Title}");
-                }
+                textComponent.text = songInfo.Title;
+                MelonLogger.Msg($"[ResultSceneUpdaterPatch] ✅ 곡 제목 직접 적용: {songInfo.Title}");
             }
             catch (Exception ex)
             {
@@ -113,7 +108,7 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        private static void QueueArtwork(object updater)
+        private static void QueueArtwork(cRythmGameResultSceneUpdater updater)
         {
             string imageFile = AlbumManager.GetCurrentImageFile();
             if (string.IsNullOrEmpty(imageFile) || !File.Exists(imageFile))
@@ -151,42 +146,30 @@ namespace GRC2.Harmony.Handlers
         }
 
         private static IEnumerator WaitAndApplyArtwork(
-            object updater,
+            cRythmGameResultSceneUpdater updater,
             Sprite customSprite)
         {
             if (updater == null || customSprite == null)
                 yield break;
 
-            Type type = updater.GetType();
-            MethodInfo isReadyMethod = type.GetMethod("isAbleFadeOpenOnSceneStart", InstanceFlags);
-            FieldInfo artworkField = type.GetField("mArtWorkImage", InstanceFlags);
-
             float timeout = 10f;
-            while (isReadyMethod != null && timeout > 0f)
+            while (timeout > 0f)
             {
-                if (updater is UnityEngine.Object unityObject &&
-                    unityObject == null)
-                {
+                // 씬이 폐기되면 updater도 파괴됩니다.
+                if (updater == null)
                     yield break;
-                }
 
-                bool isReady;
-                try { isReady = (bool)isReadyMethod.Invoke(updater, null); }
-                catch { isReady = true; } // 리플렉션 호출 실패 시 더 기다리지 않고 바로 적용 시도
-
-                if (isReady) break;
+                if (updater.isAbleFadeOpenOnSceneStart())
+                    break;
 
                 timeout -= Time.deltaTime;
                 yield return null;
             }
 
-            if (updater is UnityEngine.Object finalUnityObject &&
-                finalUnityObject == null)
-            {
+            if (updater == null)
                 yield break;
-            }
 
-            var image = artworkField?.GetValue(updater) as UnityEngine.UI.Image;
+            var image = ArtworkImageRef(updater);
             if (image != null)
             {
                 image.sprite = customSprite;
@@ -194,7 +177,7 @@ namespace GRC2.Harmony.Handlers
             }
             else
             {
-                MelonLogger.Warning("[ResultSceneUpdaterPatch] mArtWorkImage 필드를 찾을 수 없습니다.");
+                MelonLogger.Warning("[ResultSceneUpdaterPatch] mArtWorkImage가 설정되어 있지 않습니다.");
             }
         }
     }

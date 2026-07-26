@@ -1,5 +1,4 @@
 using System;
-using System.Reflection;
 using GRC2.Core;
 using GRC2.Harmony.Handlers;
 using GRC2.Injectors;
@@ -16,8 +15,8 @@ namespace GRC2.Harmony.Hooks
     /// </summary>
     public static class GameFlowHooks
     {
-        private const BindingFlags InstanceFlags =
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+        private static readonly AccessTools.FieldRef<cMusicSelectPreMusicStartWindowManager, Image> PreMusicArtworkImageRef =
+            AccessTools.FieldRefAccess<cMusicSelectPreMusicStartWindowManager, Image>("mArtworkImage");
 
         public static void BackToPreScreenPrefix()
         {
@@ -53,7 +52,7 @@ namespace GRC2.Harmony.Hooks
         /// 원본 팝업은 MusicDataMap에 존재하는 MusicID가 필요합니다.
         /// 커스텀 선택일 때만 같은 캐릭터의 실제 첫 곡 ID로 임시 치환합니다.
         /// </summary>
-        public static void CoOpenPreMusicStartWindowPrefix(object __instance)
+        public static void CoOpenPreMusicStartWindowPrefix(cMusicSelectSceneUIUpdater __instance)
         {
             try
             {
@@ -67,13 +66,7 @@ namespace GRC2.Harmony.Hooks
                 if (album == null)
                     return;
 
-                FieldInfo currentMusicIdField = __instance.GetType().GetField(
-                    "mCurentMusicId",
-                    InstanceFlags);
-                if (currentMusicIdField == null)
-                    return;
-
-                object previousMusicId = currentMusicIdField.GetValue(__instance);
+                object previousMusicId = __instance.mCurentMusicId;
                 var firstSong = string.IsNullOrWhiteSpace(artistId)
                     ? null
                     : AlbumManager.GetArtistFirstSong(artistId);
@@ -88,8 +81,7 @@ namespace GRC2.Harmony.Hooks
                         out firstTitle);
                 }
 
-                if (firstMusicId == null ||
-                    !currentMusicIdField.FieldType.IsInstanceOfType(firstMusicId))
+                if (!(firstMusicId is soRythmGameMusicDataMap.MusicID resolvedMusicId))
                 {
                     MelonLogger.Warning(
                         $"[GameFlowHooks] '{artistId ?? "unknown"}'에 대응하는 원본 기준 곡을 찾지 못했습니다.");
@@ -97,7 +89,7 @@ namespace GRC2.Harmony.Hooks
                 }
 
                 if (!Equals(previousMusicId, firstMusicId))
-                    currentMusicIdField.SetValue(__instance, firstMusicId);
+                    __instance.mCurentMusicId = resolvedMusicId;
 
                 AlbumManager.RegisterOriginalTitle(firstMusicId, firstTitle);
             }
@@ -111,7 +103,7 @@ namespace GRC2.Harmony.Hooks
         /// <summary>
         /// 팝업의 원본 artwork 로딩이 끝난 직후 실제 Image 필드에 커스텀 이미지를 적용합니다.
         /// </summary>
-        public static void PreMusicStartWindowOpenedPostfix(object __instance)
+        public static void PreMusicStartWindowOpenedPostfix(cMusicSelectPreMusicStartWindowManager __instance)
         {
             try
             {
@@ -122,9 +114,8 @@ namespace GRC2.Harmony.Hooks
                 if (string.IsNullOrWhiteSpace(imageFile))
                     return;
 
-                FieldInfo artworkField =
-                    __instance.GetType().GetField("mArtworkImage", InstanceFlags);
-                if (!(artworkField?.GetValue(__instance) is Image artworkImage))
+                Image artworkImage = PreMusicArtworkImageRef(__instance);
+                if (artworkImage == null)
                     return;
 
                 if (CustomAssetManager.TryGetCustomArtwork(imageFile, out Sprite sprite))
@@ -183,7 +174,7 @@ namespace GRC2.Harmony.Hooks
         private static class OpenPreMusicStartWindowPatch
         {
             [HarmonyPrefix]
-            private static void Prefix(object __instance)
+            private static void Prefix(cMusicSelectSceneUIUpdater __instance)
             {
                 CoOpenPreMusicStartWindowPrefix(__instance);
             }
@@ -193,7 +184,7 @@ namespace GRC2.Harmony.Hooks
         private static class PreMusicStartWindowOpenedPatch
         {
             [HarmonyPostfix]
-            private static void Postfix(object __instance)
+            private static void Postfix(cMusicSelectPreMusicStartWindowManager __instance)
             {
                 PreMusicStartWindowOpenedPostfix(__instance);
             }

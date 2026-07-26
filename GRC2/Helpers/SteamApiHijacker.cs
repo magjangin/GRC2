@@ -1,7 +1,5 @@
 using System;
 using System.IO;
-using System.Collections;
-using System.Reflection;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
@@ -78,41 +76,35 @@ namespace GRC2.Helpers
             MelonLogger.Msg("[SteamApiHijacker] sAddressableDirector.coCheckDLC 실행 완료됨.");
         }
 
-        public static void InitializePostfix(object __instance)
+        public static void InitializePostfix(cDlcDirector __instance)
         {
             try
             {
-                Type dlcDirectorType = __instance.GetType();
-                var field = AccessTools.Field(dlcDirectorType, "mDlcList");
-                var dlcList = field.GetValue(__instance) as IDictionary;
+                var dlcList = __instance.DlcList;
                 if (dlcList == null)
                 {
-                    dlcList = Activator.CreateInstance(field.FieldType) as IDictionary;
-                    field.SetValue(__instance, dlcList);
+                    MelonLogger.Warning("[SteamApiHijacker] cDlcDirector.DlcList가 null이라 DLC를 등록하지 못했습니다.");
+                    return;
                 }
 
                 string dataAddonPath = Path.GetFullPath("DataAddon");
                 MelonLogger.Msg($"[SteamApiHijacker] cDlcDirector.Initialize Postfix - Scanning {dataAddonPath}...");
 
-                if (Directory.Exists(dataAddonPath))
-                {
-                    Type dlcInfoType = dlcDirectorType.GetNestedType("cDlcInfo", BindingFlags.Public | BindingFlags.NonPublic);
-                    foreach (string dir in Directory.GetDirectories(dataAddonPath))
-                    {
-                        string dirName = Path.GetFileName(dir);
-                        if (int.TryParse(dirName, out int index))
-                        {
-                            object dlcInfoInstance = Activator.CreateInstance(dlcInfoType);
-                            string fullPath = Path.GetFullPath(dir);
-                            AccessTools.Field(dlcInfoType, "mMountPath").SetValue(dlcInfoInstance, fullPath);
-                            dlcList[index] = dlcInfoInstance;
-                            MelonLogger.Msg($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
-                        }
-                    }
-                }
-                else
+                if (!Directory.Exists(dataAddonPath))
                 {
                     MelonLogger.Warning($"[SteamApiHijacker] DataAddon folder not found at: {dataAddonPath}");
+                    return;
+                }
+
+                foreach (string dir in Directory.GetDirectories(dataAddonPath))
+                {
+                    string dirName = Path.GetFileName(dir);
+                    if (!int.TryParse(dirName, out int index))
+                        continue;
+
+                    string fullPath = Path.GetFullPath(dir);
+                    dlcList[index] = new cDlcDirector.cDlcInfo { mMountPath = fullPath };
+                    MelonLogger.Msg($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
                 }
             }
             catch (Exception ex)
@@ -225,7 +217,7 @@ namespace GRC2.Helpers
         private static class DlcDirectorInitializePatch
         {
             [HarmonyPostfix]
-            private static void Postfix(object __instance)
+            private static void Postfix(cDlcDirector __instance)
             {
                 InitializePostfix(__instance);
             }

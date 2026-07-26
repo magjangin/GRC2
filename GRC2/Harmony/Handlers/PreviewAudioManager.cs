@@ -1,9 +1,9 @@
+using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Reflection;
 using UnityEngine;
 
 namespace GRC2.Harmony.Handlers
@@ -17,16 +17,10 @@ namespace GRC2.Harmony.Handlers
         private static readonly Dictionary<AudioSource, float> MutedSources =
             new Dictionary<AudioSource, float>();
 
-        private const BindingFlags InstanceFlags =
-            BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-        private static readonly FieldInfo PreviewSourceField =
-            typeof(cMusicSelectSceneUIUpdater).GetField(
-                "mPreviewAudioSorce",
-                InstanceFlags);
-        private static readonly FieldInfo AmbientSourceField =
-            typeof(cMusicSelectSceneUIUpdater).GetField(
-                "mAmbientAudioSorce",
-                InstanceFlags);
+        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, AudioSource> PreviewSourceRef =
+            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mPreviewAudioSorce");
+        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, AudioSource> AmbientSourceRef =
+            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mAmbientAudioSorce");
         private static bool _isMonitoring;
 
         public static void StopPreviewAndAmbient(
@@ -154,10 +148,8 @@ namespace GRC2.Harmony.Handlers
                 return Array.Empty<AudioSource>();
             }
 
-            AudioSource preview =
-                PreviewSourceField?.GetValue(updater) as AudioSource;
-            AudioSource ambient =
-                AmbientSourceField?.GetValue(updater) as AudioSource;
+            AudioSource preview = PreviewSourceRef(updater);
+            AudioSource ambient = AmbientSourceRef(updater);
 
             if (preview == null)
             {

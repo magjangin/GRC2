@@ -1,9 +1,9 @@
 using GRC2.Core;
+using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
 using System;
 using System.IO;
-using System.Reflection;
 using UnityEngine;
 
 namespace GRC2.Harmony.Handlers
@@ -13,6 +13,12 @@ namespace GRC2.Harmony.Handlers
     /// </summary>
     public static class ArtworkUpdater
     {
+        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager> ArtworkManagerRef =
+            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager>("mArtWorkAndMusicDetail");
+
+        private static readonly AccessTools.FieldRef<cMusicSelectArtWorkManager, cMusicSelectArtWork> ArtWorkRef =
+            AccessTools.FieldRefAccess<cMusicSelectArtWorkManager, cMusicSelectArtWork>("mArtWork");
+
         public static void UpdateArtwork(
             cMusicSelectSceneUIUpdater instance)
         {
@@ -67,39 +73,13 @@ namespace GRC2.Harmony.Handlers
 
             try
             {
-                const BindingFlags flags =
-                    BindingFlags.Public |
-                    BindingFlags.NonPublic |
-                    BindingFlags.Instance;
-
-                FieldInfo managerField =
-                    typeof(cMusicSelectSceneUIUpdater).GetField(
-                        "mArtWorkAndMusicDetail",
-                        flags);
-                object artworkManager = managerField?.GetValue(sceneUpdater);
-                if (artworkManager == null)
+                cMusicSelectArtWork artwork = FindArtworkInstance(sceneUpdater);
+                if (artwork == null)
                 {
                     return;
                 }
 
-                Type artworkType = typeof(cMusicSelectArtWork);
-
-                object artworkInstance = FindArtworkInstance(
-                    artworkManager,
-                    artworkManager.GetType(),
-                    artworkType,
-                    flags);
-                if (artworkInstance == null)
-                {
-                    return;
-                }
-
-                MethodInfo requestSetArtwork = artworkType.GetMethod(
-                    "requestSetArtworkSprite",
-                    flags);
-                requestSetArtwork?.Invoke(
-                    artworkInstance,
-                    new object[] { sprite, true });
+                artwork.requestSetArtworkSprite(sprite, true);
             }
             catch (Exception ex)
             {
@@ -108,29 +88,21 @@ namespace GRC2.Harmony.Handlers
             }
         }
 
-        private static object FindArtworkInstance(
-            object manager,
-            Type managerType,
-            Type artworkType,
-            BindingFlags flags)
+        private static cMusicSelectArtWork FindArtworkInstance(
+            cMusicSelectSceneUIUpdater sceneUpdater)
         {
-            FieldInfo[] fields = managerType.GetFields(flags);
-            for (int i = 0; i < fields.Length; i++)
+            cMusicSelectArtWorkManager artworkManager = ArtworkManagerRef(sceneUpdater);
+            if (artworkManager != null)
             {
-                FieldInfo field = fields[i];
-                if (artworkType.IsAssignableFrom(field.FieldType))
+                cMusicSelectArtWork artwork = ArtWorkRef(artworkManager);
+                if (artwork != null)
                 {
-                    object value = field.GetValue(manager);
-                    if (value != null)
-                    {
-                        return value;
-                    }
+                    return artwork;
                 }
             }
 
-            UnityEngine.Object[] objects =
-                UnityEngine.Object.FindObjectsOfType(artworkType);
-            return objects != null && objects.Length > 0 ? objects[0] : null;
+            // 아직 UI 계층이 연결되지 않은 경우에만 씬에서 직접 찾습니다.
+            return UnityEngine.Object.FindObjectOfType<cMusicSelectArtWork>();
         }
     }
 }
