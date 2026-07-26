@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Reflection;
 using MelonLoader;
 using GRC2.Helpers;
 using GRC2.Parsers;
@@ -14,6 +13,9 @@ namespace GRC2.Harmony.Hooks
     [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]
     public static class NoteArrayHooks
     {
+        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
+            AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
+
         private static List<BmsNote> _bmsNotes = new List<BmsNote>();
 
         /// <summary>
@@ -28,7 +30,7 @@ namespace GRC2.Harmony.Hooks
             }
         }
 
-        private static void InjectBmsNotes(object instance)
+        private static void InjectBmsNotes(cFairyModeNotesManager instance)
         {
             try
             {
@@ -52,18 +54,8 @@ namespace GRC2.Harmony.Hooks
                     return;
                 }
 
-                // mFairyNoteCreateDataArray 필드 찾기
-                var noteArrayField = instance.GetType().GetField("mFairyNoteCreateDataArray",
-                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-
-                if (noteArrayField == null)
-                {
-                    MelonLogger.Error("[NoteArrayHooks] mFairyNoteCreateDataArray 필드를 찾을 수 없습니다.");
-                    return;
-                }
-
                 // BMS 노트 배열로 교체
-                noteArrayField.SetValue(instance, noteCreateDataArray);
+                NoteArrayRef(instance) = noteCreateDataArray;
                 MelonLogger.Msg($"[NoteArrayHooks] BMS 노트 교체 완료: {noteCreateDataArray.Length}개");
             }
             catch (Exception ex)
@@ -72,12 +64,12 @@ namespace GRC2.Harmony.Hooks
             }
         }
         [HarmonyPrefix]
-        public static void CreateAllNotePrefix(object __instance)
+        public static void CreateAllNotePrefix(cFairyModeNotesManager __instance)
         {
             TryInjectBmsNotes(__instance, "CreateAllNotePrefix");
         }
 
-        private static void TryInjectBmsNotes(object instance, string methodName)
+        private static void TryInjectBmsNotes(cFairyModeNotesManager instance, string methodName)
         {
             try
             {

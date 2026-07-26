@@ -75,7 +75,6 @@
     <Compile Include="Harmony\Hooks\NoteArrayHooks.cs" />
     <Compile Include="Helpers\EnumValueHelper.cs" />
     <Compile Include="Helpers\ErrorLogger.cs" />
-    <Compile Include="Helpers\FieldAccessHelper.cs" />
     <Compile Include="Helpers\PauseKeyHandler.cs" />
     <Compile Include="Helpers\SteamApiHijacker.cs" />
     <Compile Include="Injectors\Bga\BgaBgmSyncManager.cs" />
@@ -87,7 +86,6 @@
     <Compile Include="Injectors\GameEnd\BgmFinishTimeManager.cs" />
     <Compile Include="Injectors\GameEnd\BgmGameEndMonitor.cs" />
     <Compile Include="Injectors\Shared\BgmBgaInjector.cs" />
-    <Compile Include="Loaders\GameTypeLoader.cs" />
     <Compile Include="Parsers\BmsDataModels.cs" />
     <Compile Include="Parsers\BmsNoteDataParser.cs" />
     <Compile Include="Parsers\BmsParser.cs" />

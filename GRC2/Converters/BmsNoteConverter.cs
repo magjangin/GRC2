@@ -3,11 +3,14 @@ using System.Collections.Generic;
 using System.Linq;
 using GRC2.Parsers;
 using GRC2.Processors;
+using IntiCreates;
+using IntiCreates.RythmGame.FairyMode;
 using MelonLoader;
-using System.Reflection;
 
 namespace GRC2.Converters
 {
+    using NoteCreateData = FairyNoteEditorLoader.NoteCreateData;
+
     /// <summary>
     /// BMS 노트를 게임 노트로 변환하는 메인 클래스
     /// </summary>
@@ -20,16 +23,9 @@ namespace GRC2.Converters
         /// BMS 노트를 게임의 NoteCreateData 배열로 변환합니다.
         /// </summary>
         /// <param name="bmsNotes">변환할 BMS 노트 리스트</param>
-        /// <returns>NoteCreateData 타입의 배열 (타입: NoteCreateData[]). 변환 실패 시 null 반환</returns>
-        public static Array ConvertBmsNotesToNoteCreateData(List<BmsNote> bmsNotes)
+        /// <returns>NoteCreateData 배열. 변환 실패 시 null 반환</returns>
+        public static NoteCreateData[] ConvertBmsNotesToNoteCreateData(List<BmsNote> bmsNotes)
         {
-            // 타입 안전성: 초기화 검증
-            if (Loaders.GameTypeLoader.NoteCreateDataType == null)
-            {
-                MelonLogger.Error("[BmsNoteConverter] NoteCreateData 타입을 확인할 수 없습니다.");
-                return null;
-            }
-
             // 타입 안전성: 입력 검증
             if (bmsNotes == null)
             {
@@ -44,7 +40,7 @@ namespace GRC2.Converters
                 // 성능 최적화: 캐시 초기화
                 Builders.NoteCreateDataBuilder.ClearCache();
 
-                var noteList = new List<object>();
+                var noteList = new List<NoteCreateData>();
                 var holdEndNotes = new List<BmsNote>(); // 홀드 끝 노트 저장
                 var fairyEndNotes = new List<BmsNote>(); // 페어리 끝 노트 저장
 
@@ -150,71 +146,44 @@ namespace GRC2.Converters
 
     public static partial class BmsNoteConverter
     {
-        private static Array CreateTypedNoteArray(List<object> noteList, List<BmsNote> bmsNotes)
+        private static NoteCreateData[] CreateTypedNoteArray(List<NoteCreateData> noteList, List<BmsNote> bmsNotes)
         {
-            try
+            var array = noteList.ToArray();
+
+            if (EnableDetailedHoldNoteLogging)
             {
-                if (Loaders.GameTypeLoader.NoteCreateDataType == null)
-                {
-                    MelonLogger.Error("[BmsNoteConverter] NoteCreateDataType이 null입니다. 배열을 생성할 수 없습니다.");
-                    return null;
-                }
-
-                MelonLogger.Msg($"[BmsNoteConverter] 배열 생성: noteList.Count={noteList.Count}");
-                var array = Array.CreateInstance(Loaders.GameTypeLoader.NoteCreateDataType, noteList.Count);
-                int holdNoteCount = PopulateTypedNoteArray(array, noteList, bmsNotes);
-
-                if (EnableDetailedHoldNoteLogging)
-                {
-                    MelonLogger.Msg($"[BmsNoteConverter] 배열에 포함된 홀드 노트: {holdNoteCount}개 (전체 noteList: {noteList.Count}개)");
-                }
-
-                if (array.GetType().GetElementType() != Loaders.GameTypeLoader.NoteCreateDataType)
-                {
-                    MelonLogger.Error($"[BmsNoteConverter] 생성된 배열의 요소 타입이 일치하지 않습니다. 예상: {Loaders.GameTypeLoader.NoteCreateDataType.Name}, 실제: {array.GetType().GetElementType()?.Name ?? "null"}");
-                    return null;
-                }
-
-                MelonLogger.Msg($"[BmsNoteConverter] 변환 완료: {noteList.Count}개 노트 (타입: {Loaders.GameTypeLoader.NoteCreateDataType.Name}[])");
-                return array;
+                LogHoldNotesForDebug(array, bmsNotes);
             }
-            catch (Exception ex)
-            {
-                Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "배열 변환 중 오류");
-                return null;
-            }
+
+            MelonLogger.Msg($"[BmsNoteConverter] 변환 완료: {array.Length}개 노트");
+            return array;
         }
 
-        private static int PopulateTypedNoteArray(Array array, List<object> noteList, List<BmsNote> bmsNotes)
+        private static void LogHoldNotesForDebug(NoteCreateData[] array, List<BmsNote> bmsNotes)
         {
             int holdNoteCount = 0;
-            for (int i = 0; i < noteList.Count; i++)
+
+            foreach (var noteObj in array)
             {
-                var noteObj = noteList[i];
-                if (noteObj == null)
-                {
-                    MelonLogger.Warning($"[BmsNoteConverter] 인덱스 {i}의 노트가 null입니다. 건너뜁니다.");
+                if (!IsHoldNoteForDebug(noteObj, bmsNotes))
                     continue;
-                }
 
-                if (!Loaders.GameTypeLoader.NoteCreateDataType.IsInstanceOfType(noteObj))
+                holdNoteCount++;
+                var connectArray = noteObj.connectNodeDataArray;
+                if (connectArray != null && connectArray.Length > 0)
                 {
-                    MelonLogger.Error($"[BmsNoteConverter] 인덱스 {i}의 노트 타입이 일치하지 않습니다. 예상: {Loaders.GameTypeLoader.NoteCreateDataType.Name}, 실제: {noteObj.GetType().Name}");
-                    continue;
+                    MelonLogger.Msg($"[BmsNoteConverter] 홀드 노트[{holdNoteCount}]: perfectSample={noteObj.perfectSample}, connectNodeDataArray.Length={connectArray.Length}, 끝 노트 perfectSample={connectArray[0].perfectSample}");
                 }
-
-                array.SetValue(noteObj, i);
-                if (EnableDetailedHoldNoteLogging && IsHoldNoteForDebug(noteObj, bmsNotes))
+                else
                 {
-                    holdNoteCount++;
-                    LogHoldNoteConnectionForDebug(noteObj, holdNoteCount);
+                    MelonLogger.Warning($"[BmsNoteConverter] ⚠️ 홀드 노트[{holdNoteCount}]: perfectSample={noteObj.perfectSample}, connectNodeDataArray가 비어있거나 null입니다!");
                 }
             }
 
-            return holdNoteCount;
+            MelonLogger.Msg($"[BmsNoteConverter] 배열에 포함된 홀드 노트: {holdNoteCount}개 (전체: {array.Length}개)");
         }
 
-        private static bool IsHoldNoteForDebug(object noteObj, List<BmsNote> bmsNotes)
+        private static bool IsHoldNoteForDebug(NoteCreateData noteObj, List<BmsNote> bmsNotes)
         {
             var bmsNote = Builders.NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteObj, bmsNotes);
             if (bmsNote != null && bmsNote.Type == NoteType.Hold)
@@ -222,54 +191,17 @@ namespace GRC2.Converters
                 return true;
             }
 
-            var noteTypeIdField = Loaders.GameTypeLoader.NoteCreateDataType.GetField("noteTypeID", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            var noteTypeId = noteTypeIdField?.GetValue(noteObj);
-            var noteTypeIdStr = noteTypeId?.ToString();
-            return noteTypeIdStr != null && (noteTypeIdStr.Contains("Hold") || noteTypeIdStr == "Hold");
-        }
-
-        private static void LogHoldNoteConnectionForDebug(object noteObj, int holdNoteCount)
-        {
-            var connectArrayField = Loaders.GameTypeLoader.NoteCreateDataType.GetField("connectNodeDataArray",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            if (connectArrayField == null)
-                return;
-
-            var connectArray = connectArrayField.GetValue(noteObj) as Array;
-            var perfectSampleField = Loaders.GameTypeLoader.NoteCreateDataType.GetField("perfectSample",
-                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
-            var startPerfectSample = perfectSampleField?.GetValue(noteObj);
-
-            if (connectArray != null && connectArray.Length > 0)
-            {
-                var endNote = connectArray.GetValue(0);
-                var endPerfectSample = perfectSampleField?.GetValue(endNote);
-                MelonLogger.Msg($"[BmsNoteConverter] 홀드 노트[{holdNoteCount}]: perfectSample={startPerfectSample}, connectNodeDataArray.Length={connectArray.Length}, 끝 노트 perfectSample={endPerfectSample}");
-            }
-            else
-            {
-                MelonLogger.Warning($"[BmsNoteConverter] ⚠️ 홀드 노트[{holdNoteCount}]: perfectSample={startPerfectSample}, connectNodeDataArray가 비어있거나 null입니다!");
-            }
+            return noteObj.noteTypeID == NoteTypeId.Hold || noteObj.noteTypeID == NoteTypeId.Hold_Middle;
         }
     }
 
     public static partial class BmsNoteConverter
     {
-        private static void ProcessHoldEndNotes(List<object> noteList, List<BmsNote> holdEndNotes, List<BmsNote> bmsNotes)
+        private static void ProcessHoldEndNotes(List<NoteCreateData> noteList, List<BmsNote> holdEndNotes, List<BmsNote> bmsNotes)
         {
             try
             {
-                HoldNoteProcessor.ProcessHoldEndNotes(
-                    noteList,
-                    holdEndNotes,
-                    bmsNotes,
-                    Loaders.GameTypeLoader.NoteCreateDataType,
-                    Loaders.GameTypeLoader.NoteDirectionIndexEnum,
-                    Loaders.GameTypeLoader.NoteSizeEnum,
-                    Builders.NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData,
-                    Builders.NoteCreateDataBuilder.CreateNoteCreateData,
-                    Helpers.EnumValueHelper.GetEnumValue,
-                    Helpers.FieldAccessHelper.SetFieldValue);
+                HoldNoteProcessor.ProcessHoldEndNotes(noteList, holdEndNotes, bmsNotes);
             }
             catch (Exception ex)
             {
@@ -277,21 +209,11 @@ namespace GRC2.Converters
             }
         }
 
-        private static void ProcessFairyEndNotes(List<object> noteList, List<BmsNote> fairyEndNotes, List<BmsNote> bmsNotes)
+        private static void ProcessFairyEndNotes(List<NoteCreateData> noteList, List<BmsNote> fairyEndNotes, List<BmsNote> bmsNotes)
         {
             try
             {
-                FairyNoteProcessor.ProcessFairyEndNotes(
-                    noteList,
-                    fairyEndNotes,
-                    bmsNotes,
-                    Loaders.GameTypeLoader.NoteCreateDataType,
-                    Loaders.GameTypeLoader.NoteDirectionIndexEnum,
-                    Loaders.GameTypeLoader.NoteSizeEnum,
-                    Builders.NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData,
-                    Builders.NoteCreateDataBuilder.CreateNoteCreateData,
-                    Helpers.EnumValueHelper.GetEnumValue,
-                    Helpers.FieldAccessHelper.SetFieldValue);
+                FairyNoteProcessor.ProcessFairyEndNotes(noteList, fairyEndNotes, bmsNotes);
             }
             catch (Exception ex)
             {
@@ -304,7 +226,7 @@ namespace GRC2.Converters
     {
     
 
-        private static void FilterZeroTimeNotes(List<object> noteList)
+        private static void FilterZeroTimeNotes(List<NoteCreateData> noteList)
         {
             if (noteList == null || noteList.Count == 0) return;
 
@@ -313,7 +235,7 @@ namespace GRC2.Converters
                 int removedCount = 0;
                 for (int i = noteList.Count - 1; i >= 0; i--)
                 {
-                    if (noteList[i] == null || IsNoteAtZeroTime(noteList[i]))
+                    if (noteList[i] == null || noteList[i].perfectSample == 0)
                     {
                         noteList.RemoveAt(i);
                         removedCount++;
@@ -327,26 +249,6 @@ namespace GRC2.Converters
             {
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "FilterZeroTimeNotes 오류");
             }
-        }
-
-        private static bool IsNoteAtZeroTime(object note)
-        {
-            // perfectSample이 없거나 0이면 제로 타임 노트
-            var rawPerfectSample = Helpers.FieldAccessHelper.GetFieldValue(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE);
-            if (rawPerfectSample == null) return true;
-            if (TryGetIntField(note, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE, out int perfectSample) && perfectSample == 0)
-                return true;
-
-            return false;
-        }
-
-        private static bool TryGetIntField(object obj, string fieldName, out int value)
-        {
-            value = 0;
-            var raw = Helpers.FieldAccessHelper.GetFieldValue(obj, fieldName);
-            if (raw == null) return false;
-            try { value = Convert.ToInt32(raw); return true; }
-            catch { return false; }
         }
 
         private static List<BmsNote> CheckMissingEndNotes(
@@ -398,7 +300,7 @@ namespace GRC2.Converters
             return null; // 모든 끝 노트가 있음
         }
 
-        private static void SetLastNoteFlag(List<object> noteList)
+        private static void SetLastNoteFlag(List<NoteCreateData> noteList)
         {
             if (noteList == null || noteList.Count == 0)
             {
@@ -408,38 +310,26 @@ namespace GRC2.Converters
             try
             {
                 int maxPerfectSample = int.MinValue;
-                object lastNote = null;
+                NoteCreateData lastNote = null;
 
                 // 모든 노트와 connectNodeDataArray의 끝 노트를 확인하여 가장 큰 perfectSample 찾기
                 foreach (var noteObj in noteList)
                 {
-                    var perfectSample = Helpers.FieldAccessHelper.GetFieldValue(noteObj, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE);
-                    if (perfectSample != null)
+                    if (noteObj.perfectSample > maxPerfectSample)
                     {
-                        int sample = (int)perfectSample;
-                        if (sample > maxPerfectSample)
-                        {
-                            maxPerfectSample = sample;
-                            lastNote = noteObj;
-                        }
+                        maxPerfectSample = noteObj.perfectSample;
+                        lastNote = noteObj;
                     }
 
-                    // connectNodeDataArray 확인
-                    var connectNodeArray = Helpers.FieldAccessHelper.GetFieldValue(noteObj, Helpers.FieldAccessHelper.FIELD_CONNECT_NODE_DATA_ARRAY);
-                    if (connectNodeArray != null && connectNodeArray is Array connectArray)
+                    var connectArray = noteObj.connectNodeDataArray;
+                    if (connectArray == null) continue;
+
+                    foreach (var connectNode in connectArray)
                     {
-                        foreach (var connectNode in connectArray)
+                        if (connectNode != null && connectNode.perfectSample > maxPerfectSample)
                         {
-                            var connectPerfectSample = Helpers.FieldAccessHelper.GetFieldValue(connectNode, Helpers.FieldAccessHelper.FIELD_PERFECT_SAMPLE);
-                            if (connectPerfectSample != null)
-                            {
-                                int connectSample = (int)connectPerfectSample;
-                                if (connectSample > maxPerfectSample)
-                                {
-                                    maxPerfectSample = connectSample;
-                                    lastNote = connectNode;
-                                }
-                            }
+                            maxPerfectSample = connectNode.perfectSample;
+                            lastNote = connectNode;
                         }
                     }
                 }
@@ -447,7 +337,7 @@ namespace GRC2.Converters
                 // 마지막 노트에 isLast 설정
                 if (lastNote != null)
                 {
-                    Helpers.FieldAccessHelper.SetFieldValue(lastNote, Helpers.FieldAccessHelper.FIELD_IS_LAST, true);
+                    lastNote.isLast = true;
                 }
             }
             catch (Exception ex)

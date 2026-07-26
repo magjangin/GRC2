@@ -1,11 +1,16 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using GRC2.Builders;
 using GRC2.Parsers;
+using IntiCreates;
+using IntiCreates.RythmGame;
 using MelonLoader;
 
 namespace GRC2.Processors
 {
+    using NoteCreateData = FairyNoteEditorLoader.NoteCreateData;
+
     public static partial class FairyNoteProcessor
     {
         private const int SampleRate = 48000;
@@ -254,7 +259,7 @@ namespace GRC2.Processors
         }
         private sealed class FairyStartLookupEntry
         {
-            public object NoteObject { get; set; }
+            public NoteCreateData NoteObject { get; set; }
             public BmsNote BmsNote { get; set; }
             public int Sample { get; set; }
         }
@@ -265,9 +270,8 @@ namespace GRC2.Processors
     
 
         private static Dictionary<(int Lane, bool IsLeft), List<FairyStartLookupEntry>> BuildFairyStartLookup(
-            List<object> noteList,
-            List<BmsNote> allBmsNotes,
-            Func<object, List<BmsNote>, BmsNote> getBmsNoteFromNoteCreateData)
+            List<NoteCreateData> noteList,
+            List<BmsNote> allBmsNotes)
         {
             var lookup = new Dictionary<(int Lane, bool IsLeft), List<FairyStartLookupEntry>>();
 
@@ -275,7 +279,7 @@ namespace GRC2.Processors
             {
                 if (noteObj == null) continue;
 
-                var bmsNote = getBmsNoteFromNoteCreateData(noteObj, allBmsNotes);
+                var bmsNote = NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteObj, allBmsNotes);
                 if (bmsNote == null || bmsNote.Type != NoteType.Fairy) continue;
 
                 var key = (bmsNote.Lane, bmsNote.IsLeft);
@@ -302,16 +306,9 @@ namespace GRC2.Processors
         }
 
         public static void ProcessFairyEndNotes(
-            List<object> noteList,
+            List<NoteCreateData> noteList,
             List<BmsNote> fairyEndNotes,
-            List<BmsNote> allBmsNotes,
-            Type noteCreateDataType,
-            Type noteDirectionIndexEnum,
-            Type noteSizeEnum,
-            Func<object, List<BmsNote>, BmsNote> getBmsNoteFromNoteCreateData,
-            Func<BmsNote, object> createNoteCreateData,
-            Func<Type, string, object> getEnumValue,
-            Action<object, string, object> setFieldValue)
+            List<BmsNote> allBmsNotes)
         {
             if (noteList == null || fairyEndNotes == null || allBmsNotes == null) return;
 
@@ -323,10 +320,11 @@ namespace GRC2.Processors
 
             if (noteList.Count > 0)
             {
-                try { getBmsNoteFromNoteCreateData(noteList[0], allBmsNotes); } catch { /* ignore */ }
+                // 역매핑 캐시를 미리 구성해 둡니다.
+                try { NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteList[0], allBmsNotes); } catch { /* ignore */ }
             }
 
-            var startNoteMap = BuildFairyStartLookup(noteList, allBmsNotes, getBmsNoteFromNoteCreateData);
+            var startNoteMap = BuildFairyStartLookup(noteList, allBmsNotes);
 
             int success = 0;
             int fail = 0;
@@ -351,7 +349,7 @@ namespace GRC2.Processors
                         continue;
                     }
 
-                    object startNoteObj = FindStartNoteObject(startBms, startNoteMap, timeTolerance);
+                    NoteCreateData startNoteObj = FindStartNoteObject(startBms, startNoteMap, timeTolerance);
 
                     if (startNoteObj == null)
                     {
@@ -363,13 +361,7 @@ namespace GRC2.Processors
                     NoteProcessorHelper.AddEndNoteToConnectNodeArray(
                         startNoteObj,
                         fairyEnd,
-                        noteCreateDataType,
-                        noteDirectionIndexEnum,
-                        noteSizeEnum,
-                        createNoteCreateData,
-                        getEnumValue,
-                        setFieldValue,
-                        endDirection: "CENTER_TOP",
+                        endDirection: NoteDirectionIndex.CENTER_TOP,
                         processorName: "FairyNoteProcessor",
                         copyTurnDirection: true);
 
@@ -385,7 +377,7 @@ namespace GRC2.Processors
             MelonLogger.Msg($"[FairyNoteProcessor] 페어리 끝 노트 처리 완료: 성공={success}개, 실패={fail}개");
         }
 
-        private static object FindStartNoteObject(
+        private static NoteCreateData FindStartNoteObject(
             BmsNote startBms,
             Dictionary<(int Lane, bool IsLeft), List<FairyStartLookupEntry>> startNoteMap,
             float timeTolerance)
