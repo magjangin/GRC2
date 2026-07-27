@@ -6,18 +6,18 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 
 아래 문서부터 확인하세요.
 
-- [문서 인덱스](docs/README.md)
-- [현재 훅 맵](docs/maintenance/HOOK_MAP.md)
+- [문서 인덱스](GRC%20리드미/README.md)
+- [현재 훅 맵](GRC%20리드미/maintenance/HOOK_MAP.md)
 - [Harmony 레이어 README](GRC2/Harmony/README.md)
 
-정리 전 문서나 이전에 생성된 메모는 [docs/archive](docs/archive)에 보관되어 있습니다. 이 문서들은 현재 기준 문서가 아니라 과거 맥락을 확인하는 용도로 참고하세요.
+정리 전 문서나 이전에 생성된 메모는 [GRC 리드미/archive](GRC%20리드미/archive)에 보관되어 있습니다. 이 문서들은 현재 기준 문서가 아니라 과거 맥락을 확인하는 용도로 참고하세요.
 
 ## 소스 구성
 
 - 메인 모드 소스: `GRC2/`
 - 테스트: `GRC2.Tests/`
 - `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 42개, `GRC2.Tests` 2개
-- 현재 훅 소유 구조는 [docs/maintenance/HOOK_MAP.md](docs/maintenance/HOOK_MAP.md)에 정리되어 있습니다.
+- 현재 훅 소유 구조는 [GRC 리드미/maintenance/HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md)에 정리되어 있습니다.
 
 ## 검증
 
