@@ -236,6 +236,62 @@ Removal risk:
   high score/clear badge of whichever real song was borrowed as the
   template.
 
+### AutoPlay / judge manipulation / record blocking
+
+Owner files:
+
+- `GRC2/Core/CustomKey/CustomKeySettings.cs`
+- `GRC2/Harmony/Handlers/AutoPlayPatch.cs`
+- `GRC2/Harmony/Handlers/JudgePerfectPatch.cs`
+- `GRC2/Harmony/Handlers/RecordBlockPatch.cs`
+
+Patched game targets:
+
+- `IntiCreates.cFairyModeNotesManager.createAllNote` (also owned by note-array
+  replacement above; forces `mIsCurrentAutoPlay` when AutoPlay is enabled,
+  since that field is set directly from `InitializeParam.isAutoPlay` in
+  `coInitialize` and never goes through `setIsAutoPlay`)
+- `IntiCreates.cFairyModeNotesManager.setIsAutoPlay`
+- `IntiCreates.cNotecWorkBase.onJudgeMent` (every note-work subclass override
+  calls `base.onJudgeMent(judgeParam)` first, so patching the base method
+  alone covers score/combo reporting, sound, and visual effects for all note
+  types)
+- `IntiCreates.cRythmGameResultSceneUpdater.initializePreFade`
+- `IntiCreates.cRythmGameResultSceneUpdater.coUpdateResultAnim`
+- `IntiCreates.sSaveDataDirector.requestGameDataSaveToFile`
+
+Purpose:
+
+- ported from the standalone `GRC auto` and `GRC judge` MelonLoader mods,
+  reimplemented against compile-time decompiled types (the originals used
+  runtime reflection/string-based member lookup because they predated the
+  direct `Assembly-CSharp.dll` reference);
+- `AutoPlayPatch`/`JudgePerfectPatch` are off by default; `autoplay_enabled`
+  and `judge_perfect_enabled` in `savecustomkey/config.txt` (created next to
+  the `hwa` folder on first launch) are read once in `OnInitializeMelon` and
+  are the only way to turn them on — there is no in-game toggle key, so a
+  config edit needs a game restart to take effect;
+- `RecordBlockPatch` snapshots `playerMusicData[id].{highScoreArray,
+  maxComboArray, playCountArray, playFlagArray}` for the played difficulty
+  before `initializePreFade` runs and restores them afterward, zeroes the
+  displayed old high score, and makes `requestGameDataSaveToFile` a no-op —
+  all only while `AutoPlayPatch.IsEnabled || JudgePerfectPatch.IsEnabled` is
+  true, so cheated play sessions never reach the save file.
+- `RecordBlockPatch` resolves the played `MusicID` itself
+  (`CustomAssetManager.IsCustomChartSelected()` +
+  `AlbumManager.GetCurrentMusicID()`) instead of reading
+  `sceneInitParam.musicData.id` directly, so its snapshot/restore does not
+  depend on Harmony prefix ordering relative to
+  `ResultSceneUpdaterPatch.InitializePreFadePrefix` (which rewrites that same
+  field for the borrowed-template-song fix documented above).
+
+Removal risk:
+
+- removing `AutoPlayPatch`/`JudgePerfectPatch` only removes the cheat
+  features; removing `RecordBlockPatch` while keeping the other two would let
+  AutoPlay/judge-forced results write real best scores/clear badges to the
+  save file.
+
 ### Steam and DLC bypass
 
 Owner file:

@@ -49,6 +49,11 @@ namespace GRC2.Core
                     MelonLogger.Msg("[SceneDetector] hwa 폴더 생성 완료");
                 }
 
+                // AutoPlay/판정조작 on-off 설정 (savecustomkey 폴더) 로드
+                CustomKeySettings.Initialize(gameFolder);
+                AutoPlayPatch.Initialize();
+                JudgePerfectPatch.Initialize();
+
                 // 앨범 폴더 스캔 (먼저 앨범들을 스캔)
                 MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 시작...");
                 AlbumManager.ScanAlbums(_hwaFolderPath);
