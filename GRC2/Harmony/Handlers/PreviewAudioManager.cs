@@ -14,8 +14,20 @@ namespace GRC2.Harmony.Handlers
     /// </summary>
     public static class PreviewAudioManager
     {
-        private static readonly Dictionary<AudioSource, float> MutedSources =
-            new Dictionary<AudioSource, float>();
+        private readonly struct MutedAudioState
+        {
+            public readonly float Volume;
+            public readonly AudioClip Clip;
+
+            public MutedAudioState(float volume, AudioClip clip)
+            {
+                Volume = volume;
+                Clip = clip;
+            }
+        }
+
+        private static readonly Dictionary<AudioSource, MutedAudioState> MutedSources =
+            new Dictionary<AudioSource, MutedAudioState>();
 
         private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, AudioSource> PreviewSourceRef =
             AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mPreviewAudioSorce");
@@ -52,7 +64,7 @@ namespace GRC2.Harmony.Handlers
 
             try
             {
-                foreach (KeyValuePair<AudioSource, float> entry in MutedSources)
+                foreach (KeyValuePair<AudioSource, MutedAudioState> entry in MutedSources)
                 {
                     AudioSource source = entry.Key;
                     if (source == null)
@@ -60,8 +72,10 @@ namespace GRC2.Harmony.Handlers
                         continue;
                     }
 
+                    // 뮤트 시 반납했던 clip을 되돌려야 재생이 재개될 수 있습니다.
+                    source.clip = entry.Value.Clip;
                     source.mute = false;
-                    source.volume = entry.Value;
+                    source.volume = entry.Value.Volume;
                 }
             }
             catch (Exception ex)
@@ -97,9 +111,23 @@ namespace GRC2.Harmony.Handlers
                     MuteSource(currentSources[i]);
                 }
 
-                foreach (KeyValuePair<AudioSource, float> entry in MutedSources)
+                foreach (KeyValuePair<AudioSource, MutedAudioState> entry in MutedSources)
                 {
-                    MuteSourceWithoutRecording(entry.Key);
+                    AudioSource source = entry.Key;
+                    if (source == null)
+                    {
+                        continue;
+                    }
+
+                    // clip을 비운 뒤로 이 슬롯을 sSoundManager2D 풀의 다른 사운드가
+                    // 가져갔을 수 있습니다(clip이 우리가 비운 null이 아닌 값으로 바뀜).
+                    // 그런 경우 계속 건드리면 그 무관한 사운드를 우리가 끊어버리게 됩니다.
+                    if (source.clip != null && source.clip != entry.Value.Clip)
+                    {
+                        continue;
+                    }
+
+                    MuteSourceWithoutRecording(source);
                 }
 
                 yield return new WaitForSeconds(interval);
@@ -118,7 +146,7 @@ namespace GRC2.Harmony.Handlers
 
             if (!MutedSources.ContainsKey(source))
             {
-                MutedSources[source] = source.volume;
+                MutedSources[source] = new MutedAudioState(source.volume, source.clip);
             }
 
             MuteSourceWithoutRecording(source);
@@ -137,7 +165,17 @@ namespace GRC2.Harmony.Handlers
             }
 
             source.volume = 0f;
-            source.mute = true;
+
+            // sSoundManager2D는 BGM/환경음/판정 SE가 같은 AudioSource 풀을 공유하고,
+            // getPlayableData()는 clip == null인 슬롯만 재사용 가능한 것으로 봅니다. clip을
+            // 비우지 않으면 이 슬롯이 계속 "사용 중"으로 남아 풀에서 빠집니다.
+            //
+            // mute는 절대 true로 설정하지 않습니다. 원본 어셈블리 어디에도 이 풀의
+            // AudioSource.mute를 다시 false로 되돌리는 코드가 없어서, 여기서 true를
+            // 걸어두면 이 슬롯을 나중에 넘겨받는 무관한 사운드(판정 SE 포함)가
+            // volume/clip은 정상인데 영구 무음이 됩니다. Stop() + volume=0 + clip=null
+            // 만으로 우리 쪽 무음 처리는 충분합니다.
+            source.clip = null;
         }
 
         private static AudioSource[] GetUpdaterSources(

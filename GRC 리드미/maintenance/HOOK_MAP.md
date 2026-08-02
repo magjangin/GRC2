@@ -74,9 +74,20 @@ Purpose:
   pre-play window;
 - replace the artwork after the real pre-play window has opened.
 
+`PreviewAudioManager` mutes by stopping the source, zeroing its volume, and
+clearing `clip` (never `.mute = true`). `sSoundManager2D` pools every
+`AudioSource` across BGM, ambient, and judge SE, and reclaims a slot once its
+`clip` is `null`; leaving `clip` set would strand the slot, and leaving
+`.mute = true` would silently mute whatever unrelated sound the pool later
+hands that slot to, since nothing in the original assembly ever clears
+`.mute` back to `false`. The saved volume/clip pair is restored on
+`RestoreMutedAudioSources()`.
+
 Removal risk:
 
-- the mod may fail to know which custom chart is selected.
+- the mod may fail to know which custom chart is selected;
+- reverting the mute path to `.mute = true` reintroduces silent, unrelated
+  sounds (including judge SE) whenever the pool later reuses that slot.
 
 ### Note array replacement
 
@@ -126,8 +137,7 @@ Removal risk:
 Owner files:
 
 - `GRC2/Injectors/Bgm/BgmInjector.cs`
-- `GRC2/Injectors/Bgm/BgmInjectorHooks.cs`
-- `GRC2/Injectors/GameEnd/*`
+- `GRC2/Injectors/GameEnd/BgmGameEndMonitor.cs`
 
 Patched game targets:
 
