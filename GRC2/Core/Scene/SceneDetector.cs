@@ -6,6 +6,7 @@ using GRC2.Harmony.Hooks;
 using GRC2.Injectors;
 using GRC2.Parsers;
 using GRC2.Converters;
+using HarmonyLib;
 using MelonLoader;
 using UnityEngine;
 using System.Linq;
@@ -29,7 +30,7 @@ namespace GRC2.Core
             MelonLogger.Msg("[SceneDetector] 모드 초기화 시작");
             
             // 모드 어셈블리의 HarmonyPatch 특성을 한 번에 등록합니다.
-            MusicInjector.Initialize();
+            InitializeHarmony();
             
             try
             {
@@ -104,7 +105,86 @@ namespace GRC2.Core
 
             if (BgmBgaInjector.IsPlayScene())
             {
-                PauseKeyHandler.HandlePauseKeyInput();
+                HandlePauseKeyInput();
+            }
+        }
+    }
+
+    // Harmony 패치 초기화
+    public partial class SceneDetector
+    {
+        private static HarmonyLib.Harmony _harmonyInstance = null;
+
+        private static void InitializeHarmony()
+        {
+            if (_harmonyInstance != null) return;
+
+            MelonLogger.Msg("[SceneDetector] Harmony 초기화 중...");
+
+            try
+            {
+                _harmonyInstance = new HarmonyLib.Harmony("GRC2.MusicInjector");
+                _harmonyInstance.PatchAll(typeof(SceneDetector).Assembly);
+                MelonLogger.Msg("[SceneDetector] Harmony 자동 패치 적용 완료");
+            }
+            catch (Exception ex)
+            {
+                _harmonyInstance = null;
+                MelonLogger.Msg($"[SceneDetector] Harmony 패치 적용 실패: {ex.Message}");
+                MelonLogger.Msg($"[SceneDetector] 스택 트레이스: {ex.StackTrace}");
+            }
+        }
+    }
+
+    // 플레이 씬에서 Space/ESC 키 입력 시 일시정지 메뉴를 여닫는 처리
+    public partial class SceneDetector
+    {
+        private static readonly AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
+            AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
+
+        // setPauseButtonPusable은 private이므로 열린 인스턴스 델리게이트로 한 번만 바인딩합니다.
+        private static readonly Action<IntiCreates.cRythmGameManager, bool> SetPauseButtonPusable =
+            AccessTools.MethodDelegate<Action<IntiCreates.cRythmGameManager, bool>>(
+                AccessTools.Method(typeof(IntiCreates.cRythmGameManager), "setPauseButtonPusable"));
+
+        private static void HandlePauseKeyInput()
+        {
+            if (!Input.GetKeyDown(KeyCode.Space) && !Input.GetKeyDown(KeyCode.Escape))
+            {
+                return;
+            }
+
+            try
+            {
+                var manager = UnityEngine.Object.FindObjectOfType<IntiCreates.cRythmGameManager>();
+                if (manager == null)
+                    return;
+
+                bool isPausing = manager.mIsPausing;
+                var pauseMenuWork = PauseMenuWorkRef(manager);
+
+                if (isPausing && pauseMenuWork != null)
+                {
+                    // 이미 일시정지 메뉴가 열린 상태라면 계속하기(Unpause) 시도
+                    if (pauseMenuWork.getState() == IntiCreates.cRythmGamePauseMenuHud.State.Active)
+                    {
+                        pauseMenuWork.requestPushContinueButton();
+                        MelonLogger.Msg("[SceneDetector] ⏯️ 키 입력 (Space/ESC) -> 일시정지 해제 (Continue)");
+                        return;
+                    }
+                }
+
+                if (!isPausing)
+                {
+                    // 일시정지 버튼 활성화 상태 강제 후 메뉴 열기
+                    SetPauseButtonPusable?.Invoke(manager, true);
+                    manager.requestPause();
+                    MelonLogger.Msg("[SceneDetector] ⏸️ 키 입력 (Space/ESC) -> 일시정지 메뉴 오픈 (requestPause)");
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogException(ex, "[SceneDetector]", "Pause 키 처리 오류");
             }
         }
     }

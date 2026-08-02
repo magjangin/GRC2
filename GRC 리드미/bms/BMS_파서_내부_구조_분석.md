@@ -15,7 +15,7 @@ BmsParser.ParseBmsFile()
     │   └─ BmsNoteDataParser.ParseNoteData()
     ├─ 3. 홀드 노트 매칭 (HoldNoteProcessor)
     ├─ 4. 페어리 노트 매칭 (FairyNoteProcessor)
-    └─ 5. 시간 계산 (BmsTimeCalculator)
+    └─ 5. 시간 계산 (BmsParser.CalculateTime)
     ↓
 List<BmsNote>
 ```
@@ -105,7 +105,7 @@ public static List<BmsNote> ParseNoteData(int measure, int channel, string data)
 }
 ```
 
-### BmsTimeCalculator
+### BmsParser.CalculateTime (구 BmsTimeCalculator, BmsParser.cs로 병합됨)
 
 **시간 계산 알고리즘:**
 
@@ -211,7 +211,5 @@ public static List<int> ParseHexData(string data)
 
 ## 참고 자료
 
-- `GRC2/Parsers/BmsParser.cs`
+- `GRC2/Parsers/BmsParser.cs` (시간 계산 포함, 구 `BmsTimeCalculator.cs` 병합됨)
 - `GRC2/Parsers/BmsNoteDataParser.cs`
-- `GRC2/Parsers/BmsTimeCalculator.cs`
-- `GRC2/Parsers/BmsBpmParser.cs`

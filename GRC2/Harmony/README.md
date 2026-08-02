@@ -13,8 +13,8 @@
 | **Handlers** | `GRC2.Harmony.Handlers` | `[HarmonyPatch]` 패치 본문과 관련 헬퍼 |
 
 `GRC2.csproj`가 게임의 `Assembly-CSharp.dll`을 직접 참조합니다.
-`Core/Bootstrap/MusicInjector.cs`는 모드 초기화 때 `PatchAll()`을 한 번 호출해
-모드 어셈블리에 선언된 모든 Harmony 특성을 자동 등록합니다.
+`Core/Scene/SceneDetector.cs`의 `InitializeHarmony()`가 모드 초기화 때 `PatchAll()`을
+한 번 호출해 모드 어셈블리에 선언된 모든 Harmony 특성을 자동 등록합니다.
 
 ## 파일 구성
 

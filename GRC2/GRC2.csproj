@@ -59,7 +59,6 @@
     <Compile Include="Core\Album\AlbumManager.cs" />
     <Compile Include="Core\Assets\CustomAssetManager.cs" />
     <Compile Include="Core\Assets\PlaySceneArtworkInjector.cs" />
-    <Compile Include="Core\Bootstrap\MusicInjector.cs" />
     <Compile Include="Core\Scene\SceneDetector.cs" />
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
@@ -72,7 +71,6 @@
     <Compile Include="Harmony\Hooks\NoteArrayHooks.cs" />
     <Compile Include="Helpers\EnumValueHelper.cs" />
     <Compile Include="Helpers\ErrorLogger.cs" />
-    <Compile Include="Helpers\PauseKeyHandler.cs" />
     <Compile Include="Helpers\SteamApiHijacker.cs" />
     <Compile Include="Injectors\Bga\BgaBgmSyncManager.cs" />
     <Compile Include="Injectors\Bga\BgaInjector.cs" />
@@ -84,7 +82,6 @@
     <Compile Include="Parsers\BmsNoteDataParser.cs" />
     <Compile Include="Parsers\BmsParser.cs" />
     <Compile Include="Parsers\BmsSummaryPrinter.cs" />
-    <Compile Include="Parsers\BmsTimeCalculator.cs" />
     <Compile Include="Parsers\SongInfoParser.cs" />
     <Compile Include="Processors\FairyNoteProcessor.cs" />
     <Compile Include="Processors\HoldNoteProcessor.cs" />

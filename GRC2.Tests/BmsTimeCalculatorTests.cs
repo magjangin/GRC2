@@ -12,7 +12,7 @@ namespace GRC2.Tests
             var changes = new List<BpmChange>();
             float baseBpm = 120f;
             float baseFreq = 60f / baseBpm;
-            float t = BmsTimeCalculator.CalculateTime(1f, baseBpm, baseFreq, changes);
+            float t = BmsParser.CalculateTime(1f, baseBpm, baseFreq, changes);
             Assert.Equal(2f, t, precision: 5);
         }
 
@@ -25,7 +25,7 @@ namespace GRC2.Tests
             };
             float baseBpm = 120f;
             float baseFreq = 60f / baseBpm;
-            float t = BmsTimeCalculator.CalculateTime(2f, baseBpm, baseFreq, changes);
+            float t = BmsParser.CalculateTime(2f, baseBpm, baseFreq, changes);
             Assert.True(t > 0f);
         }
     }

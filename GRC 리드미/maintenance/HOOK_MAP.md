@@ -11,7 +11,7 @@ File: `GRC2/Core/Scene/SceneDetector.cs`
 
 Main startup path. It:
 
-- applies every `[HarmonyPatch]` in the mod assembly through `MusicInjector.Initialize()`;
+- applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
 - locates the game `hwa` folder;
 - scans albums, song metadata, custom artwork, and BMS files;
 - supplies parsed BMS data to the already-registered note-array hook;
@@ -47,7 +47,7 @@ Music Select is reached by any path other than the result scene.
 
 Owner files:
 
-- `GRC2/Core/Bootstrap/MusicInjector.cs`
+- `GRC2/Core/Scene/SceneDetector.cs` (`InitializeHarmony`)
 - `GRC2/Harmony/Hooks/MusicScrollViewHooks.cs`
 
 Patched game targets:

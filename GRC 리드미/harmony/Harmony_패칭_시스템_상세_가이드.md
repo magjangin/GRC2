@@ -4,7 +4,7 @@
 
 GRC2는 게임의 `Assembly-CSharp.dll`을 컴파일 타임에 직접 참조하고,
 Harmony 특성으로 패치 대상을 선언합니다. 모드 시작 시
-`MusicInjector.Initialize()`가 `PatchAll()`을 한 번 호출하며, 이후 별도
+`SceneDetector.InitializeHarmony()`가 `PatchAll()`을 한 번 호출하며, 이후 별도
 Patcher 초기화나 지연 등록 코루틴은 사용하지 않습니다.
 
 ## 프로젝트 참조
@@ -24,9 +24,9 @@ Patcher 초기화나 지연 등록 코루틴은 사용하지 않습니다.
 
 ```text
 SceneDetector.OnInitializeMelon()
-  -> MusicInjector.Initialize()
+  -> SceneDetector.InitializeHarmony()
      -> new Harmony("GRC2.MusicInjector")
-     -> PatchAll(typeof(MusicInjector).Assembly)
+     -> PatchAll(typeof(SceneDetector).Assembly)
   -> 앨범과 BMS 데이터 로드
   -> NoteArrayHooks.UpdateBmsNotes(...)
 ```
@@ -102,7 +102,7 @@ private static class BackToPreScreenPatch
    서명을 확인합니다.
 2. 대상별 `[HarmonyPatch(typeof(...), "methodName")]` 클래스를 만듭니다.
 3. 패치 메서드에 `[HarmonyPrefix]` 또는 `[HarmonyPostfix]`를 붙입니다.
-4. `MusicInjector`에 별도 등록 호출을 추가하지 않습니다.
+4. `SceneDetector.InitializeHarmony()`에 별도 등록 호출을 추가하지 않습니다.
 5. `HOOK_MAP.md`에 소유 파일, 목적, 제거 위험을 기록합니다.
 6. Debug 빌드와 테스트를 실행합니다.
 
@@ -112,5 +112,5 @@ dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --configuration Debug
 ```
 
 게임 업데이트로 타입이나 메서드가 바뀌면 컴파일 오류 또는 시작 시
-`PatchAll()` 오류로 드러납니다. `MusicInjector`는 예외 메시지와 스택
-트레이스를 MelonLoader 로그에 남깁니다.
+`PatchAll()` 오류로 드러납니다. `SceneDetector.InitializeHarmony()`는 예외
+메시지와 스택 트레이스를 MelonLoader 로그에 남깁니다.
