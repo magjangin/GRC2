@@ -89,6 +89,21 @@ namespace GRC2.Harmony.Hooks
             if (cellList[0] == null)
                 return;
 
+            // initializeMusicDataByDefault의 postfix인 이 메서드는 씬 진입 한 번에 여러 번
+            // 호출될 수 있습니다(직접 initialize()에서 한 번, requestSortAndFilter ->
+            // doFilterMusicList에서 또 한 번 등). 원본이 매번 mCellHaviableMusicDataList를
+            // 새로 Clear()하지 않는 경우에도 중복 주입되지 않도록, 이전에 주입된 커스텀
+            // 항목이 남아있다면 먼저 제거하고 다시 주입합니다. 중복 항목이 하나라도 있으면
+            // 뒤쪽 곡의 스크롤 위치 계산(getNeedsScrollCountUntilID)이 어긋나 엉뚱한 곡이
+            // 선택된 채로 화면에 표시됩니다.
+            cellList.RemoveAll(item =>
+            {
+                if (item?.mMusicSelectData.musicID == null)
+                    return false;
+                int idValue = (int)item.mMusicSelectData.musicID;
+                return idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd;
+            });
+
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
             int injectedCount = 0;

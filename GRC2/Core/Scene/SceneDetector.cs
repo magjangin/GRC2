@@ -365,9 +365,16 @@ namespace GRC2.Core
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
                 }
-                else if (sceneName == "MusicSelectScene")
+                else if (sceneName.StartsWith("MusicSelectScene", StringComparison.Ordinal))
                 {
-                    MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName}");
+                    // 실제 씬 파일명은 "MusicSelectScene_Hasegawa"처럼 접미사가 붙어있어
+                    // 정확히 일치하는 이름("MusicSelectScene")만 확인하면 이 분기가 절대
+                    // 실행되지 않습니다. 그 결과 플레이 씬에서 일시정지 메뉴로 곡 선택
+                    // 화면으로 돌아와도 _isPlayScene이 꺼지지 않아, 방금 플레이하던 곡의
+                    // 제목/아트워크 강제 치환이 곡 선택 화면에서도 계속 적용됩니다.
+                    MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
+                    BgmBgaInjector.StopInjection();
+                    BgmBgaInjector.ResetPlaySceneState();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
                 {

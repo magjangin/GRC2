@@ -33,6 +33,32 @@ namespace GRC2.Harmony.Handlers
 
         private static readonly string[] DifficultyOrder = { "easy", "normal", "hard", "expert" };
 
+        /// <summary>
+        /// 원본 initializePreFade는 시작 직전 문지기(coOpenPreMusicStartWindow)가 원본 곡
+        /// 정보 조회용으로 임시로 빌린 템플릿 곡 ID(sceneInitParam.musicData.id)를 그대로
+        /// 세이브 인덱스로 써서 하이스코어/클리어뱃지를 비교·갱신하고 setDirty()까지
+        /// 호출합니다. 여기서 실제 커스텀 곡 ID로 되돌리지 않으면 커스텀 차트의 플레이
+        /// 결과가 엉뚱한 실제 곡의 저장 슬롯을 덮어씁니다.
+        /// </summary>
+        [HarmonyPrefix]
+        public static void InitializePreFadePrefix(cRythmGameResultSceneManageObject.InitializeParam sceneInitParam)
+        {
+            try
+            {
+                if (sceneInitParam == null || !CustomAssetManager.IsCustomChartSelected())
+                    return;
+
+                if (!(AlbumManager.GetCurrentMusicID() is soRythmGameMusicDataMap.MusicID customMusicId))
+                    return;
+
+                sceneInitParam.musicData.id = customMusicId;
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning(ex, "[ResultSceneUpdaterPatch]", "InitializePreFadePrefix 오류");
+            }
+        }
+
         [HarmonyPostfix]
         public static void InitializePreFadePostfix(cRythmGameResultSceneUpdater __instance)
         {

@@ -101,6 +101,73 @@ namespace GRC2.Harmony.Hooks
         }
 
         /// <summary>
+        /// setCurrentSelectDataToGameData는 위 coOpenPreMusicStartWindow가 빌려간 템플릿 곡
+        /// ID(mCurentMusicId)를 그대로 lastPlayedMusicID/playerMusicData[].isNew에 저장합니다.
+        /// mCurentMusicId 자체를 되돌리면 startRythmGame 이후 씬 전환 로직이 실제 MusicData를
+        /// 필요로 하는 지점에서 깨져 컷인 씬이 멈추는 회귀가 났던 적이 있어(HOOK_MAP.md 참조),
+        /// 여기서는 그 필드는 건드리지 않고 원본이 이미 저장을 마친 "직후"에 세이브 값만
+        /// 실제 커스텀 ID로 다시 고쳐씁니다.
+        /// </summary>
+        public static void SetCurrentSelectDataToGameDataPostfix(bool isRhythmGameStart)
+        {
+            try
+            {
+                if (!CustomAssetManager.IsCustomChartSelected())
+                    return;
+
+                if (!(AlbumManager.GetCurrentMusicID() is soRythmGameMusicDataMap.MusicID customMusicId))
+                    return;
+
+                sSaveDataDirector saveDirector = SingletonMonoBehaviour<sSaveDataDirector>.Instance;
+                sSaveDataDirector.SavableGameData gameData = saveDirector?.getCurrentActiveGameData();
+                if (gameData?.playerData == null)
+                    return;
+
+                if (gameData.playerData.lastPlayedMusicID == customMusicId)
+                    return;
+
+                soRythmGameMusicDataMap.MusicID previousId = gameData.playerData.lastPlayedMusicID;
+                gameData.playerData.lastPlayedMusicID = customMusicId;
+
+                if (isRhythmGameStart)
+                {
+                    var musicData = gameData.playerMusicData;
+                    int index = (int)customMusicId;
+                    if (musicData != null && index >= 0 && index < musicData.Length && musicData[index] != null)
+                    {
+                        musicData[index].isNew = false;
+                    }
+                }
+
+                MelonLogger.Msg(
+                    $"[GameFlowHooks] setCurrentSelectDataToGameData 보정: lastPlayedMusicID {previousId} -> {customMusicId} (isRhythmGameStart={isRhythmGameStart})");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning(
+                    $"[GameFlowHooks] setCurrentSelectDataToGameData 보정 오류: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// 커스텀 MusicID는 원본 mMusicDataList에 실제 항목이 없어 getIsUsableMusicID가 항상
+        /// false를 반환합니다. 그 결과 곡 선택 씬 재진입 시 getMusicIDUsable이 lastPlayedMusicID를
+        /// 무시하고 FIRST_VER_DATA_TOP으로 되돌아가, 위에서 저장을 바로잡아도 커서가 여전히
+        /// 엉뚱한 곡에 위치합니다. 등록된 커스텀 ID에 한해 "사용 가능"으로 인정해 되돌려줍니다.
+        /// </summary>
+        public static void GetIsUsableMusicIDPostfix(soRythmGameMusicDataMap.MusicID id, ref bool __result)
+        {
+            if (__result || CustomAssetManager.IsSceneWhereInjectionDisallowed())
+                return;
+
+            if (AlbumManager.IsCustomChartMusicID(id))
+            {
+                __result = true;
+                MelonLogger.Msg($"[GameFlowHooks] getIsUsableMusicID 보정: {id} -> true (커스텀 곡)");
+            }
+        }
+
+        /// <summary>
         /// 팝업의 원본 artwork 로딩이 끝난 직후 실제 Image 필드에 커스텀 이미지를 적용합니다.
         /// </summary>
         public static void PreMusicStartWindowOpenedPostfix(cMusicSelectPreMusicStartWindowManager __instance)
@@ -187,6 +254,26 @@ namespace GRC2.Harmony.Hooks
             private static void Postfix(cMusicSelectPreMusicStartWindowManager __instance)
             {
                 PreMusicStartWindowOpenedPostfix(__instance);
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "setCurrentSelectDataToGameData")]
+        private static class SetCurrentSelectDataToGameDataPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(bool isRhythmGameStart)
+            {
+                SetCurrentSelectDataToGameDataPostfix(isRhythmGameStart);
+            }
+        }
+
+        [HarmonyPatch(typeof(soRythmGameMusicDataMap), "getIsUsableMusicID")]
+        private static class GetIsUsableMusicIDPatch
+        {
+            [HarmonyPostfix]
+            private static void Postfix(soRythmGameMusicDataMap.MusicID id, ref bool __result)
+            {
+                GetIsUsableMusicIDPostfix(id, ref __result);
             }
         }
     }

@@ -24,6 +24,23 @@ File: `GRC2/Core/Scene/SceneDetector.cs` (scene-routing section)
 Scene routing path. It starts or stops custom BGM/BGA/artwork injection depending on
 the loaded scene.
 
+The Music Select scene's actual Unity scene file name is `MusicSelectScene_Hasegawa`,
+not `MusicSelectScene` (confirmed from `Latest.log`). The scene-name check here uses
+`StartsWith("MusicSelectScene")` rather than an exact match for that reason. An exact
+match previously meant this branch never ran, so returning to Music Select from the
+pause menu mid-play (`cRythmGameManager.backToMusicSelectScene`, which loads
+`SceneId.MusicSelect` directly and does not pass through `RythmGameResultScene`) never
+called `BgmBgaInjector.ResetPlaySceneState()`. `_isPlayScene` stayed `true`, so
+`TextPatch.IsPlayOrLoadingScene()` (which trusts `BgmBgaInjector.IsPlayScene()`) and
+the scene-routing fallback's `PlaySceneArtworkInjector.StartArtworkInjection()` both
+kept treating Music Select as a play scene and kept forcing the just-played custom
+chart's title/artwork onto whatever the scene displayed, regardless of which song was
+actually selected.
+
+Removal risk: reverting to an exact `"MusicSelectScene"` match reintroduces the stuck
+`_isPlayScene` state and the title/artwork bleed-through described above whenever
+Music Select is reached by any path other than the result scene.
+
 ## Required Hook Groups
 
 ### Music select list injection
@@ -62,7 +79,9 @@ Patched game targets:
 - `IntiCreates.cMusicSelectSceneUIUpdater.startRythmGame`
 - `IntiCreates.cMusicSelectSceneUIUpdater.coOpenPreMusicStartWindow`
 - `IntiCreates.cMusicSelectSceneUIUpdater.backToPreScreen`
+- `IntiCreates.cMusicSelectSceneUIUpdater.setCurrentSelectDataToGameData`
 - `IntiCreates.cMusicSelectPreMusicStartWindowManager.requestOpenWindow`
+- `IntiCreates.soRythmGameMusicDataMap.getIsUsableMusicID`
 
 Purpose:
 
@@ -72,7 +91,41 @@ Purpose:
 - stop preview audio before gameplay;
 - map a custom id to a valid original song only while the game opens its
   pre-play window;
-- replace the artwork after the real pre-play window has opened.
+- replace the artwork after the real pre-play window has opened;
+- fix up `lastPlayedMusicID`/`isNew` after the original write, and make
+  `getIsUsableMusicID` accept registered custom ids (see below).
+
+`coOpenPreMusicStartWindow` needs a real `MusicID` to look up `MusicData`, so
+its prefix temporarily points `mCurentMusicId` at the selected artist's real
+first song ("template song") for the rest of the pre-play flow, and nothing
+in the original game reverts that swap. This means `startRythmGame`'s and
+`backToPreScreen`'s calls to `setCurrentSelectDataToGameData(...)` write
+`lastPlayedMusicID` and `playerMusicData[(int)mCurentMusicId].isNew` against
+the template song instead of the custom chart. A prefix/postfix attempt to
+swap `mCurentMusicId` back to the real custom id only for that one call
+caused the game to hang on the pre-game cut-in scene (`_isPlayScene` never
+flipped to `true`, so `BgmBgaInjector` polled forever) and was reverted.
+
+The fix instead leaves `mCurentMusicId` alone and patches around it:
+
+- a `setCurrentSelectDataToGameData` **postfix** re-reads
+  `AlbumManager.GetCurrentMusicID()` and overwrites the just-written
+  `lastPlayedMusicID` (and, on `isRhythmGameStart`, `playerMusicData[id].isNew`)
+  with the real custom id, so the wrong write never reaches disk;
+- but custom ids have no entry in `mMusicDataList`, so
+  `getIsUsableMusicID` always returns `false` for them, and
+  `initializePreDataLoad`'s `getMusicIDUsable(lastPlayedMusicID)` call falls
+  back to `MusicID.FIRST_VER_DATA_TOP` on the next Music Select entry even
+  after the save fix above — a `getIsUsableMusicID` **postfix** returns `true`
+  for ids `AlbumManager.IsCustomChartMusicID` recognizes (outside scenes where
+  injection is disallowed), so the scene's own
+  `getNeedsScrollCountUntilID`-based selection logic finds and scrolls to the
+  actual injected cell unmodified.
+
+Removal risk of the two new postfixes: cursor/highscore attribution reverts
+to landing on the borrowed template song instead of the custom chart when
+returning to Music Select, and result-scene high scores/clear badges may
+again be written against the template song's save slot.
 
 `PreviewAudioManager` mutes by stopping the source, zeroing its volume, and
 clearing `clip` (never `.mute = true`). `sSoundManager2D` pools every
@@ -167,11 +220,21 @@ Patched game target:
 Purpose:
 
 - replace the result title, difficulty level, and artwork at the updater's real
-  initialization point.
+  initialization point;
+- **prefix**: `initializePreFade` reads `sceneInitParam.musicData.id` (still the
+  "template song" id borrowed by `coOpenPreMusicStartWindow`, see above) to
+  index `playerMusicData[]`, compare/update `highScoreArray`/`playFlagArray`,
+  and call `mSaveDirector.setDirty()` — all before the postfix below ever
+  runs. The prefix rewrites `sceneInitParam.musicData.id` to the real custom
+  id so the score/clear-badge read-compare-write targets the custom chart's
+  own save slot instead of overwriting an unrelated real song's saved score.
 
 Removal risk:
 
-- the result screen may show the original song metadata and artwork.
+- the result screen may show the original song metadata and artwork;
+- removing the prefix makes custom chart results silently overwrite the
+  high score/clear badge of whichever real song was borrowed as the
+  template.
 
 ### Steam and DLC bypass
 
