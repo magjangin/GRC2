@@ -6,6 +6,73 @@ using GRC2;
 
 namespace GRC2.Core
 {
+    internal static class ArtworkImageFinder
+    {
+        public const string DefaultArtworkObjectName = "ArtWork";
+
+        public static bool IsCachedImageValid(UnityEngine.UI.Image image, int sceneHash)
+        {
+            return image != null &&
+                image &&
+                UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetHashCode() == sceneHash;
+        }
+
+        public static UnityEngine.UI.Image FindArtworkImage(string objectName = DefaultArtworkObjectName)
+        {
+            var image = FindImageByGameObjectName(objectName);
+            if (image != null)
+                return image;
+
+            image = FindImageUnderSceneRoots(objectName);
+            if (image != null)
+                return image;
+
+            return FindImageByScanningImages(objectName);
+        }
+
+        private static UnityEngine.UI.Image FindImageByGameObjectName(string objectName)
+        {
+            GameObject artWorkObj = GameObject.Find(objectName);
+            return artWorkObj != null ? artWorkObj.GetComponent<UnityEngine.UI.Image>() : null;
+        }
+
+        private static UnityEngine.UI.Image FindImageUnderSceneRoots(string objectName)
+        {
+            var rootObjects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
+            foreach (var root in rootObjects)
+            {
+                Transform found = root?.transform.Find(objectName);
+                if (found == null)
+                    continue;
+
+                var image = found.GetComponent<UnityEngine.UI.Image>();
+                if (image != null)
+                    return image;
+            }
+
+            return null;
+        }
+
+        private static UnityEngine.UI.Image FindImageByScanningImages(string objectName)
+        {
+            UnityEngine.UI.Image[] images = UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Image>();
+            if (images == null)
+                return null;
+
+            foreach (var image in images)
+            {
+                if (image != null &&
+                    image.gameObject != null &&
+                    image.gameObject.name.Equals(objectName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return image;
+                }
+            }
+
+            return null;
+        }
+    }
+
     /// <summary>
     /// 플레이 씬에서 커스텀 아트워크 주입을 담당하는 클래스
     /// </summary>
@@ -23,7 +90,7 @@ namespace GRC2.Core
         {
             // 재시작 시 캐시 무효화 (씬이 다시 로드되면 GameObject가 새로 생성되므로)
             ResetCache();
-            
+
             // 성능 최적화: 먼저 즉시 적용 시도 (대기 없이)
             if (TryInjectArtworkImmediately())
             {
@@ -142,6 +209,3 @@ namespace GRC2.Core
         }
     }
 }
-
-
-

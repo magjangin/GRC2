@@ -55,16 +55,13 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Builders\NoteCreateDataBuilder.cs" />
-    <Compile Include="Builders\NoteFieldInitializer.cs" />
     <Compile Include="Converters\BmsNoteConverter.cs" />
     <Compile Include="Core\Album\AlbumManager.cs" />
-    <Compile Include="Core\Assets\ArtworkImageFinder.cs" />
     <Compile Include="Core\Assets\CustomAssetManager.cs" />
     <Compile Include="Core\Assets\PlaySceneArtworkInjector.cs" />
     <Compile Include="Core\Bootstrap\MusicInjector.cs" />
     <Compile Include="Core\Scene\SceneDetector.cs" />
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
-    <Compile Include="Harmony\Handlers\ArtworkUpdater.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
     <Compile Include="Harmony\Handlers\PreviewAudioManager.cs" />
@@ -80,10 +77,7 @@
     <Compile Include="Injectors\Bga\BgaBgmSyncManager.cs" />
     <Compile Include="Injectors\Bga\BgaInjector.cs" />
     <Compile Include="Injectors\Bgm\BgmInjector.cs" />
-    <Compile Include="Injectors\Bgm\BgmInjectorHooks.cs" />
     <Compile Include="Injectors\Bgm\BgmLoader.cs" />
-    <Compile Include="Injectors\Bgm\BgmSearcher.cs" />
-    <Compile Include="Injectors\GameEnd\BgmFinishTimeManager.cs" />
     <Compile Include="Injectors\GameEnd\BgmGameEndMonitor.cs" />
     <Compile Include="Injectors\Shared\BgmBgaInjector.cs" />
     <Compile Include="Parsers\BmsDataModels.cs" />
