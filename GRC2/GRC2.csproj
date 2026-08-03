@@ -65,6 +65,7 @@
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
     <Compile Include="Harmony\Handlers\AutoPlayPatch.cs" />
+    <Compile Include="Harmony\Handlers\BgaCrossfadePatch.cs" />
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
     <Compile Include="Harmony\Handlers\JudgePerfectPatch.cs" />
     <Compile Include="Harmony\Handlers\JudgmentBarPatch.cs" />

@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Linq;
+using GRC2.Harmony.Handlers;
+using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.Video;
@@ -42,18 +44,14 @@ namespace GRC2.Injectors
             }
 
             // 활성화된 VideoPlayer 목록 준비
+            // FindObjectsOfType<VideoPlayer>()는 기본적으로 비활성 오브젝트를 포함하지 않으므로,
+            // 여기서 걸러지는 vp는 전부 이미 activeInHierarchy == true입니다.
             var activeVideoPlayers = new System.Collections.Generic.List<VideoPlayer>();
             foreach (var vp in videoPlayers)
             {
                 if (vp != null && vp.gameObject.activeInHierarchy)
                 {
                     activeVideoPlayers.Add(vp);
-                    // VideoPlayer 활성화 확인
-                    if (!vp.gameObject.activeInHierarchy)
-                    {
-                        MelonLogger.Msg($"[BgaInjector] {vp.gameObject.name} 활성화");
-                        vp.gameObject.SetActive(true);
-                    }
                 }
             }
 
@@ -201,6 +199,20 @@ namespace GRC2.Injectors
                 MelonLogger.Msg($"[BGAPlayerHook] BGA 교체 완료 및 재생 시작: {bgaFileName}");
                 MelonLogger.Msg($"[BgaInjector] BGA 재생 중 ({actuallyPlayingCount}/{activeVideoPlayers.Count}개 VideoPlayer)");
                 _bgaInjected = true;
+
+                // 게임 자체 BGA 크로스페이드 코루틴이 곡 막바지에 원본 클립으로 되돌리는 것을 방지
+                try
+                {
+                    var movieSceneManager = UnityEngine.Object.FindObjectOfType<cPlayMovieSceneManager>();
+                    if (movieSceneManager != null)
+                    {
+                        BgaCrossfadePatch.TryStopSwapCoroutine(movieSceneManager);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"[BgaInjector] 크로스페이드 코루틴 정지 시도 오류: {ex.Message}");
+                }
 
                 // BGA와 BGM 동기화 시작
                 var playingVideoPlayers = activeVideoPlayers.Where(vp => vp != null && vp.isPlaying).ToArray();
