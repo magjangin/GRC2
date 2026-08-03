@@ -6,6 +6,7 @@ using GRC2.Harmony.Hooks;
 using GRC2.Injectors;
 using GRC2.Parsers;
 using GRC2.Converters;
+using GRC2.Core.Hud;
 using HarmonyLib;
 using MelonLoader;
 using UnityEngine;
@@ -112,6 +113,13 @@ namespace GRC2.Core
             {
                 HandlePauseKeyInput();
             }
+        }
+
+        public override void OnGUI()
+        {
+            if (!_isInitialized) return;
+
+            GameHud.Draw(BgmBgaInjector.IsPlayScene());
         }
     }
 

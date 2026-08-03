@@ -6,7 +6,7 @@ namespace GRC2.Harmony.Handlers
 {
     /// <summary>
     /// cFairyModeNotesManager의 오토플레이 상태를 강제합니다.
-    /// savecustomkey/config.txt의 autoplay_enabled 값으로만 결정되며, 게임 중 토글은 없습니다.
+    /// savecustomkey/config.txt의 AutoPlay 값으로만 결정되며, 게임 중 토글은 없습니다.
     /// mIsCurrentAutoPlay는 씬 초기화 시 InitializeParam.isAutoPlay로 직접 대입되어
     /// setIsAutoPlay를 거치지 않으므로, createAllNote 진입 시점에도 함께 강제합니다.
     /// </summary>
@@ -19,7 +19,7 @@ namespace GRC2.Harmony.Handlers
 
         public static void Initialize()
         {
-            IsEnabled = CustomKeySettings.AutoPlayEnabled;
+            IsEnabled = CustomKeySettings.AutoPlay;
         }
 
         [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]

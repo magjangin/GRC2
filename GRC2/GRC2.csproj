@@ -60,12 +60,15 @@
     <Compile Include="Core\Assets\CustomAssetManager.cs" />
     <Compile Include="Core\Assets\PlaySceneArtworkInjector.cs" />
     <Compile Include="Core\CustomKey\CustomKeySettings.cs" />
+    <Compile Include="Core\Hud\GameHud.cs" />
     <Compile Include="Core\Scene\SceneDetector.cs" />
     <Compile Include="Harmony\Handlers\ArtWorkPatch.cs" />
     <Compile Include="Harmony\Handlers\AudioClipPatch.cs" />
     <Compile Include="Harmony\Handlers\AutoPlayPatch.cs" />
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
     <Compile Include="Harmony\Handlers\JudgePerfectPatch.cs" />
+    <Compile Include="Harmony\Handlers\JudgmentBarPatch.cs" />
+    <Compile Include="Harmony\Handlers\NoteSwayPatch.cs" />
     <Compile Include="Harmony\Handlers\PreviewAudioManager.cs" />
     <Compile Include="Harmony\Handlers\RecordBlockPatch.cs" />
     <Compile Include="Harmony\Handlers\ResultSceneUpdaterPatch.cs" />

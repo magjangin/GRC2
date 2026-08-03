@@ -9,12 +9,13 @@ using MelonLoader;
 namespace GRC2.Harmony.Handlers
 {
     /// <summary>
-    /// AutoPlay/판정조작(JudgePerfect)이 켜진 상태로 플레이한 결과가 베스트 스코어/콤보/클리어뱃지/
-    /// 세이브 파일에 반영되지 않도록 차단합니다.
+    /// savecustomkey/config.txt의 BlockSave 값이 켜져 있으면 플레이 결과가 베스트 스코어/콤보/
+    /// 클리어뱃지/세이브 파일에 반영되지 않도록 차단합니다. AutoPlay/AllPerfect와 별개로 독립
+    /// 설정이므로, 두 기능이 꺼져 있어도 BlockSave=1이면 계속 차단됩니다.
     /// </summary>
     public static class RecordBlockPatch
     {
-        public static bool ShouldBlock => AutoPlayPatch.IsEnabled || JudgePerfectPatch.IsEnabled;
+        public static bool ShouldBlock => CustomKeySettings.BlockSave;
 
         private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, int> OldHighScoreRef =
             AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, int>("mOldPlayHighScore");
