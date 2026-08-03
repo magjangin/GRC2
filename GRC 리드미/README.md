@@ -37,6 +37,7 @@ Runtime systems and user-visible mod behavior:
 - `BGM_BGA_관리_시스템.md`
 - `텍스트_패치_시스템_분석.md`
 - `아티스트_ID_기반_시스템_분석.md`
+- `터치_판정_영역_시스템_분석.md`
 
 ### `bms`
 
