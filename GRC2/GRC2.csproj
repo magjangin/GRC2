@@ -68,6 +68,7 @@
     <Compile Include="Harmony\Handlers\CustomBgmPlayer.cs" />
     <Compile Include="Harmony\Handlers\JudgePerfectPatch.cs" />
     <Compile Include="Harmony\Handlers\JudgmentBarPatch.cs" />
+    <Compile Include="Harmony\Handlers\NoteSpeedChaosPatch.cs" />
     <Compile Include="Harmony\Handlers\NoteSwayPatch.cs" />
     <Compile Include="Harmony\Handlers\PreviewAudioManager.cs" />
     <Compile Include="Harmony\Handlers\RecordBlockPatch.cs" />

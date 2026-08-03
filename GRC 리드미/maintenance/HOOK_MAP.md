@@ -292,6 +292,57 @@ Removal risk:
   AutoPlay/judge-forced results write real best scores/clear badges to the
   save file.
 
+### Judgment bar / note sway / note speed chaos (GameHud overlays)
+
+Owner files:
+
+- `GRC2/Core/Hud/GameHud.cs`
+- `GRC2/Harmony/Handlers/JudgmentBarPatch.cs`
+- `GRC2/Harmony/Handlers/NoteSwayPatch.cs`
+- `GRC2/Harmony/Handlers/NoteSpeedChaosPatch.cs`
+
+Patched game targets:
+
+- `IntiCreates.cNotecWorkBase.onJudgeMent` (judgment-bar data source, separate
+  Postfix from `JudgePerfectPatch`'s Prefix on the same method)
+- `IntiCreates.cNotecWorkBase.simulate` (NoteSway; only the base implementation
+  — slide/fairy-cursor notes and the post-touch phase of hold notes have their
+  own position code and are not covered)
+- `IntiCreates.cNotecWorkBase.getNoteSpeed` (NoteSpeedChaos; non-virtual single
+  definition, so one patch covers Touch/Flick/Hold/Hold_Middle/Slide/SlideGuide)
+- `IntiCreates.cFairyModeNotesManager.createAllNote` (also owned by note-array
+  replacement and AutoPlay above; NoteSpeedChaosPatch clears its per-note/
+  per-lane multiplier cache here so each song re-randomizes)
+
+Purpose:
+
+- `GameHud` draws directly in `MelonMod.OnGUI()` (IMGUI) rather than building a
+  `Canvas`/`Image` object tree, so there is nothing to create/destroy across
+  scene loads besides a couple of cached `Texture2D`s;
+- all three effects (judgment bar marker, note sway offset, note speed
+  multiplier) only ever touch rendering — `mCurrentPos`/`getNoteSpeed()` output
+  or an IMGUI draw call — never `perfectSample`/lane fields, so none of them
+  can change judgment outcome;
+- `config.txt` keys: `EnableJudgmentBar`/`JudgmentBarVertical`/
+  `JudgmentBarCapsule`/`JudgmentBarLeft`, `NoteSway`/`NoteSwayAmplitude`/
+  `NoteSwaySpeed`/`NoteSwayDamping`/`NoteSwayDampingTime`, `NoteSpeedChaos`/
+  `NoteSpeedChaosMin`/`NoteSpeedChaosMax`/`NoteSpeedChaosPerLane`.
+
+Removal risk:
+
+- purely cosmetic; removing any of the three loses that visual only.
+
+Planned (not implemented yet):
+
+- a judgment-bar-style **live per-grade hit counter** (running PERFECT/GREAT/
+  GOOD/BAD/MISS tally, updated the same way `JudgmentBarPatch` already gets
+  `judgeType` from `onJudgeMent`'s Postfix);
+- **per-box customization** of the 3 rectangular touch hit-zones per side
+  (`cFairyJudgeCircleTouchAreas.mTouchRect`, `NoteSubLaneType.Lane_1/2/3`) —
+  see [터치_판정_영역_시스템_분석.md](../systems/터치_판정_영역_시스템_분석.md)
+  for the confirmed structure and open question (`cEditorVisualRect`'s actual
+  fields still need to be checked before implementation).
+
 ### Steam and DLC bypass
 
 Owner file:

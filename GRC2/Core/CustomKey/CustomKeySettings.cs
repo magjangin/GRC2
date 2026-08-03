@@ -31,6 +31,11 @@ namespace GRC2.Core
         public static bool NoteSwayDamping { get; private set; } = true;
         public static float NoteSwayDampingTime { get; private set; } = 0.4f;
 
+        public static bool NoteSpeedChaos { get; private set; }
+        public static float NoteSpeedChaosMin { get; private set; } = 0.6f;
+        public static float NoteSpeedChaosMax { get; private set; } = 1.8f;
+        public static bool NoteSpeedChaosPerLane { get; private set; } = true;
+
         public static void Initialize(string gameFolder)
         {
             try
@@ -55,7 +60,9 @@ namespace GRC2.Core
                     $"AutoPlay={AutoPlay}, AllPerfect={AllPerfect}, BlockSave={BlockSave}, " +
                     $"EnableJudgmentBar={EnableJudgmentBar}(Vertical={JudgmentBarVertical}, Capsule={JudgmentBarCapsule}, Left={JudgmentBarLeft}), " +
                     $"NoteSway={NoteSway}(Amplitude={NoteSwayAmplitude}, Speed={NoteSwaySpeed}, " +
-                    $"Damping={NoteSwayDamping}, DampingTime={NoteSwayDampingTime})");
+                    $"Damping={NoteSwayDamping}, DampingTime={NoteSwayDampingTime}), " +
+                    $"NoteSpeedChaos={NoteSpeedChaos}(Min={NoteSpeedChaosMin}, Max={NoteSpeedChaosMax}, " +
+                    $"PerLane={NoteSpeedChaosPerLane})");
             }
             catch (Exception ex)
             {
@@ -103,7 +110,19 @@ namespace GRC2.Core
             "NoteSwayDamping=1",
             "",
             "# 판정선 도달 몇 초 전부터 흔들림이 잦아들지",
-            "NoteSwayDampingTime=0.4"
+            "NoteSwayDampingTime=0.4",
+            "",
+            "# [챌린지] 노트마다 낙하 속도를 제각각으로 (1 = 켜짐, 0 = 꺼짐)",
+            "# 노트끼리 서로 추월하므로 읽기가 매우 어려워집니다. 판정에는 영향이 없습니다.",
+            "NoteSpeedChaos=0",
+            "",
+            "# 속도 배율 범위 (1 = 원래 속도). 예: 0.6 ~ 1.8",
+            "NoteSpeedChaosMin=0.6",
+            "NoteSpeedChaosMax=1.8",
+            "",
+            "# 1 = 레인마다 속도가 다름(같은 레인 안에서는 순서 유지, 읽을 수는 있음)",
+            "# 0 = 노트마다 속도가 다름(완전 카오스)",
+            "NoteSpeedChaosPerLane=1"
         };
 
         private static void Load(string filePath)
@@ -134,6 +153,10 @@ namespace GRC2.Core
             NoteSwaySpeed = ParseFloat(values, "NoteSwaySpeed", 0.8f);
             NoteSwayDamping = ParseBool(values, "NoteSwayDamping", true);
             NoteSwayDampingTime = ParseFloat(values, "NoteSwayDampingTime", 0.4f);
+            NoteSpeedChaos = ParseBool(values, "NoteSpeedChaos", false);
+            NoteSpeedChaosMin = ParseFloat(values, "NoteSpeedChaosMin", 0.6f);
+            NoteSpeedChaosMax = ParseFloat(values, "NoteSpeedChaosMax", 1.8f);
+            NoteSpeedChaosPerLane = ParseBool(values, "NoteSpeedChaosPerLane", true);
         }
 
         /// <summary>
