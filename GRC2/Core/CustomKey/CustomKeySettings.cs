@@ -72,7 +72,7 @@ namespace GRC2.Core
 
         private static readonly string[] DefaultLines =
         {
-            "# 지원 형식: 1/0, true/false, 켜짐/꺼짐, on/off",
+            "# 지원 형식: 1/0, true/false, 참/거짓, 켜기/끄기(켜짐/꺼짐), 활성화/비활성화, on/off, enable/disable, enabled/disabled, y/n, yes/no, 트루/폴스",
             "",
             "# 오토 플레이 (1 = 켜짐, 0 = 꺼짐)",
             "AutoPlay=0",
@@ -160,32 +160,56 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// 1/0, true/false, 켜짐/꺼짐, on/off를 모두 인식합니다.
+        /// 참: true, 트루, 참, 켜기, 켜짐, 활성화, on, 1, enable, enabled, y, yes
+        /// 거짓: false, 폴스, 거짓, 비활성화, 끄기, 꺼짐, off, 0, disable, disabled, n, no
+        /// 라벨 표현식 파싱
         /// </summary>
-        private static bool ParseBool(Dictionary<string, string> values, string key, bool fallback)
+        public static bool ParseBool(Dictionary<string, string> values, string key, bool fallback)
         {
             if (!values.TryGetValue(key, out var raw))
                 return fallback;
 
-            switch (raw.Trim())
+            return ParseBool(raw, fallback);
+        }
+
+        public static bool ParseBool(string raw, bool fallback)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return fallback;
+
+            switch (raw.Trim().ToLowerInvariant())
             {
                 case "1":
+                case "true":
+                case "트루":
+                case "참":
+                case "켜기":
                 case "켜짐":
+                case "활성화":
+                case "on":
+                case "enable":
+                case "enabled":
+                case "y":
+                case "yes":
                     return true;
+
                 case "0":
+                case "false":
+                case "폴스":
+                case "거짓":
+                case "비활성화":
+                case "끄기":
                 case "꺼짐":
+                case "off":
+                case "disable":
+                case "disabled":
+                case "n":
+                case "no":
                     return false;
+
+                default:
+                    return fallback;
             }
-
-            if (bool.TryParse(raw, out var parsedBool))
-                return parsedBool;
-
-            if (string.Equals(raw, "on", StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (string.Equals(raw, "off", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            return fallback;
         }
 
         private static float ParseFloat(Dictionary<string, string> values, string key, float fallback)
