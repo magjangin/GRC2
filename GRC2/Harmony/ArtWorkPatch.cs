@@ -4,7 +4,7 @@ using GRC2.Core;
 using HarmonyLib;
 using IntiCreates;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cMusicSelectArtWork.requestSetArtworkSprite 메서드 후킹 - 커버 이미지 교체
@@ -13,7 +13,7 @@ namespace GRC2.Harmony.Handlers
     public static class ArtWorkPatch
     {
         [HarmonyPrefix]
-        public static void RequestSetArtworkSpritePrefix(object __instance, ref Sprite useSprite, bool isInstant)
+        public static void RequestSetArtworkSpritePrefix(ref Sprite useSprite)
         {
             try
             {

@@ -1,12 +1,10 @@
 using System;
 using System.Collections;
 using System.IO;
-using System.Reflection;
 using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 using UnityEngine.Networking;
-using GRC2.Helpers;
 
 namespace GRC2.Injectors
 {
@@ -74,7 +72,8 @@ namespace GRC2.Injectors
                 var fileName = Path.GetFileNameWithoutExtension(bgmFilePath);
                 if (string.IsNullOrEmpty(audioClip.name))
                 {
-                    TrySetClipName(audioClip, fileName);
+                    // UnityWebRequest로 만든 클립은 name이 비어 있을 수 있어 파일 이름으로 채웁니다.
+                    audioClip.name = fileName;
                 }
 
                 var clipNameForLog = string.IsNullOrEmpty(audioClip.name) ? fileName : audioClip.name;
@@ -94,23 +93,6 @@ namespace GRC2.Injectors
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[BgmLoader] BGM 주입 실패: {ex.Message}");
-            }
-        }
-
-        /// <summary>
-        /// UnityWebRequest로 만든 AudioClip은 name이 비어있을 수 있어 파일 이름으로 채웁니다.
-        /// AudioClip.name setter는 런타임 생성 클립에 반영되지 않으므로 내부 필드를 사용합니다.
-        /// </summary>
-        private static void TrySetClipName(AudioClip audioClip, string fileName)
-        {
-            try
-            {
-                var nameField = typeof(AudioClip).GetField("m_Name", BindingFlags.NonPublic | BindingFlags.Instance);
-                nameField?.SetValue(audioClip, fileName);
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(ex, "[BgmLoader] LoadAndInjectAudioClip", "AudioClip.m_Name 설정 실패(무시)");
             }
         }
 

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using GRC2.Builders;
+using GRC2.Helpers;
 using GRC2.Parsers;
 using IntiCreates;
 using IntiCreates.RythmGame;
@@ -11,9 +12,8 @@ namespace GRC2.Processors
 {
     using NoteCreateData = FairyNoteEditorLoader.NoteCreateData;
 
-    public static partial class FairyNoteProcessor
+    public static class FairyNoteProcessor
     {
-        private const int SampleRate = 48000;
         private const int StartLookupSampleSlack = 8;
         private const float BaseToleranceSeconds = 0.05f;
         private const float BaseBpm = 120f;
@@ -263,11 +263,6 @@ namespace GRC2.Processors
             public BmsNote BmsNote { get; set; }
             public int Sample { get; set; }
         }
-    }
-
-    public static partial class FairyNoteProcessor
-    {
-    
 
         private static Dictionary<(int Lane, bool IsLeft), List<FairyStartLookupEntry>> BuildFairyStartLookup(
             List<NoteCreateData> noteList,
@@ -419,7 +414,7 @@ namespace GRC2.Processors
 
         private static int ToSampleIndex(float timeSeconds)
         {
-            return (int)Math.Round(timeSeconds * SampleRate, MidpointRounding.AwayFromZero);
+            return NoteSampleTime.ToSamples(timeSeconds);
         }
-}
+    }
 }

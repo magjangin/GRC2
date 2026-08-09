@@ -1,10 +1,9 @@
 using GRC2.Core;
-using GRC2.Core.Hud;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cNotecWorkBase.onJudgeMent를 후킹해 판정 결과(등급/시간오차)를 GameHud의 판정바로 전달합니다.

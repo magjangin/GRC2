@@ -1,6 +1,5 @@
 using System;
 using GRC2.Core;
-using GRC2.Harmony.Handlers;
 using GRC2.Injectors;
 using HarmonyLib;
 using IntiCreates;
@@ -8,7 +7,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace GRC2.Harmony.Hooks
+namespace GRC2.Harmony
 {
     /// <summary>
     /// 곡 선택 화면에서 실제로 상태를 보정해야 하는 흐름만 처리합니다.
@@ -66,11 +65,11 @@ namespace GRC2.Harmony.Hooks
                 if (album == null)
                     return;
 
-                object previousMusicId = __instance.mCurentMusicId;
+                soRythmGameMusicDataMap.MusicID previousMusicId = __instance.mCurentMusicId;
                 var firstSong = string.IsNullOrWhiteSpace(artistId)
                     ? null
                     : AlbumManager.GetArtistFirstSong(artistId);
-                object firstMusicId = firstSong?.musicId;
+                soRythmGameMusicDataMap.MusicID? firstMusicId = firstSong?.musicId;
                 string firstTitle = firstSong?.title;
 
                 if (firstMusicId == null)
@@ -81,17 +80,17 @@ namespace GRC2.Harmony.Hooks
                         out firstTitle);
                 }
 
-                if (!(firstMusicId is soRythmGameMusicDataMap.MusicID resolvedMusicId))
+                if (firstMusicId == null)
                 {
                     MelonLogger.Warning(
                         $"[GameFlowHooks] '{artistId ?? "unknown"}'에 대응하는 원본 기준 곡을 찾지 못했습니다.");
                     return;
                 }
 
-                if (!Equals(previousMusicId, firstMusicId))
-                    __instance.mCurentMusicId = resolvedMusicId;
+                if (previousMusicId != firstMusicId.Value)
+                    __instance.mCurentMusicId = firstMusicId.Value;
 
-                AlbumManager.RegisterOriginalTitle(firstMusicId, firstTitle);
+                AlbumManager.RegisterOriginalTitle(firstMusicId.Value, firstTitle);
             }
             catch (Exception ex)
             {
@@ -115,9 +114,11 @@ namespace GRC2.Harmony.Hooks
                 if (!CustomAssetManager.IsCustomChartSelected())
                     return;
 
-                if (!(AlbumManager.GetCurrentMusicID() is soRythmGameMusicDataMap.MusicID customMusicId))
+                soRythmGameMusicDataMap.MusicID? currentMusicId = AlbumManager.GetCurrentMusicID();
+                if (currentMusicId == null)
                     return;
 
+                soRythmGameMusicDataMap.MusicID customMusicId = currentMusicId.Value;
                 sSaveDataDirector saveDirector = SingletonMonoBehaviour<sSaveDataDirector>.Instance;
                 sSaveDataDirector.SavableGameData gameData = saveDirector?.getCurrentActiveGameData();
                 if (gameData?.playerData == null)

@@ -2,20 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using GRC2.Helpers;
-using GRC2.Harmony.Hooks;
+using GRC2.Harmony;
 using GRC2.Injectors;
 using GRC2.Parsers;
 using GRC2.Converters;
-using GRC2.Core.Hud;
 using HarmonyLib;
 using MelonLoader;
 using UnityEngine;
 using System.Linq;
-using GRC2.Harmony.Handlers;
 
 namespace GRC2.Core
 {
-    public partial class SceneDetector : MelonMod
+    public class SceneDetector : MelonMod
     {
         private bool _isInitialized = false;
         private string _hwaFolderPath;
@@ -121,11 +119,9 @@ namespace GRC2.Core
 
             GameHud.Draw(BgmBgaInjector.IsPlayScene());
         }
-    }
 
-    // Harmony 패치 초기화
-    public partial class SceneDetector
-    {
+        #region Harmony 패치 초기화
+
         private static HarmonyLib.Harmony _harmonyInstance = null;
 
         private static void InitializeHarmony()
@@ -147,11 +143,11 @@ namespace GRC2.Core
                 MelonLogger.Msg($"[SceneDetector] 스택 트레이스: {ex.StackTrace}");
             }
         }
-    }
 
-    // 플레이 씬에서 Space/ESC 키 입력 시 일시정지 메뉴를 여닫는 처리
-    public partial class SceneDetector
-    {
+        #endregion
+
+        #region 플레이 씬에서 Space/ESC 키 입력 시 일시정지 메뉴를 여닫는 처리
+
         private static readonly AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
             AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
 
@@ -200,10 +196,11 @@ namespace GRC2.Core
                 ErrorLogger.LogException(ex, "[SceneDetector]", "Pause 키 처리 오류");
             }
         }
-    }
 
-    public partial class SceneDetector
-    {
+        #endregion
+
+        #region 곡 정보 / 아트워크 / BMS 스캔
+
         private void ParseSongInfo()
         {
             try
@@ -410,10 +407,11 @@ namespace GRC2.Core
                 ErrorLogger.LogException(ex, "[SceneDetector]", "커스텀 아트워크 로드 오류");
             }
         }
-    }
 
-    public partial class SceneDetector
-    {
+        #endregion
+
+        #region 씬 라우팅
+
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             MelonLogger.Msg($"[SceneDetector] 씬 로드: {sceneName} (BuildIndex: {buildIndex})");
@@ -531,5 +529,7 @@ namespace GRC2.Core
                 ErrorLogger.LogException(ex, "[SceneDetector]", $"{sceneName} 처리 실패");
             }
         }
+
+        #endregion
     }
 }

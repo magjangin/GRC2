@@ -6,7 +6,7 @@ using GRC2.Helpers;
 using GRC2.Injectors;
 using HarmonyLib;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// Text와 TextMeshPro의 text 속성 setter 후킹 - 커스텀 차트의 원본 제목을 파싱된 곡 제목으로 교체
@@ -42,18 +42,14 @@ namespace GRC2.Harmony.Handlers
                 }
 
                 // 현재 씬 이름 확인
-                var currentScene = UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                if (currentScene != null)
-                {
-                    string sceneName = currentScene.name;
-                    // 플레이 씬: FairyModeScene, PlayMovieScene
-                    // 로딩 씬: RenderCutinScene
-                    // 결과 씬: RythmGameResultScene (결과 화면에서도 커스텀 차트 제목 표시 필요)
-                    return sceneName == "FairyModeScene" || 
-                           sceneName == "PlayMovieScene" || 
-                           sceneName == "RenderCutinScene" ||
-                           sceneName == "RythmGameResultScene";
-                }
+                // 플레이 씬: FairyModeScene, PlayMovieScene
+                // 로딩 씬: RenderCutinScene
+                // 결과 씬: RythmGameResultScene (결과 화면에서도 커스텀 차트 제목 표시 필요)
+                string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
+                return sceneName == "FairyModeScene" ||
+                       sceneName == "PlayMovieScene" ||
+                       sceneName == "RenderCutinScene" ||
+                       sceneName == "RythmGameResultScene";
             }
             catch (Exception ex)
             {
@@ -63,7 +59,7 @@ namespace GRC2.Harmony.Handlers
             return false;
         }
 
-        public static void SetTextPrefix(object __instance, ref string value)
+        public static void SetTextPrefix(ref string value)
         {
             try
             {
@@ -100,9 +96,9 @@ namespace GRC2.Harmony.Handlers
         private static class UnityTextSetterPatch
         {
             [HarmonyPrefix]
-            private static void Prefix(object __instance, ref string value)
+            private static void Prefix(ref string value)
             {
-                SetTextPrefix(__instance, ref value);
+                SetTextPrefix(ref value);
             }
         }
 
@@ -111,9 +107,9 @@ namespace GRC2.Harmony.Handlers
         private static class TmpTextSetterPatch
         {
             [HarmonyPrefix]
-            private static void Prefix(object __instance, ref string value)
+            private static void Prefix(ref string value)
             {
-                SetTextPrefix(__instance, ref value);
+                SetTextPrefix(ref value);
             }
         }
     }

@@ -2,7 +2,7 @@ using GRC2.Core;
 using HarmonyLib;
 using IntiCreates;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cFairyModeNotesManager의 오토플레이 상태를 강제합니다.

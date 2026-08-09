@@ -14,7 +14,7 @@ namespace GRC2.Converters
     /// <summary>
     /// BMS 노트를 게임 노트로 변환하는 메인 클래스
     /// </summary>
-    public static partial class BmsNoteConverter
+    public static class BmsNoteConverter
     {
         // 상세 로깅 플래그 (성능 최적화용, 기본 비활성화)
         private static readonly bool EnableDetailedHoldNoteLogging = false;
@@ -48,7 +48,7 @@ namespace GRC2.Converters
                 var sortedBmsNotes = bmsNotes.OrderBy(n => n.Time).ToList();
                 int convertedCount = 0;
                 int skippedCount = 0;
-                
+
                 foreach (var bmsNote in sortedBmsNotes)
                 {
                     try
@@ -91,7 +91,7 @@ namespace GRC2.Converters
                     "홀드",
                     "홀드 시작 노트(02 채널)",
                     "홀드 끝 노트(19 채널)");
-                
+
                 if (missingHoldEnds != null)
                 {
                     return null; // 주입 금지
@@ -99,14 +99,16 @@ namespace GRC2.Converters
 
                 ProcessHoldEndNotes(noteList, holdEndNotes, bmsNotes);
 
-                // 페어리 끝 노트 체크: 매칭된 페어리 시작(Duration>0)에 대해 끝이 있는지만 검사
+                // 페어리 끝 노트 체크: 매칭된 페어리 시작(Duration>0)에 대해 끝이 있는지만 검사.
+                // 짝을 아예 찾지 못해 Duration이 0으로 남은 페어리는 여기서 걸러지지 않으므로,
+                // 아래 CheckIncompleteConnectedNotes가 최종 산출물 기준으로 다시 확인합니다.
                 var missingFairyEnds = CheckMissingEndNotes(
                     bmsNotes.Where(n => n.Type == NoteType.Fairy && n.Duration > 0),
                     fairyEndNotes,
                     "페어리",
                     "페어리 시작 노트(11-18 채널)",
                     "페어리 끝 노트(1A-1B 채널)");
-                
+
                 if (missingFairyEnds != null)
                 {
                     return null; // 주입 금지
@@ -122,6 +124,12 @@ namespace GRC2.Converters
                 catch (Exception ex)
                 {
                     Helpers.ErrorLogger.LogWarning(ex, "[BmsNoteConverter]", "0초 노트 필터링 중 오류");
+                }
+
+                // 최종 방어선: 게임에 넘길 수 없는 노트가 남아 있으면 주입 자체를 취소합니다.
+                if (CheckIncompleteConnectedNotes(noteList))
+                {
+                    return null; // 주입 금지
                 }
 
                 // 마지막 노트 찾기 및 isLast 설정
@@ -142,10 +150,7 @@ namespace GRC2.Converters
                 return null;
             }
         }
-    }
 
-    public static partial class BmsNoteConverter
-    {
         private static NoteCreateData[] CreateTypedNoteArray(List<NoteCreateData> noteList, List<BmsNote> bmsNotes)
         {
             var array = noteList.ToArray();
@@ -193,10 +198,7 @@ namespace GRC2.Converters
 
             return noteObj.noteTypeID == NoteTypeId.Hold || noteObj.noteTypeID == NoteTypeId.Hold_Middle;
         }
-    }
 
-    public static partial class BmsNoteConverter
-    {
         private static void ProcessHoldEndNotes(List<NoteCreateData> noteList, List<BmsNote> holdEndNotes, List<BmsNote> bmsNotes)
         {
             try
@@ -220,11 +222,6 @@ namespace GRC2.Converters
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "페어리 끝 노트 처리 중 오류");
             }
         }
-    }
-
-    public static partial class BmsNoteConverter
-    {
-    
 
         private static void FilterZeroTimeNotes(List<NoteCreateData> noteList)
         {
@@ -251,6 +248,64 @@ namespace GRC2.Converters
             }
         }
 
+        /// <summary>
+        /// 게임의 cFairyModeNotesManager.createNote는 Fairy/Hold 노트에서 null 검사 없이
+        /// connectNodeDataArray[0]을 읽습니다. 끝 노트가 붙지 않은 채로 배열을 넘기면
+        /// createAllNote 안에서 NullReferenceException이 나고 곡 로딩이 통째로 깨집니다.
+        ///
+        /// 앞선 CheckMissingEndNotes는 BMS 원본 노트 기준이라
+        /// (a) 짝을 못 찾아 Duration이 0으로 남은 페어리 시작,
+        /// (b) 사전 검사는 통과했지만 Hold/FairyNoteProcessor의 매칭 단계에서 실패한 노트
+        /// 두 경우를 놓칩니다. 여기서 실제로 게임에 넘길 배열을 기준으로 다시 확인합니다.
+        /// </summary>
+        /// <returns>넘길 수 없는 노트가 있으면 true (주입 금지)</returns>
+        private static bool CheckIncompleteConnectedNotes(List<NoteCreateData> noteList)
+        {
+            if (noteList == null || noteList.Count == 0)
+            {
+                return false;
+            }
+
+            var incomplete = noteList
+                .Where(note => note != null && RequiresConnectNode(note.noteTypeID) &&
+                    (note.connectNodeDataArray == null || note.connectNodeDataArray.Length == 0))
+                .ToList();
+
+            if (incomplete.Count == 0)
+            {
+                return false;
+            }
+
+            MelonLogger.Error("");
+            MelonLogger.Error("═══════════════════════════════════════════════════════════════");
+            MelonLogger.Error("❌❌❌ BMS 노트 주입 실패: 끝 노트가 연결되지 않은 노트가 있습니다! ❌❌❌");
+            MelonLogger.Error("═══════════════════════════════════════════════════════════════");
+            MelonLogger.Error($"홀드/페어리 노트 {incomplete.Count}개에 끝 노트가 연결되지 않았습니다.");
+            MelonLogger.Error("이 상태로 주입하면 게임이 노트를 만드는 도중 크래시합니다.");
+            MelonLogger.Error("");
+            MelonLogger.Error("🔍 BMS 파일을 다시 확인해보세요!");
+            MelonLogger.Error("   - 페어리 시작 노트(11-18 채널)에는 끝 노트(1A/1B 채널)가,");
+            MelonLogger.Error("   - 홀드 시작 노트(02 채널)에는 끝 노트(19 채널)가 필요합니다.");
+            MelonLogger.Error("");
+            foreach (var note in incomplete)
+            {
+                MelonLogger.Error(
+                    $"   {note.noteTypeID}: Time={Helpers.NoteSampleTime.ToSeconds(note.perfectSample):F3}초, " +
+                    $"perfectSample={note.perfectSample}, Lane={note.laneLeftRightID}/{note.subLaneID}");
+            }
+            MelonLogger.Error("═══════════════════════════════════════════════════════════════");
+            MelonLogger.Error("");
+            return true;
+        }
+
+        /// <summary>
+        /// 게임이 connectNodeDataArray[0]을 반드시 읽는 노트 타입인지 판정합니다.
+        /// </summary>
+        private static bool RequiresConnectNode(NoteTypeId noteTypeId)
+        {
+            return noteTypeId == NoteTypeId.Fairy || noteTypeId == NoteTypeId.Hold;
+        }
+
         private static List<BmsNote> CheckMissingEndNotes(
             IEnumerable<BmsNote> startNotes,
             List<BmsNote> endNotes,
@@ -260,21 +315,21 @@ namespace GRC2.Converters
         {
             var missingEnds = new List<BmsNote>();
             const float TIME_TOLERANCE = 0.01f; // 시간 오차 허용 범위
-            
+
             foreach (var startNote in startNotes)
             {
                 var expectedEndTime = startNote.Time + startNote.Duration;
-                var hasEndNote = endNotes.Any(end => 
+                var hasEndNote = endNotes.Any(end =>
                     Math.Abs(end.Time - expectedEndTime) < TIME_TOLERANCE &&
                     end.Lane == startNote.Lane &&
                     end.IsLeft == startNote.IsLeft);
-                
+
                 if (!hasEndNote)
                 {
                     missingEnds.Add(startNote);
                 }
             }
-            
+
             if (missingEnds.Count > 0)
             {
                 MelonLogger.Error("");
@@ -296,7 +351,7 @@ namespace GRC2.Converters
                 MelonLogger.Error("");
                 return missingEnds; // 주입 금지
             }
-            
+
             return null; // 모든 끝 노트가 있음
         }
 
@@ -345,5 +400,5 @@ namespace GRC2.Converters
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "SetLastNoteFlag 오류");
             }
         }
-}
+    }
 }

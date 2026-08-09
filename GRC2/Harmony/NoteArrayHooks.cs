@@ -8,7 +8,7 @@ using HarmonyLib;
 using GRC2.Core;
 using IntiCreates;
 
-namespace GRC2.Harmony.Hooks
+namespace GRC2.Harmony
 {
     [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]
     public static class NoteArrayHooks

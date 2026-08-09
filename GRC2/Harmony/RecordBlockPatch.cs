@@ -6,7 +6,7 @@ using IntiCreates;
 using IntiCreates.RythmGame;
 using MelonLoader;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// savecustomkey/config.txt의 BlockSave 값이 켜져 있으면 플레이 결과가 베스트 스코어/콤보/
@@ -37,10 +37,13 @@ namespace GRC2.Harmony.Handlers
         /// </summary>
         private static int ResolveMusicId(soRythmGameMusicDataMap.MusicData musicData)
         {
-            if (CustomAssetManager.IsCustomChartSelected() &&
-                AlbumManager.GetCurrentMusicID() is soRythmGameMusicDataMap.MusicID customId)
+            if (CustomAssetManager.IsCustomChartSelected())
             {
-                return (int)customId;
+                soRythmGameMusicDataMap.MusicID? customId = AlbumManager.GetCurrentMusicID();
+                if (customId != null)
+                {
+                    return (int)customId.Value;
+                }
             }
 
             return (int)musicData.id;

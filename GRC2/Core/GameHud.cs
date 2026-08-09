@@ -1,7 +1,7 @@
 using IntiCreates.RythmGame;
 using UnityEngine;
 
-namespace GRC2.Core.Hud
+namespace GRC2.Core
 {
     /// <summary>
     /// 판정바를 MelonLoader의 OnGUI(IMGUI)에서 직접 그립니다. 게임의 UI 캔버스/오브젝트 트리를

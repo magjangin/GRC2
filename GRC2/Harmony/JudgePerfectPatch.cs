@@ -3,7 +3,7 @@ using HarmonyLib;
 using IntiCreates;
 using IntiCreates.RythmGame;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cNotecWorkBase.onJudgeMent를 후킹해 모든 판정을 PERFECT로 강제합니다.

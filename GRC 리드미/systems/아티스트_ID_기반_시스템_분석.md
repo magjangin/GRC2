@@ -1,4 +1,4 @@
-﻿# 아티스트 ID 기반 MusicID 및 텍스트 교체 시스템 분석
+# 아티스트 ID 기반 MusicID 및 텍스트 교체 시스템 분석
 
 ## 개요
 
@@ -388,7 +388,7 @@ private static string _currentArtistId;
 [assembly: MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")]
 ```
 
-**위치**: `GRC2/Core/Scene/SceneDetector.cs`
+**위치**: `GRC2/Core/SceneDetector.cs`
 
 ### 참조 DLL
 

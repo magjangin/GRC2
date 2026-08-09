@@ -5,7 +5,7 @@ using IntiCreates;
 using MelonLoader;
 using Steamworks;
 
-namespace GRC2.Helpers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// Steamworks API 및 게임 내부 DLC 검증 메서드를 하이재킹하는 클래스
@@ -69,11 +69,6 @@ namespace GRC2.Helpers
         {
             __result = false; // 미구매 상태가 아니도록(구매완료됨) 우회
             return false;
-        }
-
-        public static void CoCheckDLCPostfix()
-        {
-            MelonLogger.Msg("[SteamApiHijacker] sAddressableDirector.coCheckDLC 실행 완료됨.");
         }
 
         public static void InitializePostfix(cDlcDirector __instance)
@@ -190,16 +185,6 @@ namespace GRC2.Helpers
             private static bool Prefix(ref bool __result)
             {
                 return IsNotYetPurchasedPrefix(ref __result);
-            }
-        }
-
-        [HarmonyPatch(typeof(sAddressableDirector), "coCheckDLC")]
-        private static class CheckDlcPatch
-        {
-            [HarmonyPostfix]
-            private static void Postfix()
-            {
-                CoCheckDLCPostfix();
             }
         }
 

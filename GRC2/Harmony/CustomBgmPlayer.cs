@@ -6,7 +6,7 @@ using System.IO;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// 커스텀 곡 프리뷰를 지연 로드하고 최근 클립을 재사용합니다.

@@ -7,7 +7,7 @@ Every hook should have a clear owner, purpose, and removal condition.
 
 ### `SceneDetector.OnInitializeMelon`
 
-File: `GRC2/Core/Scene/SceneDetector.cs`
+File: `GRC2/Core/SceneDetector.cs`
 
 Main startup path. It:
 
@@ -19,7 +19,7 @@ Main startup path. It:
 
 ### `SceneDetector.OnSceneWasLoaded`
 
-File: `GRC2/Core/Scene/SceneDetector.cs` (scene-routing section)
+File: `GRC2/Core/SceneDetector.cs` (scene-routing section)
 
 Scene routing path. It starts or stops custom BGM/BGA/artwork injection depending on
 the loaded scene.
@@ -47,8 +47,8 @@ Music Select is reached by any path other than the result scene.
 
 Owner files:
 
-- `GRC2/Core/Scene/SceneDetector.cs` (`InitializeHarmony`)
-- `GRC2/Harmony/Hooks/MusicScrollViewHooks.cs`
+- `GRC2/Core/SceneDetector.cs` (`InitializeHarmony`)
+- `GRC2/Harmony/MusicScrollViewHooks.cs`
 
 Patched game targets:
 
@@ -70,8 +70,8 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Hooks/GameFlowHooks.cs`
-- `GRC2/Harmony/Handlers/AudioClipPatch.cs`
+- `GRC2/Harmony/GameFlowHooks.cs`
+- `GRC2/Harmony/AudioClipPatch.cs`
 
 Patched game targets:
 
@@ -146,7 +146,7 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Harmony/Hooks/NoteArrayHooks.cs`
+- `GRC2/Harmony/NoteArrayHooks.cs`
 - `GRC2/Converters/BmsNoteConverter.cs`
 - `GRC2/Builders/*`
 - `GRC2/Processors/*`
@@ -160,16 +160,36 @@ Purpose:
 - convert parsed BMS notes into game `NoteCreateData` objects;
 - replace `mFairyNoteCreateDataArray` before the game creates notes.
 
+`createNote` dereferences `createData.connectNodeDataArray[0]` with no null
+check for both `NoteTypeId.Fairy` and `NoteTypeId.Hold`, so any such note that
+reaches the array without an end note attached crashes `createAllNote`.
+`BmsNoteConverter` guards this in two places, and both are needed:
+
+- `CheckMissingEndNotes` works on the parsed BMS notes and catches charts that
+  are missing 19 / 1A / 1B entries outright;
+- `CheckIncompleteConnectedNotes` works on the final `NoteCreateData` list and
+  catches what the first one structurally cannot see — fairy starts whose
+  `Duration` stayed `0` because no partner was ever matched (the BMS-level check
+  filters on `Duration > 0`), and notes that passed the BMS check but lost their
+  end during `HoldNoteProcessor`/`FairyNoteProcessor` matching.
+
+Both cancel the whole injection and return `null`; `NoteArrayHooks` then leaves
+`mFairyNoteCreateDataArray` alone, so the original chart plays under the custom
+BGM/BGA instead of the game crashing.
+
 Removal risk:
 
-- custom charts may load custom music but keep original note data.
+- custom charts may load custom music but keep original note data;
+- removing either check lets a `Fairy`/`Hold` note with an empty
+  `connectNodeDataArray` reach `createAllNote`, which is an immediate
+  `NullReferenceException` during song load.
 
 ### Cover, title, and text replacement
 
 Owner files:
 
-- `GRC2/Harmony/Handlers/ArtWorkPatch.cs`
-- `GRC2/Harmony/Handlers/TextPatch.cs`
+- `GRC2/Harmony/ArtWorkPatch.cs`
+- `GRC2/Harmony/TextPatch.cs`
 
 Patched game targets:
 
@@ -189,8 +209,8 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Injectors/Bgm/BgmInjector.cs`
-- `GRC2/Injectors/GameEnd/BgmGameEndMonitor.cs`
+- `GRC2/Injectors/BgmInjector.cs`
+- `GRC2/Injectors/BgmGameEndMonitor.cs`
 
 Patched game targets:
 
@@ -211,7 +231,7 @@ Removal risk:
 
 Owner file:
 
-- `GRC2/Harmony/Handlers/ResultSceneUpdaterPatch.cs`
+- `GRC2/Harmony/ResultSceneUpdaterPatch.cs`
 
 Patched game target:
 
@@ -240,10 +260,10 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Core/CustomKey/CustomKeySettings.cs`
-- `GRC2/Harmony/Handlers/AutoPlayPatch.cs`
-- `GRC2/Harmony/Handlers/JudgePerfectPatch.cs`
-- `GRC2/Harmony/Handlers/RecordBlockPatch.cs`
+- `GRC2/Core/CustomKeySettings.cs`
+- `GRC2/Harmony/AutoPlayPatch.cs`
+- `GRC2/Harmony/JudgePerfectPatch.cs`
+- `GRC2/Harmony/RecordBlockPatch.cs`
 
 Patched game targets:
 
@@ -266,17 +286,19 @@ Purpose:
   reimplemented against compile-time decompiled types (the originals used
   runtime reflection/string-based member lookup because they predated the
   direct `Assembly-CSharp.dll` reference);
-- `AutoPlayPatch`/`JudgePerfectPatch` are off by default; `autoplay_enabled`
-  and `judge_perfect_enabled` in `savecustomkey/config.txt` (created next to
+- `AutoPlayPatch`/`JudgePerfectPatch` are off by default; the `AutoPlay` and
+  `AllPerfect` keys in `savecustomkey/config.txt` (created next to
   the `hwa` folder on first launch) are read once in `OnInitializeMelon` and
   are the only way to turn them on — there is no in-game toggle key, so a
   config edit needs a game restart to take effect;
 - `RecordBlockPatch` snapshots `playerMusicData[id].{highScoreArray,
   maxComboArray, playCountArray, playFlagArray}` for the played difficulty
   before `initializePreFade` runs and restores them afterward, zeroes the
-  displayed old high score, and makes `requestGameDataSaveToFile` a no-op —
-  all only while `AutoPlayPatch.IsEnabled || JudgePerfectPatch.IsEnabled` is
-  true, so cheated play sessions never reach the save file.
+  displayed old high score, and makes `requestGameDataSaveToFile` a no-op.
+  It is gated on its own `BlockSave` config key (`CustomKeySettings.BlockSave`,
+  **default `true`**), *not* on `AutoPlayPatch`/`JudgePerfectPatch` — so record
+  blocking stays on even with both cheats off, and turning the cheats on
+  without also setting `BlockSave=0` never reaches the save file.
 - `RecordBlockPatch` resolves the played `MusicID` itself
   (`CustomAssetManager.IsCustomChartSelected()` +
   `AlbumManager.GetCurrentMusicID()`) instead of reading
@@ -288,18 +310,46 @@ Purpose:
 Removal risk:
 
 - removing `AutoPlayPatch`/`JudgePerfectPatch` only removes the cheat
-  features; removing `RecordBlockPatch` while keeping the other two would let
-  AutoPlay/judge-forced results write real best scores/clear badges to the
-  save file.
+  features; removing `RecordBlockPatch` (or setting `BlockSave=0`) while
+  keeping the other two would let AutoPlay/judge-forced results write real
+  best scores/clear badges to the save file.
+
+### Custom BGA crossfade suppression
+
+Owner file:
+
+- `GRC2/Harmony/BgaCrossfadePatch.cs`
+
+Patched game target:
+
+- `IntiCreates.cPlayMovieSceneManager.requestPlay` (postfix)
+
+Purpose:
+
+- `requestPlay` starts `coUpdateMovieInARow()` whenever
+  `mBackGroundSceneInitParam.mvType == BackGroundMVType.GamePlay &&
+  mLoadMoviePathList.Count > 1`. That coroutine swaps to the *next original*
+  clip once the current one is within `mPreCrossFadeFrame` (40 frames, ~0.67s)
+  of its end, and it keeps running even after `BgaInjector` has pushed a custom
+  clip into the `VideoPlayer` — which made custom-BGA songs flip back to the
+  original video right at the end of the song;
+- the postfix stops that coroutine and clears `mUpdateSwapCoroutine`, but only
+  when `BgaInjector.IsInjected` is true, so songs playing the original BGA are
+  untouched. `BgaCrossfadePatch.TryStopSwapCoroutine` is also called directly by
+  `BgaInjector` for the case where injection finishes *after* `requestPlay`.
+
+Removal risk:
+
+- custom BGA songs revert to the original clip in the last ~0.67s of playback.
 
 ### Judgment bar / note sway / note speed chaos (GameHud overlays)
 
 Owner files:
 
-- `GRC2/Core/Hud/GameHud.cs`
-- `GRC2/Harmony/Handlers/JudgmentBarPatch.cs`
-- `GRC2/Harmony/Handlers/NoteSwayPatch.cs`
-- `GRC2/Harmony/Handlers/NoteSpeedChaosPatch.cs`
+- `GRC2/Core/GameHud.cs`
+- `GRC2/Harmony/JudgmentBarPatch.cs`
+- `GRC2/Harmony/NoteSwayPatch.cs`
+- `GRC2/Harmony/NoteSpeedChaosPatch.cs`
 
 Patched game targets:
 
@@ -347,7 +397,7 @@ Planned (not implemented yet):
 
 Owner file:
 
-- `GRC2/Helpers/SteamApiHijacker.cs`
+- `GRC2/Harmony/SteamApiHijacker.cs`
 
 Patched targets:
 
@@ -369,8 +419,8 @@ Removal risk:
 
 Owner files:
 
-- `GRC2/Injectors/Shared/BgmBgaInjector.cs`
-- `GRC2/Injectors/Bga/*`
+- `GRC2/Injectors/BgmBgaInjector.cs`
+- `GRC2/Injectors/*`
 
 Runtime entry:
 
@@ -413,8 +463,91 @@ of the current source baseline:
 - `BgmFormattingUtils`
 - `BgmMethodCallHooks`
 - `BgmMonitorCoroutine`
+- `SteamApiHijacker.CoCheckDLCPostfix` and its `sAddressableDirector.coCheckDLC`
+  patch (removed 2026-08-09; log-only, and fired before the coroutine body ran)
+- `BgmInjectorHooks` (removed 2026-08-09; folded into `BgmGameEndMonitor`)
+- `BgmLoader.TrySetClipName` (removed 2026-08-09; `AudioClip` has no `m_Name`
+  field, so the reflection lookup was always null)
 
 ## Cleanup Log
+
+### 2026-08-09
+
+Audit of the whole hook surface against `Decompiled/`, plus the structural
+cleanup that came out of it.
+
+Verified correct and left alone: all 21 string-named patch targets exist with no
+overload ambiguity, all 17 `AccessTools.FieldRefAccess` field names *and* types
+match, and every game enum member the mod names exists. The build resolves
+against the real `Assembly-CSharp.dll` with 0 warnings, so only the string-keyed
+lookups needed hand-checking.
+
+Correctness fixes:
+
+- Added `BmsNoteConverter.CheckIncompleteConnectedNotes`, a final check on the
+  array that actually goes to the game. `createNote` reads
+  `connectNodeDataArray[0]` with no null check for `NoteTypeId.Fairy` and
+  `NoteTypeId.Hold`, and the existing `CheckMissingEndNotes` runs on *BMS* notes
+  filtered by `Duration > 0`, so a fairy start (11-18) with no 1A/1B partner
+  kept `Duration == 0`, skipped the check, and reached the game with a null
+  `connectNodeDataArray` — a guaranteed `NullReferenceException` inside
+  `createAllNote`. Matching failures inside `HoldNoteProcessor`/
+  `FairyNoteProcessor` could produce the same state. Injection is now cancelled
+  (original chart plays) with a log listing the offending notes.
+- Unified sample/second conversion in `Helpers/NoteSampleTime.cs`.
+  `NoteCreateDataBuilder` truncated (`(int)`) while the processors rounded
+  (`Math.Round(AwayFromZero)`), so the same instant could differ by one sample;
+  the processors' ±2-sample search had been absorbing that.
+- `BgmLoader.TrySetClipName` was a permanent no-op: `AudioClip` has no `m_Name`
+  field (`UnityEngine.Object` declares only `m_CachedPtr`; `name` is an extern
+  property), so the reflection lookup always returned null and the
+  `nameField?.SetValue` silently did nothing. Replaced with `audioClip.name =`,
+  which `CustomBgmPlayer` was already using.
+- Removed the `sAddressableDirector.coCheckDLC` postfix. It only logged
+  "실행 완료됨", and because the target returns `IEnumerator` the postfix fires
+  when the enumerator is *created*, before the coroutine body runs — the message
+  was wrong and nothing else depended on it.
+- Removed a dead `if (currentScene != null)` guard in `TextPatch`
+  (`SceneManager.GetActiveScene()` returns a struct) and the unused
+  `object __instance` parameters in `TextPatch`/`ArtWorkPatch`. Those three were
+  the exceptions to the 2026-07-26 entry's "every patch method receives
+  `__instance` as its concrete game type" claim, which was not true as written.
+
+Structural cleanup (no behavior change):
+
+- Removed `partial` from all 7 classes that used it. None of them spanned more
+  than one file — 27 class-declaration blocks collapsed into 7 (`AlbumManager`
+  6→1, `SceneDetector` 5→1, `BmsNoteConverter`/`HoldNoteProcessor`/
+  `BgaBgmSyncManager` 4→1, `NoteCreateDataBuilder`/`FairyNoteProcessor` 2→1),
+  with `#region` markers kept where the old blocks carried section comments.
+  This was leftover from the 2026-07-21 file merge, which concatenated the files
+  without collapsing the class headers.
+- Typed the 9 `AlbumManager` MusicID APIs as
+  `soRythmGameMusicDataMap.MusicID` (nullable where "no mapping" is a real
+  answer) instead of `object`. That removed the boxing plus six defensive
+  `is soRythmGameMusicDataMap.MusicID x` casts at the call sites, and makes the
+  backing dictionaries use the non-boxing enum comparer.
+- Flattened the 8 single-file folders that carried no namespace of their own:
+  `Core/{Album,Assets,CustomKey,Hud,Scene}` -> `Core/`, and
+  `Injectors/{Bga,Bgm,GameEnd,Shared}` -> `Injectors/`. `Core/Hud` was also the
+  only one of the five that had its own namespace (`GRC2.Core.Hud`); `GameHud`
+  now sits in `GRC2.Core` with its neighbours.
+- Merged `Harmony/Handlers/` and `Harmony/Hooks/` into `Harmony/`
+  (namespace `GRC2.Harmony`). Nothing in the code distinguished the two — both
+  held `[HarmonyPatch]` classes. Moved `SteamApiHijacker.cs` (11 patches) there
+  from `Helpers/`.
+- Dropped two single-target `[HarmonyPatch]` wrapper classes that only existed
+  to hold one method: `BgmInjectorHooks` (now `[HarmonyPatch]` on
+  `BgmGameEndMonitor` itself) and `BgaCrossfadePatch.RequestPlayPatch`. Nested
+  wrappers are still used where one class patches several targets.
+
+Documented, not changed:
+
+- `BgmGameEndMonitor` keeps its own `coMonitorGameEnd` patch instead of moving
+  to `Harmony/`; it shares state with `BgmFinishTimeManager` in the same file.
+- `Builders/`, `Converters/` and `Processors/` remain three namespaces for one
+  BMS→`NoteCreateData` pipeline. Their folders and namespaces at least agree,
+  which was the property the flattened folders lacked.
 
 ### 2026-05-12
 
@@ -451,7 +584,7 @@ of the current source baseline:
 - Replaced delayed reflection registration and every manual `Harmony.Patch(...)`
   call with `[HarmonyPatch]` declarations and one `PatchAll()` startup call.
 - Removed `Harmony/Registration/Patchers.cs` and
-  `Injectors/Shared/PatchApplier.cs`.
+  `Injectors/PatchApplier.cs`.
 - Removed the invalid
   `cFairyModeNotesManager.loadFairyNoteDatasJsonToArray` target; that method
   belongs to `FairyNoteEditorLoader`, while note injection is correctly owned by

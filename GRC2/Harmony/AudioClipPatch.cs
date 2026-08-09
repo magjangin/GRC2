@@ -6,7 +6,7 @@ using System;
 using System.IO;
 using UnityEngine;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// 비동기로 준비된 커스텀 아트워크를 현재 곡 선택 UI에 반영합니다.
@@ -112,20 +112,15 @@ namespace GRC2.Harmony.Handlers
     [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "noticeChangedMusic")]
     public static class AudioClipPatch
     {
-        private static object _lastHandledMusicId;
+        private static soRythmGameMusicDataMap.MusicID? _lastHandledMusicId;
 
         [HarmonyPostfix]
         public static void NoticeChangedMusicPostfix(
             cMusicSelectSceneUIUpdater __instance,
-            object nextMusicID)
+            soRythmGameMusicDataMap.MusicID nextMusicID)
         {
             try
             {
-                if (nextMusicID == null)
-                {
-                    return;
-                }
-
                 if (!AlbumManager.IsCustomChartMusicID(nextMusicID))
                 {
                     HandleNormalSongSelection();
@@ -135,7 +130,7 @@ namespace GRC2.Harmony.Handlers
                 // 원본 UI가 같은 MusicID를 여러 번 알리는 경우 대용량 에셋 요청을
                 // 반복해서 시작하지 않습니다.
                 if (CustomAssetManager.IsCustomChartSelected() &&
-                    Equals(_lastHandledMusicId, nextMusicID))
+                    _lastHandledMusicId == nextMusicID)
                 {
                     return;
                 }

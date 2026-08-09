@@ -5,7 +5,7 @@ using HarmonyLib;
 using IntiCreates;
 using IntiCreates.RythmGame.FairyMode;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cNotecWorkBase.getNoteSpeed()는 virtual이 아닌 단일 정의라서 Touch/Flick/Hold/Hold_Middle/

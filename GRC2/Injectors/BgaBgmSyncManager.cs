@@ -10,7 +10,7 @@ namespace GRC2.Injectors
     /// <summary>
     /// BGA와 BGM 동기화를 담당하는 클래스
     /// </summary>
-    internal static partial class BgaBgmSyncManager
+    internal static class BgaBgmSyncManager
     {
         private static object _syncCoroutine = null;
         private static bool _isSyncing = false;
@@ -52,10 +52,6 @@ namespace GRC2.Injectors
             MelonLogger.Msg($"[BGAPlayerHook] BGA-BGM 동기화 시작: {_videoPlayers.Length}개 VideoPlayer");
         }
 
-    }
-
-    internal static partial class BgaBgmSyncManager
-    {
         /// <summary>
         /// BGM 오디오 소스 찾기 (cBGMBeatManager 우선, 그 다음 일반 검색)
         /// </summary>
@@ -148,10 +144,7 @@ namespace GRC2.Injectors
 
             return null;
         }
-    }
 
-    internal static partial class BgaBgmSyncManager
-    {
         private static cBGMBeatManager _cachedBgmManager;
 
         private static cBGMBeatManager GetBgmBeatManager()
@@ -311,10 +304,7 @@ namespace GRC2.Injectors
         {
             StopSync();
         }
-}
 
-    internal static partial class BgaBgmSyncManager
-    {
         /// <summary>
         /// BGA를 BGM 시간에 맞춰 동기화
         /// </summary>

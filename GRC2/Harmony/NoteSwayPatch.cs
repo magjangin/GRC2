@@ -1,9 +1,10 @@
 using GRC2.Core;
+using GRC2.Helpers;
 using HarmonyLib;
 using IntiCreates;
 using UnityEngine;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cNotecWorkBase.simulate가 매 프레임 계산하는 mCurrentPos는 노트의 세로(레인 진행) 위치만
@@ -20,8 +21,6 @@ namespace GRC2.Harmony.Handlers
     [HarmonyPatch(typeof(cNotecWorkBase), "simulate")]
     public static class NoteSwayPatch
     {
-        private const float SAMPLE_RATE = 48000f;
-
         [HarmonyPostfix]
         private static void Postfix(cNotecWorkBase __instance, int currentSample)
         {
@@ -32,7 +31,7 @@ namespace GRC2.Harmony.Handlers
             if (createParam?.createData == null)
                 return;
 
-            float secondsUntilHit = (createParam.createData.perfectSample - currentSample) / SAMPLE_RATE;
+            float secondsUntilHit = NoteSampleTime.ToSeconds(createParam.createData.perfectSample - currentSample);
 
             float damping = 1f;
             if (CustomKeySettings.NoteSwayDamping)

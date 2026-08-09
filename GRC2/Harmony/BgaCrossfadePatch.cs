@@ -5,7 +5,7 @@ using IntiCreates;
 using MelonLoader;
 using UnityEngine;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cPlayMovieSceneManager.coUpdateMovieInARow()는 mLoadMoviePathList.Count &gt; 1인 곡에서
@@ -19,23 +19,20 @@ namespace GRC2.Harmony.Handlers
     /// 커스텀 BGA가 실제로 주입/재생 중일 때만 이 코루틴을 멈춰서 원본으로 되돌아가지 않게 합니다.
     /// 커스텀 BGA가 없는(원본 그대로 재생하는) 곡에서는 아무 것도 건드리지 않습니다.
     /// </summary>
+    [HarmonyPatch(typeof(cPlayMovieSceneManager), "requestPlay")]
     public static class BgaCrossfadePatch
     {
         private static readonly AccessTools.FieldRef<cPlayMovieSceneManager, Coroutine> SwapCoroutineRef =
             AccessTools.FieldRefAccess<cPlayMovieSceneManager, Coroutine>("mUpdateSwapCoroutine");
 
-        [HarmonyPatch(typeof(cPlayMovieSceneManager), "requestPlay")]
-        private static class RequestPlayPatch
+        /// <summary>
+        /// 게임의 requestPlay()가 BgaInjector의 주입 완료보다 먼저 끝나 코루틴이 이미
+        /// 시작된 경우를 대비한 경로입니다(순서가 반대인 경우는 BgaInjector가 직접 호출).
+        /// </summary>
+        [HarmonyPostfix]
+        private static void RequestPlayPostfix(cPlayMovieSceneManager __instance)
         {
-            /// <summary>
-            /// 게임의 requestPlay()가 BgaInjector의 주입 완료보다 먼저 끝나 코루틴이 이미
-            /// 시작된 경우를 대비한 경로입니다(순서가 반대인 경우는 BgaInjector가 직접 호출).
-            /// </summary>
-            [HarmonyPostfix]
-            private static void Postfix(cPlayMovieSceneManager __instance)
-            {
-                TryStopSwapCoroutine(__instance);
-            }
+            TryStopSwapCoroutine(__instance);
         }
 
         /// <summary>

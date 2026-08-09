@@ -6,7 +6,7 @@ using IntiCreates;
 using IntiCreates.RythmGame;
 using MelonLoader;
 
-namespace GRC2.Harmony.Hooks
+namespace GRC2.Harmony
 {
     using MusicSelectData = cMusicSelectScrollViewDataGetter.MusicSelectData;
     using MusicID = soRythmGameMusicDataMap.MusicID;
@@ -30,8 +30,8 @@ namespace GRC2.Harmony.Hooks
             "easy", "normal", "hard", "expert"
         };
 
-        private static readonly Dictionary<object, TemplateSong> TemplateSongs =
-            new Dictionary<object, TemplateSong>();
+        private static readonly Dictionary<MusicID, TemplateSong> TemplateSongs =
+            new Dictionary<MusicID, TemplateSong>();
 
         [HarmonyPostfix]
         public static void InitializeMusicDataByDefaultPostfix(cMusicSelectScrollView __instance)
@@ -98,7 +98,7 @@ namespace GRC2.Harmony.Hooks
             // 선택된 채로 화면에 표시됩니다.
             cellList.RemoveAll(item =>
             {
-                if (item?.mMusicSelectData.musicID == null)
+                if (item == null)
                     return false;
                 int idValue = (int)item.mMusicSelectData.musicID;
                 return idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd;
@@ -160,22 +160,21 @@ namespace GRC2.Harmony.Hooks
         }
 
         internal static bool TryGetTemplateSong(
-            object customMusicId,
-            out object templateMusicId,
+            MusicID customMusicId,
+            out MusicID? templateMusicId,
             out string templateTitle)
         {
             templateMusicId = null;
             templateTitle = null;
 
-            if (customMusicId == null ||
-                !TemplateSongs.TryGetValue(customMusicId, out TemplateSong song))
+            if (!TemplateSongs.TryGetValue(customMusicId, out TemplateSong song))
             {
                 return false;
             }
 
             templateMusicId = song.MusicId;
             templateTitle = song.Title;
-            return templateMusicId != null;
+            return true;
         }
 
         private static void RegisterTemplateSong(
@@ -183,7 +182,7 @@ namespace GRC2.Harmony.Hooks
             AlbumInfo album,
             MusicID customMusicId)
         {
-            object templateMusicId = templateData.musicID;
+            MusicID templateMusicId = templateData.musicID;
             string templateTitle = templateData.songTitle;
 
             string artistId = album.SongInfo?.Character;
@@ -196,9 +195,6 @@ namespace GRC2.Harmony.Hooks
                 templateMusicId = artistSong.Value.musicId;
                 templateTitle = artistSong.Value.title;
             }
-
-            if (templateMusicId == null)
-                return;
 
             TemplateSongs[customMusicId] = new TemplateSong
             {
@@ -277,7 +273,7 @@ namespace GRC2.Harmony.Hooks
 
         private sealed class TemplateSong
         {
-            public object MusicId;
+            public MusicID MusicId;
             public string Title;
         }
     }

@@ -85,11 +85,8 @@ namespace GRC2.Builders
     /// <summary>
     /// NoteCreateData 생성 및 필드 설정을 담당하는 클래스
     /// </summary>
-    public static partial class NoteCreateDataBuilder
+    public static class NoteCreateDataBuilder
     {
-        // 샘플레이트 (게임의 오디오 샘플레이트, 일반적으로 48000)
-        private const int SAMPLE_RATE = 48000;
-
         private static Dictionary<string, BmsNote> _timeToBmsNoteCache = null;
         private static List<BmsNote> _cachedBmsNotes = null;
 
@@ -107,7 +104,7 @@ namespace GRC2.Builders
                 // bool 필드들은 기본값이 false이므로 별도 초기화가 필요 없습니다.
                 var noteCreateData = new NoteCreateData
                 {
-                    perfectSample = (int)(bmsNote.Time * SAMPLE_RATE),
+                    perfectSample = NoteSampleTime.ToSamples(bmsNote.Time),
                     laneLeftRightID = EnumValueHelper.GetLaneLeftRight(bmsNote.IsLeft),
                     subLaneID = EnumValueHelper.GetSubLaneType(bmsNote.Lane),
                     noteTypeID = EnumValueHelper.GetNoteTypeId(bmsNote.Type),
@@ -132,10 +129,7 @@ namespace GRC2.Builders
                 return null;
             }
         }
-    }
 
-    public static partial class NoteCreateDataBuilder
-    {
         /// <summary>
         /// NoteCreateData의 perfectSample을 역으로 계산하여 대응하는 BmsNote를 찾습니다.
         /// 성능 최적화: Dictionary를 사용하여 O(1) 검색
@@ -152,7 +146,7 @@ namespace GRC2.Builders
                 bool isLeft = noteCreateData.laneLeftRightID == IntiCreates.RythmGame.FairyMode.NoteLaneLeftRight.Left;
                 int lane = EnumValueHelper.ToLaneIndex(noteCreateData.subLaneID);
                 NoteType? targetType = EnumValueHelper.ToBmsNoteType(noteCreateData.noteTypeID);
-                float time = noteCreateData.perfectSample / (float)SAMPLE_RATE;
+                float time = NoteSampleTime.ToSeconds(noteCreateData.perfectSample);
 
                 EnsureBmsNoteLookupCache(bmsNotes);
                 string searchKey = BuildBmsNoteLookupKey(time, lane, isLeft, targetType);

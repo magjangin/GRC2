@@ -89,7 +89,7 @@ As of 2026-07-21:
 As of 2026-07-21 (file consolidation):
 
 - Merged every partial-class file set into a single file per class (16 classes, 61 files -> 16 files); deleted the empty `NoteArrayHooks.MusicDataAdjust.cs`.
-- Flattened folders that held only one merged class file (e.g. `Harmony/Hooks/GameFlow/` -> `Harmony/Hooks/GameFlowHooks.cs`).
+- Flattened folders that held only one merged class file (e.g. `Harmony/GameFlow/` -> `Harmony/GameFlowHooks.cs`).
 - Merged the six `Harmony/Registration/*Patcher.cs` files into `Harmony/Registration/Patchers.cs` (class names unchanged).
 - Current managed source count is 51 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
 
@@ -106,7 +106,7 @@ As of 2026-07-26 (Harmony automatic patch migration):
 - Replaced delayed reflection registration and manual `Harmony.Patch(...)`
   calls with `[HarmonyPatch]` declarations and one `PatchAll()` startup call.
 - Removed `Harmony/Registration/Patchers.cs` and
-  `Injectors/Shared/PatchApplier.cs`.
+  `Injectors/PatchApplier.cs`.
 - Removed obsolete runtime type search and duplicate scene injection paths after
   validating their owners against `Decompiled/`: `ReflectionHelper.cs`,
   `GameTypeSearcher.cs`, `SceneHandler.cs`, and `ResultSceneInjector.cs`.

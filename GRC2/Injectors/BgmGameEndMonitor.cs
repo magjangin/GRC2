@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using GRC2.Core;
+using GRC2.Helpers;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
@@ -13,8 +14,6 @@ namespace GRC2.Injectors
     /// </summary>
     internal static class BgmFinishTimeManager
     {
-        private const float SampleRate = 48000f;
-
         private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
             AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
 
@@ -74,17 +73,21 @@ namespace GRC2.Injectors
                 }
             }
 
-            return lastNoteSample / SampleRate;
+            return NoteSampleTime.ToSeconds(lastNoteSample);
         }
     }
 
     /// <summary>
     /// 커스텀 BGM 길이가 준비된 뒤 원본 게임 종료 코루틴을 실행합니다.
     /// 원본 코루틴의 페이드, 점수 보정, 클리어 연출과 씬 전환은 그대로 유지됩니다.
+    ///
+    /// coMonitorGameEnd는 코루틴 본문 첫 줄에서 mRythmGameMusicData의 페이드 샘플을
+    /// 지역 변수로 캡처하므로, 원본 IEnumerator의 첫 MoveNext() 전에 ApplyTargetTime을
+    /// 호출해야 커스텀 종료 시간이 반영됩니다.
     /// </summary>
+    [HarmonyPatch(typeof(cRythmGameManager), "coMonitorGameEnd")]
     internal static class BgmGameEndMonitor
     {
-        private const float SampleRate = 48000f;
         private const float TimingWaitTimeout = 15f;
 
         private static readonly AccessTools.FieldRef<cRythmGameManager, FairyNoteEditorLoader.MusicData> MusicDataRef =
@@ -101,6 +104,7 @@ namespace GRC2.Injectors
         /// <summary>
         /// IEnumerator 팩터리의 반환값을 감싸되 원본 자체는 건너뛰지 않습니다.
         /// </summary>
+        [HarmonyPostfix]
         public static void MonitorGameEndPostfix(cRythmGameManager __instance, ref IEnumerator __result)
         {
             if (__instance == null ||
@@ -172,21 +176,11 @@ namespace GRC2.Injectors
 
         private static int ToSample(float seconds)
         {
-            double samples = seconds * SampleRate;
-            return samples >= int.MaxValue ? int.MaxValue : (int)samples;
-        }
-    }
+            // 비정상적으로 긴 BGM에서 int 오버플로 대신 상한으로 잘라냅니다.
+            if (seconds >= int.MaxValue / (float)NoteSampleTime.SampleRate)
+                return int.MaxValue;
 
-    /// <summary>
-    /// BGM 주입에 필요한 게임 종료 IEnumerator 래퍼를 자동 등록합니다.
-    /// </summary>
-    [HarmonyPatch(typeof(cRythmGameManager), "coMonitorGameEnd")]
-    internal static class BgmInjectorHooks
-    {
-        [HarmonyPostfix]
-        private static void Postfix(cRythmGameManager __instance, ref IEnumerator __result)
-        {
-            BgmGameEndMonitor.MonitorGameEndPostfix(__instance, ref __result);
+            return NoteSampleTime.ToSamples(seconds);
         }
     }
 }

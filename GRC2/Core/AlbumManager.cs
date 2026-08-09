@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
 using GRC2.Parsers;
+using IntiCreates;
 using MelonLoader;
 using System.Linq;
 using System.IO;
 
 namespace GRC2.Core
 {
+    using MusicID = soRythmGameMusicDataMap.MusicID;
+
     /// <summary>
     /// 앨범별 파일 관리 클래스
     /// </summary>
@@ -25,24 +28,28 @@ namespace GRC2.Core
     /// <summary>
     /// 앨범 폴더 스캔 및 파일 매핑 관리
     /// </summary>
-    public static partial class AlbumManager
+    public static class AlbumManager
     {
+        private static readonly HashSet<string> BmsExtensions = new HashSet<string> { ".bms", ".bme", ".bml" };
+        private static readonly HashSet<string> ImageExtensions = new HashSet<string> { ".jpg", ".png", ".jpeg" };
+        private static readonly HashSet<string> AudioExtensions = new HashSet<string> { ".mp3", ".wav", ".ogg" };
+
         private static Dictionary<string, AlbumInfo> _albums = new Dictionary<string, AlbumInfo>();
         private static AlbumInfo _currentAlbum = null;
-        private static Dictionary<object, AlbumInfo> _musicIdToAlbumMap = new Dictionary<object, AlbumInfo>();
-        private static Dictionary<object, string> _musicIdToOriginalTitleMap = new Dictionary<object, string>();
-        
+        private static Dictionary<MusicID, AlbumInfo> _musicIdToAlbumMap = new Dictionary<MusicID, AlbumInfo>();
+        private static Dictionary<MusicID, string> _musicIdToOriginalTitleMap = new Dictionary<MusicID, string>();
+
         /// <summary>
         /// 아티스트 ID별 첫 곡 정보 저장 (아티스트ID -> (MusicID, 제목))
         /// </summary>
-        private static Dictionary<string, (object musicId, string title)> _artistIdToFirstSong = new Dictionary<string, (object, string)>();
-    }
+        private static Dictionary<string, (MusicID musicId, string title)> _artistIdToFirstSong =
+            new Dictionary<string, (MusicID, string)>();
 
-    public static partial class AlbumManager
-    {
-        public static void RegisterArtistFirstSong(string artistId, object musicId, string title)
+        #region 아티스트 첫 곡 매핑
+
+        public static void RegisterArtistFirstSong(string artistId, MusicID musicId, string title)
         {
-            if (string.IsNullOrWhiteSpace(artistId) || musicId == null || string.IsNullOrWhiteSpace(title))
+            if (string.IsNullOrWhiteSpace(artistId) || string.IsNullOrWhiteSpace(title))
             {
                 return;
             }
@@ -80,7 +87,7 @@ namespace GRC2.Core
             return normalized;
         }
 
-        public static (object musicId, string title)? GetArtistFirstSong(string artistId)
+        public static (MusicID musicId, string title)? GetArtistFirstSong(string artistId)
         {
             if (string.IsNullOrWhiteSpace(artistId))
                 return null;
@@ -111,10 +118,10 @@ namespace GRC2.Core
             return null;
         }
 
-    }
+        #endregion
 
-    public static partial class AlbumManager
-    {
+        #region 현재 앨범 파일 접근
+
         /// <summary>
         /// 현재 선택된 앨범의 BMS 파일 가져오기
         /// </summary>
@@ -173,20 +180,24 @@ namespace GRC2.Core
         {
             return _currentAlbum;
         }
-    }
 
-    public static partial class AlbumManager
-    {
-        public static object GetCurrentMusicID()
+        #endregion
+
+        #region MusicID 매핑
+
+        /// <summary>
+        /// 현재 선택된 앨범에 배정된 커스텀 MusicID입니다. 매핑이 없으면 null입니다.
+        /// </summary>
+        public static MusicID? GetCurrentMusicID()
         {
             if (_currentAlbum == null) return null;
             return GetMusicIDByAlbum(_currentAlbum);
         }
 
-        public static object GetMusicIDByAlbum(AlbumInfo album)
+        public static MusicID? GetMusicIDByAlbum(AlbumInfo album)
         {
             if (album == null) return null;
-            
+
             // _musicIdToAlbumMap에서 앨범에 해당하는 MusicID 찾기
             foreach (var kvp in _musicIdToAlbumMap)
             {
@@ -195,7 +206,7 @@ namespace GRC2.Core
                     return kvp.Key;
                 }
             }
-            
+
             // 매핑이 없으면 null 반환
             return null;
         }
@@ -205,10 +216,8 @@ namespace GRC2.Core
             return _albums;
         }
 
-        public static bool SelectAlbumByMusicID(object musicID)
+        public static bool SelectAlbumByMusicID(MusicID musicID)
         {
-            if (musicID == null) return false;
-
             try
             {
                 if (_musicIdToAlbumMap.TryGetValue(musicID, out AlbumInfo album))
@@ -228,40 +237,39 @@ namespace GRC2.Core
             }
         }
 
-        public static void RegisterMusicIDToAlbum(object musicID, AlbumInfo album)
+        public static void RegisterMusicIDToAlbum(MusicID musicID, AlbumInfo album)
         {
-            if (musicID != null && album != null)
+            if (album != null)
             {
                 _musicIdToAlbumMap[musicID] = album;
                 MelonLogger.Msg($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
             }
         }
 
-        public static bool IsCustomChartMusicID(object musicID)
+        public static bool IsCustomChartMusicID(MusicID musicID)
         {
-            if (musicID == null) return false;
             return _musicIdToAlbumMap.ContainsKey(musicID);
         }
 
-        public static void RegisterOriginalTitle(object musicID, string originalTitle)
+        public static void RegisterOriginalTitle(MusicID musicID, string originalTitle)
         {
-            if (musicID != null && !string.IsNullOrWhiteSpace(originalTitle))
+            if (!string.IsNullOrWhiteSpace(originalTitle))
             {
                 _musicIdToOriginalTitleMap[musicID] = originalTitle;
                 MelonLogger.Msg($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
             }
         }
 
-        public static string GetOriginalTitle(object musicID)
+        public static string GetOriginalTitle(MusicID? musicID)
         {
             if (musicID == null) return null;
-            _musicIdToOriginalTitleMap.TryGetValue(musicID, out string originalTitle);
+            _musicIdToOriginalTitleMap.TryGetValue(musicID.Value, out string originalTitle);
             return originalTitle;
         }
 
-        public static System.Collections.Generic.HashSet<string> GetAllOriginalTitles()
+        public static HashSet<string> GetAllOriginalTitles()
         {
-            var titles = new System.Collections.Generic.HashSet<string>();
+            var titles = new HashSet<string>();
             foreach (var title in _musicIdToOriginalTitleMap.Values)
             {
                 if (!string.IsNullOrWhiteSpace(title))
@@ -271,13 +279,10 @@ namespace GRC2.Core
             }
             return titles;
         }
-    }
 
-    public static partial class AlbumManager
-    {
-        private static readonly HashSet<string> BmsExtensions = new HashSet<string> { ".bms", ".bme", ".bml" };
-        private static readonly HashSet<string> ImageExtensions = new HashSet<string> { ".jpg", ".png", ".jpeg" };
-        private static readonly HashSet<string> AudioExtensions = new HashSet<string> { ".mp3", ".wav", ".ogg" };
+        #endregion
+
+        #region 앨범 폴더 스캔
 
         /// <summary>
         /// hwa 폴더 내의 모든 앨범 폴더를 스캔
@@ -434,10 +439,11 @@ namespace GRC2.Core
             string albumKey = Path.GetFileName(albumFolderPath);
             return string.IsNullOrEmpty(albumKey) || albumKey == "hwa" ? "root" : albumKey;
         }
-    }
 
-    public static partial class AlbumManager
-    {
+        #endregion
+
+        #region 앨범 선택
+
         /// <summary>
         /// 앨범 폴더 경로로 앨범 선택
         /// </summary>
@@ -555,5 +561,7 @@ namespace GRC2.Core
             MelonLogger.Msg($"[AlbumManager] 매칭되는 앨범이 없어 기본 앨범 선택: {_currentAlbum.AlbumName}");
             return true;
         }
+
+        #endregion
     }
 }

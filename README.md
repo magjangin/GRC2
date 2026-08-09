@@ -16,7 +16,8 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 
 - 메인 모드 소스: `GRC2/`
 - 테스트: `GRC2.Tests/`
-- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 37개, `GRC2.Tests` 2개
+- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 43개, `GRC2.Tests` 3개
+- `GRC2.csproj`는 `EnableDefaultCompileItems=false`라 소스를 추가하면 `<Compile Include>` 항목도 같이 넣어야 합니다(빠뜨려도 빌드는 통과하고 그 파일만 조용히 빠집니다)
 - 현재 훅 소유 구조는 [GRC 리드미/maintenance/HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md)에 정리되어 있습니다.
 
 ## 검증

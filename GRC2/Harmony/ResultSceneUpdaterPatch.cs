@@ -9,7 +9,7 @@ using HarmonyLib;
 using IntiCreates;
 using TMPro;
 
-namespace GRC2.Harmony.Handlers
+namespace GRC2.Harmony
 {
     /// <summary>
     /// cRythmGameResultSceneUpdater.initializePreFade를 직접 후킹해서 아트워크/곡 제목을 주입합니다.
@@ -48,10 +48,11 @@ namespace GRC2.Harmony.Handlers
                 if (sceneInitParam == null || !CustomAssetManager.IsCustomChartSelected())
                     return;
 
-                if (!(AlbumManager.GetCurrentMusicID() is soRythmGameMusicDataMap.MusicID customMusicId))
+                soRythmGameMusicDataMap.MusicID? customMusicId = AlbumManager.GetCurrentMusicID();
+                if (customMusicId == null)
                     return;
 
-                sceneInitParam.musicData.id = customMusicId;
+                sceneInitParam.musicData.id = customMusicId.Value;
             }
             catch (Exception ex)
             {

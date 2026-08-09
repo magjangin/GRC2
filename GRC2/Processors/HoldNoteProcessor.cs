@@ -13,13 +13,11 @@ namespace GRC2.Processors
 {
     using NoteCreateData = FairyNoteEditorLoader.NoteCreateData;
 
-    public static partial class HoldNoteProcessor
+    public static class HoldNoteProcessor
     {
-        private const int SampleRate = 48000;
-
         private static int ToSampleIndex(float timeSeconds)
         {
-            return (int)Math.Round(timeSeconds * SampleRate, MidpointRounding.AwayFromZero);
+            return NoteSampleTime.ToSamples(timeSeconds);
         }
 
         private static string BuildEndKey(int lane, bool isLeft, int endSample)
@@ -79,10 +77,7 @@ namespace GRC2.Processors
                 }
             }
         }
-    }
 
-    public static partial class HoldNoteProcessor
-    {
         private static HoldAttachResult AttachHoldEnd(
             BmsNote holdEnd,
             Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
@@ -237,10 +232,7 @@ namespace GRC2.Processors
                 processorName: "HoldNoteProcessor",
                 copyTurnDirection: false);
         }
-    }
 
-    public static partial class HoldNoteProcessor
-    {
         private enum HoldAttachResult
         {
             NotMatched,
@@ -305,10 +297,7 @@ namespace GRC2.Processors
             MelonLogger.Msg($"[HoldNoteProcessor] 홀드 끝 노트 매칭 완료: 성공={successCount}개, 실패={failCount}개");
             LogRemainingHoldStarts(holdStartMap);
         }
-    }
 
-    public static partial class HoldNoteProcessor
-    {
         private static void LogHoldEndMatchFailure(BmsNote holdEnd, List<BmsNote> allBmsNotes, Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
             MelonLogger.Warning($"[HoldNoteProcessor] 홀드 끝 노트 매칭 실패: Lane={holdEnd.Lane}, IsLeft={holdEnd.IsLeft}, Time={holdEnd.Time:F3}");
@@ -343,7 +332,7 @@ namespace GRC2.Processors
                 }
             }
             if (!foundInMap)
-                MelonLogger.Warning($"[HoldNoteProcessor]   (해당 레인의 홀드 시작 노트가 holdStartMap에 없습니다)");
+                MelonLogger.Warning("[HoldNoteProcessor]   (해당 레인의 홀드 시작 노트가 holdStartMap에 없습니다)");
         }
 
         private static void LogRemainingHoldStarts(Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
@@ -362,10 +351,7 @@ namespace GRC2.Processors
                 }
             }
         }
-    }
 
-    public static partial class HoldNoteProcessor
-    {
         private static Dictionary<int, List<NoteCreateData>> BuildNoteListBySample(List<NoteCreateData> noteList)
         {
             var noteListBySample = new Dictionary<int, List<NoteCreateData>>();
