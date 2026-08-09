@@ -288,9 +288,11 @@ Purpose:
   direct `Assembly-CSharp.dll` reference);
 - `AutoPlayPatch`/`JudgePerfectPatch` are off by default; the `AutoPlay` and
   `AllPerfect` keys in `savecustomkey/config.txt` (created next to
-  the `hwa` folder on first launch) are read once in `OnInitializeMelon` and
-  are the only way to turn them on — there is no in-game toggle key, so a
-  config edit needs a game restart to take effect;
+  the `hwa` folder on first launch) are the only way to turn them on — there is
+  no in-game toggle key. Both patches read `CustomKeySettings` on every call
+  instead of caching a copy, and `CustomKeySettings.Reload()` re-reads the file
+  on every scene load, so a config edit takes effect from the next play
+  (retry included) without a game restart — see the section below;
 - `RecordBlockPatch` snapshots `playerMusicData[id].{highScoreArray,
   maxComboArray, playCountArray, playFlagArray}` for the played difficulty
   before `initializePreFade` runs and restores them afterward, zeroes the
@@ -313,6 +315,54 @@ Removal risk:
   features; removing `RecordBlockPatch` (or setting `BlockSave=0`) while
   keeping the other two would let AutoPlay/judge-forced results write real
   best scores/clear badges to the save file.
+
+### config.txt reload (no game restart)
+
+Owner files:
+
+- `GRC2/Core/CustomKeySettings.cs`
+- `GRC2/Core/SceneDetector.cs`
+
+No game targets are patched — this is mod-side plumbing only.
+
+Purpose:
+
+- `savecustomkey/config.txt` is read in `OnInitializeMelon` and then re-read by
+  `CustomKeySettings.Reload()` at the top of `SceneDetector.OnSceneWasLoaded`,
+  so editing the file takes effect **from the next play** with no game restart;
+- **why scene load and not a timer or `createAllNote`**: every consumer already
+  reads the `CustomKeySettings` properties live (per frame or per call), so the
+  only thing that decides "when does a change land" is when the properties get
+  reassigned. A scene load is by definition not mid-song, and it runs well
+  before `createAllNote`, so values that are latched at song start (AutoPlay's
+  `mIsCurrentAutoPlay` force, NoteSpeedChaos's multiplier cache reset) are not
+  a play behind. Patching `createAllNote` instead would put the reload prefix in
+  an undefined order against the `AutoPlayPatch`/`NoteSpeedChaosPatch` prefixes
+  already on that method (no `HarmonyPriority`/`HarmonyBefore` between separate
+  patch classes), which is exactly the "one play late" bug this avoids;
+- **`RythmGameResultScene` is excluded** (`SceneDetector.ResultSceneName`).
+  `BlockSave` is the one key whose effect lands *after* the song, in
+  `RecordBlockPatch`'s hooks on `initializePreFade`/`requestGameDataSaveToFile`.
+  Reloading on the result scene would apply a mid-song edit to the play that
+  already finished; skipping it keeps `BlockSave` pinned to its play-entry value
+  for the whole play → result → save cycle;
+- retry is covered: `cRythmGameManager.gui_requestRetry` goes through
+  `changeNextScene(SceneId.RythmGame_Fairy, …)`, a real scene change;
+- `Reload()` no-ops when the file's `LastWriteTimeUtc` is unchanged, and keeps
+  the previous values when `Load()` finds zero `key=value` entries — an editor
+  mid-write would otherwise read as an empty file and silently reset everything
+  to defaults (e.g. `AllPerfect` flipping to `false`). It is also wrapped in
+  try/catch so a bad read cannot break scene routing;
+- `CustomKeySettings.PollFileChange()` runs from `OnUpdate` once a second
+  (`SettingsPollIntervalSeconds`, on `Time.unscaledTime` so it still ticks while
+  paused). It **only logs** `설정 파일 변경 감지 - 다음 플레이부터 적용됩니다.`
+  once per distinct write time; it never touches the values.
+
+Removal risk:
+
+- dropping the `Reload()` call returns the mod to restart-only config edits;
+  dropping the `ResultSceneName` exclusion makes a `BlockSave` edit made during
+  a song apply to that song's own result/save.
 
 ### Custom BGA crossfade suppression
 

@@ -9,12 +9,23 @@ namespace GRC2.Core
 {
     /// <summary>
     /// savecustomkey/config.txt에서 AutoPlay/판정조작/기록차단/판정바/노트 흔들림 설정을 읽습니다.
-    /// 게임 로드 시 한 번만 읽으며, 값을 바꾸려면 파일을 수정한 뒤 게임을 재시작해야 합니다.
+    /// 게임 로드 시 한 번 읽고, 이후에는 씬이 바뀔 때마다 <see cref="Reload"/>로 다시 읽습니다.
+    /// 값이 바뀌는 시점이 씬 경계뿐이라 곡이 진행되는 도중에는 절대 흔들리지 않습니다. 즉 파일을
+    /// 고치면 게임 재시작 없이 다음 플레이부터 적용됩니다.
     /// </summary>
     public static class CustomKeySettings
     {
         private const string FolderName = "savecustomkey";
         private const string FileName = "config.txt";
+
+        /// <summary>Initialize에서 확정한 설정 파일 경로. Reload/PollFileChange는 이 경로만 사용합니다.</summary>
+        private static string _filePath;
+
+        /// <summary>마지막으로 "값까지 반영한" 파일 수정 시각.</summary>
+        private static DateTime _loadedWriteTimeUtc = DateTime.MinValue;
+
+        /// <summary>마지막으로 "변경 감지 로그를 띄운" 파일 수정 시각. 같은 수정에 로그가 반복되지 않게 합니다.</summary>
+        private static DateTime _announcedWriteTimeUtc = DateTime.MinValue;
 
         public static bool AutoPlay { get; private set; }
         public static bool AllPerfect { get; private set; }
@@ -54,15 +65,16 @@ namespace GRC2.Core
                     MelonLogger.Msg($"[CustomKeySettings] 기본 설정 파일 생성: {filePath}");
                 }
 
-                Load(filePath);
-                MelonLogger.Msg(
-                    "[CustomKeySettings] 로드 완료: " +
-                    $"AutoPlay={AutoPlay}, AllPerfect={AllPerfect}, BlockSave={BlockSave}, " +
-                    $"EnableJudgmentBar={EnableJudgmentBar}(Vertical={JudgmentBarVertical}, Capsule={JudgmentBarCapsule}, Left={JudgmentBarLeft}), " +
-                    $"NoteSway={NoteSway}(Amplitude={NoteSwayAmplitude}, Speed={NoteSwaySpeed}, " +
-                    $"Damping={NoteSwayDamping}, DampingTime={NoteSwayDampingTime}), " +
-                    $"NoteSpeedChaos={NoteSpeedChaos}(Min={NoteSpeedChaosMin}, Max={NoteSpeedChaosMax}, " +
-                    $"PerLane={NoteSpeedChaosPerLane})");
+                _filePath = filePath;
+
+                if (!Load(filePath))
+                {
+                    MelonLogger.Warning("[CustomKeySettings] 설정 파일에서 유효한 항목을 찾지 못했습니다. 기본값으로 진행합니다.");
+                }
+
+                _loadedWriteTimeUtc = GetWriteTimeUtcOrDefault(filePath);
+                _announcedWriteTimeUtc = _loadedWriteTimeUtc;
+                MelonLogger.Msg("[CustomKeySettings] 로드 완료: " + DescribeSettings());
             }
             catch (Exception ex)
             {
@@ -70,8 +82,101 @@ namespace GRC2.Core
             }
         }
 
+        /// <summary>
+        /// 설정 파일을 다시 읽습니다. 씬 로드 시점에만 호출되므로 곡이 진행되는 도중에는 값이 바뀌지 않습니다.
+        /// 에디터가 파일을 쓰는 도중에 읽히면 항목이 하나도 안 잡혀 전부 기본값으로 떨어질 수 있으므로,
+        /// 그런 경우에는 반영하지 않고 이전 값을 그대로 유지합니다.
+        /// </summary>
+        public static void Reload()
+        {
+            if (string.IsNullOrEmpty(_filePath))
+                return;
+
+            try
+            {
+                if (!File.Exists(_filePath))
+                {
+                    MelonLogger.Warning($"[CustomKeySettings] 설정 파일이 없어 다시 읽기를 건너뜁니다: {_filePath}");
+                    return;
+                }
+
+                var writeTimeUtc = GetWriteTimeUtcOrDefault(_filePath);
+                if (writeTimeUtc == _loadedWriteTimeUtc)
+                    return; // 파일이 그대로면 다시 읽을 이유가 없습니다.
+
+                // Load는 파일을 전부 읽어 딕셔너리를 만든 뒤에야 프로퍼티에 대입하므로,
+                // ReadAllLines가 던지면 값이 반쯤 바뀐 상태로 남지 않습니다.
+                if (!Load(_filePath))
+                {
+                    MelonLogger.Warning("[CustomKeySettings] 설정 파일에서 유효한 항목을 찾지 못해 이전 값을 유지합니다.");
+                    return;
+                }
+
+                _loadedWriteTimeUtc = writeTimeUtc;
+                _announcedWriteTimeUtc = writeTimeUtc;
+                MelonLogger.Msg("[CustomKeySettings] 설정 다시 읽음: " + DescribeSettings());
+            }
+            catch (Exception ex)
+            {
+                ErrorLogger.LogWarning(ex, "[CustomKeySettings]", "설정 다시 읽기 실패 (이전 값 유지)");
+            }
+        }
+
+        /// <summary>
+        /// 설정 파일이 수정됐는지 확인해 한 번만 알립니다. 값은 건드리지 않습니다.
+        /// 실제 반영은 다음 플레이 씬에 진입할 때 <see cref="Reload"/>에서 이뤄집니다.
+        /// </summary>
+        public static void PollFileChange()
+        {
+            if (string.IsNullOrEmpty(_filePath))
+                return;
+
+            try
+            {
+                if (!File.Exists(_filePath))
+                    return;
+
+                var writeTimeUtc = GetWriteTimeUtcOrDefault(_filePath);
+                if (writeTimeUtc == _loadedWriteTimeUtc || writeTimeUtc == _announcedWriteTimeUtc)
+                    return;
+
+                _announcedWriteTimeUtc = writeTimeUtc;
+                MelonLogger.Msg("[CustomKeySettings] 설정 파일 변경 감지 - 다음 플레이부터 적용됩니다.");
+            }
+            catch
+            {
+                // 에디터가 저장하는 순간에는 접근이 막힐 수 있습니다. 다음 폴링에서 다시 확인합니다.
+            }
+        }
+
+        private static DateTime GetWriteTimeUtcOrDefault(string filePath)
+        {
+            try
+            {
+                return File.GetLastWriteTimeUtc(filePath);
+            }
+            catch
+            {
+                return DateTime.MinValue;
+            }
+        }
+
+        private static string DescribeSettings()
+        {
+            return
+                $"AutoPlay={AutoPlay}, AllPerfect={AllPerfect}, BlockSave={BlockSave}, " +
+                $"EnableJudgmentBar={EnableJudgmentBar}(Vertical={JudgmentBarVertical}, Capsule={JudgmentBarCapsule}, Left={JudgmentBarLeft}), " +
+                $"NoteSway={NoteSway}(Amplitude={NoteSwayAmplitude}, Speed={NoteSwaySpeed}, " +
+                $"Damping={NoteSwayDamping}, DampingTime={NoteSwayDampingTime}), " +
+                $"NoteSpeedChaos={NoteSpeedChaos}(Min={NoteSpeedChaosMin}, Max={NoteSpeedChaosMax}, " +
+                $"PerLane={NoteSpeedChaosPerLane})";
+        }
+
         private static readonly string[] DefaultLines =
         {
+            "# 이 파일은 게임을 재시작하지 않아도 반영됩니다. 저장해두면 다음 플레이(리트라이 포함)부터 적용됩니다.",
+            "# 곡이 진행되는 도중에는 값이 바뀌지 않습니다.",
+            "",
             "# 지원 형식: 1/0, true/false, 참/거짓, 켜기/끄기(켜짐/꺼짐), 활성화/비활성화, on/off, enable/disable, enabled/disabled, y/n, yes/no, 트루/폴스",
             "",
             "# 오토 플레이 (1 = 켜짐, 0 = 꺼짐)",
@@ -125,7 +230,11 @@ namespace GRC2.Core
             "NoteSpeedChaosPerLane=1"
         };
 
-        private static void Load(string filePath)
+        /// <summary>
+        /// 설정 파일을 읽어 프로퍼티에 반영합니다. 유효한 "키=값" 항목을 하나도 찾지 못하면
+        /// (파일이 비었거나 저장 도중이라 반쯤 읽힌 경우) 아무것도 대입하지 않고 false를 돌려줍니다.
+        /// </summary>
+        private static bool Load(string filePath)
         {
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             foreach (var line in File.ReadAllLines(filePath))
@@ -140,6 +249,9 @@ namespace GRC2.Core
 
                 values[trimmed.Substring(0, idx).Trim()] = trimmed.Substring(idx + 1).Trim();
             }
+
+            if (values.Count == 0)
+                return false;
 
             AutoPlay = ParseBool(values, "AutoPlay", false);
             AllPerfect = ParseBool(values, "AllPerfect", false);
@@ -157,6 +269,7 @@ namespace GRC2.Core
             NoteSpeedChaosMin = ParseFloat(values, "NoteSpeedChaosMin", 0.6f);
             NoteSpeedChaosMax = ParseFloat(values, "NoteSpeedChaosMax", 1.8f);
             NoteSpeedChaosPerLane = ParseBool(values, "NoteSpeedChaosPerLane", true);
+            return true;
         }
 
         /// <summary>

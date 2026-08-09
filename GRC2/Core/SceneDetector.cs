@@ -15,7 +15,18 @@ namespace GRC2.Core
 {
     public class SceneDetector : MelonMod
     {
+        /// <summary>
+        /// 이 씬만 설정 다시 읽기에서 제외합니다. BlockSave는 효과가 곡이 끝난 뒤(결과 씬의 기록
+        /// 원복/세이브 차단)에 나타나므로, 여기서 값이 바뀌면 방금 끝난 판에 새 값이 적용됩니다.
+        /// 제외해두면 BlockSave가 플레이 진입 시점 값으로 플레이~결과~저장 한 사이클 내내 고정됩니다.
+        /// </summary>
+        private const string ResultSceneName = "RythmGameResultScene";
+
+        /// <summary>설정 파일 수정 감지 폴링 주기(초). 값 반영이 아니라 로그 알림용입니다.</summary>
+        private const float SettingsPollIntervalSeconds = 1f;
+
         private bool _isInitialized = false;
+        private float _nextSettingsPollTime;
         private string _hwaFolderPath;
         private string _lastParsedBmsFile = null; // 마지막으로 파싱한 BMS 파일 경로
         public static List<Parsers.BmsNote> ParsedBmsNotes { get; private set; } = new List<Parsers.BmsNote>();
@@ -48,10 +59,9 @@ namespace GRC2.Core
                     MelonLogger.Msg("[SceneDetector] hwa 폴더 생성 완료");
                 }
 
-                // AutoPlay/판정조작 on-off 설정 (savecustomkey 폴더) 로드
+                // AutoPlay/판정조작 on-off 설정 (savecustomkey 폴더) 로드.
+                // 이후에는 씬이 바뀔 때마다 CustomKeySettings.Reload()로 다시 읽습니다.
                 CustomKeySettings.Initialize(gameFolder);
-                AutoPlayPatch.Initialize();
-                JudgePerfectPatch.Initialize();
 
                 // 앨범 폴더 스캔 (먼저 앨범들을 스캔)
                 MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 시작...");
@@ -107,10 +117,26 @@ namespace GRC2.Core
         {
             if (!_isInitialized) return;
 
+            PollCustomKeySettingsFile();
+
             if (BgmBgaInjector.IsPlayScene())
             {
                 HandlePauseKeyInput();
             }
+        }
+
+        /// <summary>
+        /// 곡 중에 설정 파일을 고쳐도 바로 알 수 있도록 수정 여부만 주기적으로 확인해 로그를 남깁니다.
+        /// 값 반영은 하지 않습니다(다음 플레이 씬 진입 시 Reload에서 처리). 게임 시간이 멈추는
+        /// 일시정지 중에도 확인되도록 unscaledTime을 씁니다.
+        /// </summary>
+        private void PollCustomKeySettingsFile()
+        {
+            if (Time.unscaledTime < _nextSettingsPollTime)
+                return;
+
+            _nextSettingsPollTime = Time.unscaledTime + SettingsPollIntervalSeconds;
+            CustomKeySettings.PollFileChange();
         }
 
         public override void OnGUI()
@@ -422,6 +448,15 @@ namespace GRC2.Core
                 return;
             }
 
+            // 설정 파일을 여기서 다시 읽어 이번 플레이부터 반영합니다. 씬 로드는 곡이 진행 중이
+            // 아닌 게 확실한 경계이고 createAllNote보다 확실히 먼저이므로, AutoPlay/판정조작처럼
+            // 곡 시작 시점에 확정되는 값도 한 판 늦지 않고 제때 적용됩니다. 리트라이도 실제
+            // 씬 전환(gui_requestRetry -> changeNextScene)이라 여기로 들어옵니다.
+            if (sceneName != ResultSceneName)
+            {
+                CustomKeySettings.Reload();
+            }
+
             try
             {
                 if (sceneName == "FairyModeScene")
@@ -450,7 +485,7 @@ namespace GRC2.Core
                         PlaySceneArtworkInjector.StartArtworkInjection();
                     }
                 }
-                else if (sceneName == "RythmGameResultScene")
+                else if (sceneName == ResultSceneName)
                 {
                     MelonLogger.Msg($"[SceneDetector] 결과 씬 감지: {sceneName} - BGM 주입 중지");
                     BgmBgaInjector.StopInjection();
