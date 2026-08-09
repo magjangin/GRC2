@@ -109,8 +109,8 @@ namespace GRC2.Builders
                     subLaneID = EnumValueHelper.GetSubLaneType(bmsNote.Lane),
                     noteTypeID = EnumValueHelper.GetNoteTypeId(bmsNote.Type),
                     noteSize = NoteSize.Scale1,
-                    // 게임 기본값은 NUM이지만, 플릭이 아닌 노트는 CENTER_MIDDLE을 사용합니다.
-                    slideEndFlickDirection = NoteDirectionIndex.CENTER_MIDDLE
+                    // 디컴파일된 NoteCreateData 기본값은 NUM이며, 이 모드에서는 특별한 플릭/슬라이드 노트가 아니라면 그대로 유지합니다.
+                    slideEndFlickDirection = NoteDirectionIndex.NUM
                 };
 
                 var directionIndexValue = NoteFieldInitializer.SetDirectionIndex(noteCreateData, bmsNote);
