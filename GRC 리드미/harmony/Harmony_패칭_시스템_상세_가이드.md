@@ -27,8 +27,10 @@ SceneDetector.OnInitializeMelon()
   -> SceneDetector.InitializeHarmony()
      -> new Harmony("GRC2.MusicInjector")
      -> PatchAll(typeof(SceneDetector).Assembly)
+  -> hwa 폴더 준비, CustomKeySettings.Initialize (savecustomkey/config.txt)
   -> 앨범과 BMS 데이터 로드
   -> NoteArrayHooks.UpdateBmsNotes(...)
+  -> BgmBgaInjector.Initialize(hwa)
 ```
 
 `Assembly-CSharp.dll`은 MelonLoader가 모드를 초기화하기 전에 게임
@@ -44,10 +46,7 @@ SceneDetector.OnInitializeMelon()
 public static class ArtWorkPatch
 {
     [HarmonyPrefix]
-    public static void RequestSetArtworkSpritePrefix(
-        object __instance,
-        ref Sprite useSprite,
-        bool isInstant)
+    public static void RequestSetArtworkSpritePrefix(ref Sprite useSprite)
     {
         // 패치 본문
     }
@@ -77,12 +76,18 @@ private static class BackToPreScreenPatch
 | 그룹 | 소유 파일 | 주요 대상 |
 |------|-----------|-----------|
 | 곡 목록 | `MusicScrollViewHooks.cs` | `cMusicSelectScrollView.initializeMusicDataByDefault` |
-| 곡 선택/시작 창 | `AudioClipPatch.cs`, `GameFlowHooks.cs` | `cMusicSelectSceneUIUpdater`, `cMusicSelectPreMusicStartWindowManager` |
+| 곡 선택/시작 창 | `AudioClipPatch.cs`, `GameFlowHooks.cs` | `cMusicSelectSceneUIUpdater`, `cMusicSelectPreMusicStartWindowManager`, `soRythmGameMusicDataMap.getIsUsableMusicID` |
 | 노트 배열 | `NoteArrayHooks.cs` | `cFairyModeNotesManager.createAllNote` |
 | 커버/텍스트 | `ArtWorkPatch.cs`, `TextPatch.cs` | `cMusicSelectArtWork`, Unity UI/TMP text setter |
 | 결과 화면 | `ResultSceneUpdaterPatch.cs` | `cRythmGameResultSceneUpdater.initializePreFade` |
-| 게임 종료 | `BgmInjectorHooks.cs` | `cRythmGameManager.coMonitorGameEnd` |
+| 게임 종료 | `Injectors/BgmGameEndMonitor.cs` | `cRythmGameManager.coMonitorGameEnd` |
+| BGA 크로스페이드 | `BgaCrossfadePatch.cs` | `cPlayMovieSceneManager.requestPlay` |
+| 오토플레이/판정/기록 차단 | `AutoPlayPatch.cs`, `JudgePerfectPatch.cs`, `RecordBlockPatch.cs` | `cFairyModeNotesManager`, `cNotecWorkBase.onJudgeMent`, `cRythmGameResultSceneUpdater`, `sSaveDataDirector.requestGameDataSaveToFile` |
+| 판정바/연출 | `JudgmentBarPatch.cs`, `NoteSwayPatch.cs`, `NoteSpeedChaosPatch.cs` | `cNotecWorkBase.onJudgeMent`/`simulate`/`getNoteSpeed`, `createAllNote` |
 | Steam/DLC | `SteamApiHijacker.cs` | Steamworks API와 게임 DLC 검사 |
+
+같은 메서드를 여러 클래스가 패치합니다(`createAllNote` 3곳, `onJudgeMent`·`initializePreFade` 각 2곳).
+패치 클래스 사이에 `HarmonyPriority`/`HarmonyBefore`를 두지 않았으므로, 서로 실행 순서에 의존하지 않게 작성해야 합니다.
 
 전체 대상 목록은
 [`maintenance/HOOK_MAP.md`](../maintenance/HOOK_MAP.md)에서 관리합니다.
@@ -110,6 +115,9 @@ private static class BackToPreScreenPatch
 dotnet build GRC2.sln --no-restore --configuration Debug
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --configuration Debug
 ```
+
+`GRC2.sln`에는 테스트 프로젝트가 없으므로 테스트는 반드시 `GRC2.Tests.csproj`를 지정해 실행합니다.
+새 `.cs` 파일은 `GRC2.csproj`에 `<Compile Include>`도 추가해야 합니다(`EnableDefaultCompileItems=false`).
 
 게임 업데이트로 타입이나 메서드가 바뀌면 컴파일 오류 또는 시작 시
 `PatchAll()` 오류로 드러납니다. `SceneDetector.InitializeHarmony()`는 예외

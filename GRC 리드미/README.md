@@ -5,15 +5,19 @@ This folder is the current home for project documentation. Documents are grouped
 ## Start Here
 
 - [Current Hook Map](maintenance/HOOK_MAP.md): current Harmony and MelonLoader hook ownership.
+- [알려진_문제.md](maintenance/알려진_문제.md): issues found in the 2026-09-28 review that are not fixed yet
+  (read section A before reinstalling the game or moving to a new PC).
+- [게임_코드_분석.md](architecture/게임_코드_분석.md): topic index for every current document.
+- [BMS chart rules](bms/BMS_파싱_및_변환_로직_가이드.md): what a chart, BGM, and `info.txt` must look like.
 - [Harmony Layer README](../GRC2/Harmony/README.md): source-folder-level guide for `GRC2/Harmony`.
 - [Legacy README](archive/README_legacy.md): older comprehensive notes kept for reference only.
 
-`HOOK_MAP.md`, the Harmony layer README, and the cleanup baseline below are the
-current source of truth. Topic guides that still mention removed runtime type
-searchers, scene injectors, or reflection helpers describe older
-implementations. In particular `harmony/리플렉션_및_필드_접근_시스템.md` is
-deprecated in full: the mod now uses compile-time typed access to
-`Assembly-CSharp` and retains a single reflection call.
+`HOOK_MAP.md` is the source of truth for hook ownership. As of 2026-09-28 every
+document outside `archive/` was rewritten against the current source and
+`Decompiled/`. The mod uses compile-time typed access to `Assembly-CSharp`;
+private fields go through `AccessTools.FieldRefAccess`, and the only
+reflection-based method lookup is `cRythmGameManager.setPauseButtonPusable`
+(`AccessTools.MethodDelegate` in `SceneDetector`).
 
 ## Folders
 
@@ -50,27 +54,28 @@ BMS parsing, note conversion, and note processing:
 
 ### `harmony`
 
-Harmony, reflection, enum, and game type notes:
+Harmony patching and game enum notes:
 
 - `Harmony_패칭_시스템_상세_가이드.md`
-- `리플렉션_및_필드_접근_시스템.md`
 - `Enum_및_타입_시스템_관리.md`
 
 ### `maintenance`
 
-Current maintenance references, cleanup history, performance, debugging, and timing:
+Current maintenance references, known issues, cleanup history, and timing:
 
 - `HOOK_MAP.md`
+- `알려진_문제.md`
 - `게임_종료_로직.md`
 - `게임_종료_시간_조정_가이드.md`
-- `성능_분석_및_최적화_권장사항.md`
-- `성능_최적화_기법_종합_가이드.md`
-- `최적화_완료_보고서.md`
 - `코루틴_및_비동기_처리_패턴.md`
 
 ### `archive`
 
-Historical or pre-cleanup documents. These may mention removed code such as `HarmonyHookManager`, `BgaVideoHooks`, `GameTypeInspector`, or `NoteArrayJsonDumper`.
+Historical or pre-cleanup documents. These may mention removed code such as `HarmonyHookManager`, `BgaVideoHooks`, `GameTypeInspector`, `ReflectionHelper`, `FieldAccessHelper`, or `NoteArrayJsonDumper`.
+
+Moved here on 2026-09-28 because they only describe the removed reflection layer:
+`리플렉션_및_필드_접근_시스템.md`, `성능_분석_및_최적화_권장사항.md`,
+`성능_최적화_기법_종합_가이드.md`, `최적화_완료_보고서.md`.
 
 Use archive documents only when investigating old decisions.
 
@@ -140,10 +145,20 @@ single reflection call in total.
   `mFairyNoteCreateDataArray`, `mPreviewAudioSorce`, `mArtWorkImage`, etc.).
   `MusicSelectData` is a struct, so the `MemberwiseClone` reflection became a
   plain assignment.
-- The only remaining reflection is `AudioClip.m_Name` in `BgmLoader.cs`, a Unity
-  internal field with no typed alternative.
+- The only remaining reflection at the time was `AudioClip.m_Name` in
+  `BgmLoader.cs`. (Corrected 2026-08-09: that lookup was always null and was
+  replaced with `audioClip.name`; see HOOK_MAP.)
 - `PlaySceneArtworkInjector`'s name-based lookup is intentionally kept: no
   decompiled type owns the play-scene artwork object, and the result is cached
   per scene.
-- Current managed source count is 42 files (~6,600 lines) under `GRC2/`,
+- Managed source count at that point: 42 files (~6,600 lines) under `GRC2/`,
   excluding `bin/obj` (`GRC2.Tests`: 2 files).
+
+As of 2026-09-28 (documentation pass, no source changes):
+
+- Rewrote every non-archive document against the current source and
+  `Decompiled/`, moved four reflection-era documents to `archive/`, and added
+  `maintenance/알려진_문제.md`. Details are in the HOOK_MAP cleanup log.
+- Current managed source count is 43 files under `GRC2/` (including
+  `Properties/AssemblyInfo.cs`), excluding `bin/obj`; `GRC2.Tests` has 3 files
+  and 32 passing tests (`dotnet test GRC2.Tests\GRC2.Tests.csproj`).

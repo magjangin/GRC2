@@ -1,355 +1,88 @@
-﻿# BGM/BGA 관리 시스템
-
-이 문서는 GUNVOLT RECORDS Cychronicle 게임의 BGM/BGA 관리 시스템을 설명합니다.
-
-## `cBGMBeatManager` 클래스
-
-BGM 및 비트 관리를 담당하는 클래스입니다.
-
-### 추정 클래스 구조
-
-```csharp
-namespace IntiCreates
-{
-    public class cBGMBeatManager : MonoBehaviour
-    {
-        // 오디오 소스
-        private AudioSource _sorce;  // 오디오 소스 (오타로 추정, 실제로는 _source일 수도 있음)
-        
-        // BGM 관련 필드
-        private AudioClip currentClip;  // 현재 재생 중인 BGM 클립
-        private float bgmLength;        // BGM 길이 (초)
-        
-        // 메서드
-        public void setClip(AudioClip clip, bool autoPlay)  // BGM 클립 설정
-        public void setClip(string clipPath, bool autoPlay)  // BGM 클립 경로로 설정 (오버로드)
-        public void requestPlayAudio()  // 오디오 재생 요청
-        public void requestLoadBGM()  // BGM 로드 요청
-        public void requestPause()  // 일시정지 요청
-        public AudioClip getAudioClip()  // 현재 AudioClip 반환
-        public int getCurrentSample()  // 현재 재생 샘플 수 반환 (48000Hz 기준)
-        public bool isReadyPlay()  // 재생 준비 여부 확인
-        public void setTime(float time)  // 재생 시간 설정 (시간 제한 적용됨)
-        public void setBPM(float bpm)  // BPM 설정
-        public void setSample(int sample)  // 샘플 수 설정
-    }
-}
-```
-
-### 주요 메서드 동작 추정
-
-**`setClip(AudioClip clip, bool autoPlay)` 메서드:**
-```csharp
-public void setClip(AudioClip clip, bool autoPlay)
-{
-    // 1. 현재 클립 저장
-    currentClip = clip;
-    
-    // 2. AudioSource에 클립 할당
-    _sorce.clip = clip;
-    
-    // 3. BGM 길이 저장
-    if (clip != null)
-    {
-        bgmLength = clip.length;
-    }
-    
-    // 4. 자동 재생 옵션
-    if (autoPlay)
-    {
-        requestPlayAudio();
-    }
-}
-```
-
-**`requestPlayAudio()` 메서드:**
-```csharp
-public void requestPlayAudio()
-{
-    // 1. AudioSource 재생
-    if (_sorce != null && _sorce.clip != null)
-    {
-        _sorce.Play();
-    }
-    
-    // 2. 비트 매칭 시작 (추정)
-    StartBeatMatching();
-}
-```
-
-## VideoPlayer 통합
-
-게임은 Unity의 `VideoPlayer` 컴포넌트를 사용하여 BGA를 재생합니다.
-
-### 추정 구조
-
-```csharp
-// 게임 내 VideoPlayer 사용 방식 (추정)
-public class VideoManager : MonoBehaviour
-{
-    private VideoPlayer videoPlayer;  // Unity VideoPlayer 컴포넌트
-    
-    public void SetVideoURL(string url)
-    {
-        videoPlayer.url = url;
-        videoPlayer.Prepare();
-    }
-    
-    public void PlayVideo()
-    {
-        videoPlayer.Play();
-    }
-}
-```
+# BGM/BGA 관리 시스템
 
-## BGA/BGM 동기화 시스템
+플레이 씬에서 커스텀 BGM(음악)과 BGA(배경 영상)를 넣고 서로 맞추는 방식을 설명합니다.
+곡 선택 화면의 프리뷰 BGM은 [커스텀_에셋_로딩_시스템.md](커스텀_에셋_로딩_시스템.md)를 봅니다.
+게임 쪽 설명은 `Decompiled/`의 원본 코드로 확인한 내용입니다. (2026-09-28 기준)
 
-모드는 `BgaBgmSyncManager`를 통해 BGA와 BGM을 자동으로 동기화합니다.
+## 게임 원본: `cBGMBeatManager`
 
-### 동기화 동작 원리
+플레이 BGM을 재생하는 컴포넌트입니다(`[RequireComponent(typeof(AudioSource))]`). 모드가 쓰는 메서드:
 
-**1. 동기화 시작 (`BgaBgmSyncManager.StartSync()`)**
-- BGA 재생 시작 시 `BgaInjector`에서 호출
-- BGM 오디오 소스 찾기 (`GetCurrentAudioSource()`)
-  - 우선순위: `cBGMBeatManager`에서 AudioSource 찾기
-  - 실패 시: 모든 AudioSource 검색하여 최적의 소스 선택 (이름, 재생 상태, 클립 존재 여부로 점수화)
-- 즉시 동기화 수행 (`SyncBgaToBgm()`)
-- 지속적인 동기화 모니터링 코루틴 시작 (`SyncCoroutine()`)
+| 메서드 | 원본 동작 |
+|--------|-----------|
+| `setClip(AudioClip clip, bool isNeedLoad)` | `AudioSource.clip = clip`, `isNeedLoad`면 `LoadAudioData()` |
+| `getAudioClip()` / `getAudioSorce()` | 현재 clip / `AudioSource` |
+| `requestPlayAudio()` | `AudioSource.Play()` (처음부터 재생) |
+| `getAudioSorceCurrentTime()` | `AudioSource.time` |
+| `getCurrentSample()` | `AudioSource.timeSamples` |
 
-**2. 즉시 동기화 (`SyncBgaToBgm()`)**
-- BGM 시간 가져오기:
-  - `AudioSource.time` (재생 중인 경우)
-  - `cBGMBeatManager.getCurrentSample()` → 샘플을 초로 변환 (48000Hz 기준)
-  - `cBGMBeatManager.getAudioSorceCurrentTime()` (대체 방법)
-- 모든 VideoPlayer를 BGM 시간에 맞춰 동기화:
-  - `videoPlayer.time = bgmTime % videoPlayer.length` (비디오 길이로 모듈로 연산하여 루프 처리)
-
-**3. 지속적인 동기화 모니터링 (`SyncCoroutine()`)**
-- 0.1초마다 동기화 상태 확인
-- BGM 재생 시작 감지 및 즉시 동기화
-- BGA와 BGM 시간 차이 확인:
-  - 0.1초 이상 차이 발생 시 재동기화
-  - 마지막 동기화로부터 1초 이상 경과한 경우에만 재동기화 (과도한 동기화 방지)
-- 여러 VideoPlayer 지원 (모든 활성화된 VideoPlayer 동기화)
-
-**4. 동기화 중지 (`StopSync()`)**
-- 코루틴 중지
-- 상태 리셋 (오디오 소스, VideoPlayer 배열 초기화)
-
-### 동기화 알고리즘
-
-```csharp
-// BGA 시간 = BGM 시간 % 비디오 길이 (루프 처리)
-float syncTime = (float)(bgmTime % videoPlayer.length);
-videoPlayer.time = syncTime;
-
-// 시간 차이 확인 (0.1초 이상 차이 시 재동기화)
-float expectedVideoTime = (float)(bgmTime % videoPlayer.length);
-float timeDiff = Mathf.Abs((float)(videoPlayer.time - expectedVideoTime));
-if (timeDiff > 0.1f && Mathf.Abs(bgmTime - lastSyncTime) > 1f)
-{
-    SyncBgaToBgm(); // 재동기화
-}
-```
-
-### BGM 시간 가져오기 방법
-
-1. **AudioSource.time** (우선순위 1)
-   - 재생 중인 경우 직접 시간 가져오기
-
-2. **cBGMBeatManager.getCurrentSample()** (우선순위 2)
-   - 샘플 단위로 시간 반환
-   - 변환: `time = sample / 48000f`
-
-3. **cBGMBeatManager.getAudioSorceCurrentTime()** (우선순위 3)
-   - 직접 초 단위로 시간 반환
-
-### 동기화 성능 최적화
-
-- **과도한 동기화 방지**: 마지막 동기화로부터 1초 이상 경과한 경우에만 재동기화
-- **여러 VideoPlayer 지원**: 모든 활성화된 VideoPlayer를 한 번에 동기화
-- **오디오 소스 캐싱**: 한 번 찾은 오디오 소스는 재사용
-- **조건부 동기화**: 재생 중이고 준비된 VideoPlayer만 동기화
-
-## `cMoviePlayerMoviePlaySceneManagerObject` 클래스
-
-BGA 제어를 담당하는 클래스입니다. (Timeline 조정은 제거됨 - 4개 필드 조정만으로 충분)
-
-## `cMusicSelectSceneUIUpdater` 클래스 (곡 선택 화면)
-
-곡 선택 화면의 UI 업데이트 및 프리뷰 BGM 관리를 담당하는 클래스입니다.
-
-### 주요 필드
-
-- **`mCurrentUsingPreviewBGMClip`** (AudioClip): 현재 사용 중인 프리뷰 BGM 클립
-- **`mPreviewAudioSorce`** (AudioSource): 프리뷰 오디오를 재생하는 AudioSource (오타: "Sorce" → "Source")
-- **`mCurrentPreviewMusicID`** (MusicID): 현재 프리뷰로 재생 중인 곡의 ID
-- **`mCurentMusicId`** (MusicID): 현재 선택된 곡의 ID
-
-### 주요 메서드
-
-1. **`noticeChangedMusic(MusicID nextMusicID)`**
-   - 곡 선택 변경 알림 메서드
-   - **핵심 메서드**: 실제 프리뷰 BGM이 변경되는 시점
-   - 커스텀 차트 선택 시 이 메서드에서 BGM 주입 성공
-
-2. **`coChangePreviewBGM(MusicID loadMusicID, MusicID preMusicID)`** (IEnumerator)
-   - 프리뷰 BGM 변경 코루틴
-   - 비동기로 프리뷰 BGM을 교체
-
-3. **`getPreviewAudioClipAddressablePath(MusicData musicData)`** (String)
-   - 선택된 곡의 프리뷰 오디오 클립의 Addressable 경로 반환
-   - 일반 곡일 때 빈 경로 반환하여 프리뷰 BGM 로드 차단 가능
-
-4. **`requestFadeCurrentPlayingPreviewMusic(Boolean isFadeIn, Single fadeTime)`**
-   - 현재 재생 중인 프리뷰 BGM 페이드 인/아웃 요청
-
-### 프리뷰 BGM 주입 메커니즘
-
-**구현 클래스:**
-- `AudioClipPatch`: `noticeChangedMusic` 후킹 담당
-- `CustomBgmPlayer`: 커스텀 BGM 재생 관리
-- `PreviewAudioManager`: 원본 프리뷰/환경음 제어
-
-**커스텀 차트 선택 시:**
-1. `noticeChangedMusic` 호출 → `AudioClipPatch.NoticeChangedMusicPostfix()` 실행
-2. `AlbumManager.SelectAlbumByMusicID() (구현: AlbumManager.Mappings.cs)`로 앨범 선택
-3. `CustomBgmPlayer.InjectCustomBgm()` 호출:
-   - 새로운 GameObject 생성 (`CustomPreviewBGM`)
-   - AudioSource 컴포넌트 추가 및 설정 (루프 재생, 최우선 재생)
-   - `UnityWebRequestMultimedia.GetAudioClip()`으로 커스텀 BGM 로드
-   - AudioSource에 클립 설정 및 재생 시작
-4. `PreviewAudioManager.StopPreviewAndAmbient()`로 원본 프리뷰/환경음 중지
-5. `CustomAssetManager.SetCustomChartSelected(true)`로 상태 설정
-
-**일반 곡 선택 시:**
-1. `noticeChangedMusic` 호출 → `AudioClipPatch.NoticeChangedMusicPostfix()` 실행
-   - 현재는 호출 감지만 수행 (로깅만)
-2. `coOpen` 호출 → `GameFlowHooks.CoOpenPrefix() (구현: GameFlowHooks.Navigation.cs)` 실행
-3. `CustomBgmPlayer.CleanupAndRestore()` 호출:
-   - 커스텀 BGM AudioSource 정리 및 GameObject 제거
-   - `PreviewAudioManager.RestoreMutedAudioSources()`로 원본 프리뷰 복원
-     - **개선**: `cSoundManager`에서 직접 `mPreviewAudioSorce`와 `mAmbientAudioSorce`를 찾아서 복원
-     - **개선**: 중복 복원 방지 (딕셔너리와 cSoundManager의 AudioSource 중복 처리)
-4. `CustomAssetManager.SetCustomChartSelected(false)`로 상태 설정
-   - **중요**: BMS/BGA/BGM 노트 주입은 `CustomAssetManager.ShouldInjectCustomContent()`로 제어 (커스텀 선택 + 주입 금지 씬(SoundPlayerScene, MoviePlayer_MovieSelect) 아님)
-
-### CustomBgmPlayer 특징
-
-- **독립적인 AudioSource**: 게임의 원본 프리뷰 시스템과 분리
-- **DontDestroyOnLoad**: 씬 전환 시에도 유지 (플레이 씬 진입 시 수동 정리)
-- **루프 재생**: 무한 반복 재생
-- **자동 정리**: 플레이 씬 진입 시 `SceneDetector`에서 자동으로 정리
-
-## `cMusicSelectSceneSelectingMusicUI` 클래스 (곡 선택 UI)
-
-곡 선택 UI를 관리하는 클래스입니다. 곡 선택 창을 열고 닫는 기능을 담당합니다.
-
-### 주요 필드
-
-- **`mCurrentDispData`**: 현재 표시 중인 데이터
-  - **`mMusicSelectData`**: 곡 선택 데이터
-    - **`musicID`** (MusicID): 현재 선택된 곡의 MusicID
-    - 기타 곡 정보 필드들
-
-### 주요 메서드
-
-1. **`coOpen()`** (IEnumerator)
-   - 곡 선택 창 열기 코루틴
-   - **핵심 메서드**: 커스텀 차트 감지 및 아트워크/BGM 로드에 사용
-   - `mCurrentDispData.mMusicSelectData.musicID`를 통해 현재 선택된 곡의 MusicID 확인
-   - 커스텀 차트인 경우 자동으로 아트워크와 BGM 로드
-   - **후킹**: `GameFlowHooks.CoOpenPrefix() (구현: GameFlowHooks.Navigation.cs)`에서 후킹하여 커스텀 차트 감지 및 에셋 로드
-
-2. **`coClose()`** (IEnumerator)
-   - 곡 선택 창 닫기 코루틴
-   - **후킹**: `GameFlowHooks.CoClosePrefix() (구현: GameFlowHooks.Navigation.cs)`에서 후킹하여 닫기 동작 모니터링
-
-### coOpen 후킹 메커니즘
-
-**구현 클래스:**
-- `GameFlowHooks`: `coOpen` 후킹 담당
-- `PatchApplier`: `cMusicSelectSceneSelectingMusicUI` 타입 패치 적용
-
-**커스텀 차트 선택 시 (coOpen 후킹):**
-1. `coOpen` 호출 → `GameFlowHooks.CoOpenPrefix() (구현: GameFlowHooks.Navigation.cs)` 실행
-2. `mCurrentDispData.mMusicSelectData.musicID` 및 `songTitle`을 통해 현재 선택된 곡 확인
-3. **곡 제목 기반 판단 로직**:
-   - 곡 제목이 원본 제목 목록(`GetAllOriginalTitles()`)에 있으면 → 일반 곡 (커스텀 차트 아님)
-   - 곡 제목이 커스텀 차트 앨범 제목이면 → 커스텀 차트
-   - 둘 다 아니면 MusicID로 확인 (`AlbumManager.IsCustomChartMusicID() (구현: AlbumManager.Mappings.cs)`)
-4. **커스텀 차트인 경우**:
-   - `AlbumManager.SelectAlbumByMusicID() (구현: AlbumManager.Mappings.cs)`로 앨범 선택
-   - `CustomBgmPlayer.InjectCustomBgm()`로 커스텀 프리뷰 BGM 주입
-   - `PreviewAudioManager.StopPreviewAndAmbient()`로 원본 프리뷰/환경음 중지
-   - `CustomAssetManager.LoadCustomArtwork()`로 커스텀 아트워크 로드
-   - `ArtworkUpdater.UpdateArtwork()`로 아트워크 업데이트
-   - 곡 이름과 MusicID 로깅
-5. **일반 곡인 경우**:
-   - `CustomAssetManager.SetCustomChartSelected(false)`로 커스텀 차트 선택 해제
-   - `CustomBgmPlayer.CleanupAndRestore()`로 원본 아트워크/BGM 복원
-   - 원본 프리뷰/환경음 복원
-
-**noticeChangedMusic과 coOpen의 차이:**
-- **`noticeChangedMusic`**: 곡 선택 변경 시 호출되는 메서드 (프리뷰 BGM 변경 시점)
-- **`coOpen`**: 곡 선택 창을 열 때 호출되는 코루틴 (UI 표시 시점)
-- 두 메서드 모두 커스텀 차트 감지 및 에셋 로드를 수행하므로, 어느 쪽이 먼저 호출되더라도 정상 작동
-
-## 커스텀 아트워크 주입 시스템
-
-모드는 곡 선택 화면과 플레이 씬에서 커스텀 아트워크를 자동으로 주입합니다.
-
-### `CustomAssetManager` 클래스
-
-커스텀 아트워크와 BGM을 관리하는 중앙 관리 클래스입니다.
-
-**주요 메서드:**
-- `LoadCustomArtwork(string imagePath)`: 커스텀 아트워크 로드
-  - **리사이즈/리샘플 없음**: 원본 해상도 그대로 `Texture2D`/`Sprite` 생성
-  - UI 스케일은 게임의 `CanvasScaler(ScaleWithScreenSize)` 설정에 의해 처리됨
-  - 이미지 경로 캐싱을 통한 성능 최적화
-- `LoadCustomPreviewBGM(string audioPath)`: 커스텀 프리뷰 BGM 로드
-- `IsCustomChart(object musicID, object musicData)`: MusicID나 MusicData로 커스텀 차트인지 확인
-- `GetCustomArtwork()`: 로드된 커스텀 아트워크 스프라이트 반환
-- `IsImageLoaded(string imagePath)`: 특정 경로의 이미지가 이미 로드되어 있는지 확인
-
-### `PlaySceneArtworkInjector` 클래스
-
-플레이 씬에서 커스텀 아트워크를 주입하는 클래스입니다.
-
-**주요 기능:**
-- `StartArtworkInjection()`: 아트워크 주입 코루틴 시작 (중복 방지)
-- `TryInjectArtworkImmediately()`: 아트워크 즉시 적용 시도 (성능 최적화)
-- Image 캐싱을 통한 성능 최적화
-- GameObject.Find, Transform.Find, FindObjectsOfType 순서로 Image 검색
-
-### `SceneHandler` 클래스
-
-씬별 처리 로직을 담당하는 클래스입니다.
-
-**주요 기능:**
-- `HandleFairyModeScene()`: FairyModeScene 처리
-- `HandlePlayMovieScene()`: PlayMovieScene 처리
-- `StopPreviewBGMOnPlayScene()`: 플레이 씬 진입 시 프리뷰 BGM 중지
-
-### 아트워크 주입 흐름
-
-1. **곡 선택 화면**: `ArtWorkPatch`를 통해 커스텀 아트워크 교체
-2. **플레이 씬**: `PlaySceneArtworkInjector`를 통해 커스텀 아트워크 주입
-   - 즉시 적용 시도 (성능 최적화)
-   - 실패 시 코루틴으로 재시도
+**노트 시계는 BGM 자체입니다.** `cFairyModeNotesManager.getCurrentJudgeSample()`은
+`getCurrentSample()` + `mNoteMusicData.offset` + 옵션 판정 보정값이고, 노트의 `perfectSample`과 이 값을 비교합니다.
+그래서:
+
+- 모드가 BGM을 바꾸고 처음부터 다시 틀어도 노트는 새 BGM을 따라갑니다.
+- `timeSamples`는 **BGM 파일의 샘플레이트** 단위이고, 모드는 `perfectSample`을 48000Hz로 계산합니다.
+  **BGM은 반드시 48kHz로 저장해야** 노트가 밀리지 않습니다([알려진_문제.md](../maintenance/알려진_문제.md) B1).
+
+## 주입 루프: `BgmBgaInjector`
+
+[BgmBgaInjector.cs](../../GRC2/Injectors/BgmBgaInjector.cs). `SceneDetector`가 씬마다 시작/정지합니다.
+
+| 씬 | 호출 |
+|----|------|
+| `FairyModeScene`, `PlayMovieScene`, `RenderCutinScene` | `StartInjection(isPlayScene: true)` |
+| `RythmGameResultScene`, `MusicSelectScene*`, `SoundPlayerScene`, `MoviePlayer_MovieSelect` | `StopInjection()` + `ResetPlaySceneState()` |
+| 그 밖의 씬 | 플레이 씬 상태가 아니면 `StartInjection(isPlayScene: false)` |
+
+코루틴은 **2초마다**:
+
+1. `ShouldInjectCustomContent()`가 false면 건너뜁니다.
+2. 현재 앨범의 BGA/BGM 경로로 갱신합니다(앨범에 파일이 없으면 이전 경로 유지 → 알려진 문제 C1).
+3. 플레이 씬이면 BGA 주입 → BGM 주입을 시도합니다.
+4. 둘 다 끝나면 멈춥니다. BGA가 없는 앨범이면 루프가 씬이 끝날 때까지 계속 돕니다(가벼운 확인만 함).
+
+실제 로그(2026-08-03)에서는 `FairyModeScene` 로드 후 약 3초 뒤 BGA·BGM이 주입되고, 그 2초 뒤 종료 시간이 적용됐습니다.
+
+## BGM 주입: `BgmInjector` → `BgmLoader`
+
+1. `cBGMBeatManager`를 찾습니다(`FindObjectOfType`, 없으면 모든 `AudioSource`에서 역으로). 곡당 최대 10번 시도합니다.
+2. `UnityWebRequestMultimedia.GetAudioClip("file://…", 확장자별 AudioType)`로 **전체를 메모리에** 읽습니다(스트리밍 아님).
+   타임아웃은 기본 600프레임 + 10MB당 60프레임, 최대 3600프레임입니다(60fps 기준 10~60초).
+   50MB 이상이면 경고, 200MB 이상이면 오류 로그를 남깁니다.
+3. `setClip(clip, false)` → `requestPlayAudio()`로 교체·재생합니다.
+4. `BgmFinishTimeManager.SetFinishTime(clip.length)`로 곡 종료 시간을 정합니다([게임_종료_시간_조정_가이드.md](../maintenance/게임_종료_시간_조정_가이드.md)).
+
+## BGA 주입: `BgaInjector`
+
+1. 활성화된 모든 `VideoPlayer`를 찾습니다(없으면 조용히 종료 → 다음 루프에서 재시도).
+2. 모두에 `source = Url`, `url = "file://…"`, `isLooping = true`를 넣고 `Prepare()`합니다.
+3. 준비될 때까지 기다립니다(기본 300프레임 + 100MB당 60프레임, 최대 3600프레임). 일부만 준비돼도 준비된 것부터 재생합니다.
+4. 0.5초 뒤 실제로 재생 중이면 주입 완료로 보고:
+   - `BgaCrossfadePatch.TryStopSwapCoroutine()`: 원본의 BGA 자동 교체 코루틴(`coUpdateMovieInARow`)을 멈춥니다.
+     멈추지 않으면 곡 끝 약 0.67초 전에 원본 영상으로 돌아갑니다.
+   - `BgaBgmSyncManager.StartSync()`: BGM과 동기화를 시작합니다.
+
+## BGA-BGM 동기화: `BgaBgmSyncManager`
+
+[BgaBgmSyncManager.cs](../../GRC2/Injectors/BgaBgmSyncManager.cs)
+
+- BGM 소스: `cBGMBeatManager.getAudioSorce()` 우선, 없으면 이름/재생 상태로 점수를 매겨 가장 그럴듯한 `AudioSource`.
+- BGM 시간: `AudioSource.time`, 0이면 `getAudioSorceCurrentTime()`.
+- 맞추는 식: `videoPlayer.time = bgmTime % videoPlayer.length` (영상이 짧으면 반복).
+- 0.1초마다 확인합니다. BGM이 막 재생되기 시작하면 즉시 맞추고, 이후에는 차이가 0.1초를 넘고 마지막 동기화로부터
+  BGM 시간이 1초 이상 지났을 때만 다시 맞춥니다(탐색으로 인한 끊김 최소화).
+- 모드는 일시정지를 따로 처리하지 않습니다. 재개 후 차이가 생기면 다음 확인에서 맞춰집니다.
+- 로그 태그는 예전 이름(`[BGAPlayerHook]`, `[BGABGMSyncHook]`)을 그대로 씁니다.
+
+## 파일 준비 요령
+
+- BGM: 48kHz ogg 권장. mp3/wav도 되지만 wav는 크고, 앨범의 키음 wav와 섞여 잘못 선택될 수 있습니다(ogg가 있으면 ogg 우선).
+- BGA: mp4. BGM과 길이가 달라도 됩니다(짧으면 반복).
+- 폴더에 BGA/BGM이 없으면 이전 곡의 것이 남을 수 있으니, 곡마다 넣어 두는 것이 안전합니다(알려진 문제 C1).
 
 ## 관련 문서
 
-- [게임 아키텍처 개요](../architecture/게임_아키텍처_개요.md): 게임 아키텍처 개요
-- [게임 클래스 구조](../architecture/게임_클래스_구조.md): 핵심 클래스 및 데이터 구조 상세 설명
-- [게임 플로우 및 메서드](../architecture/게임_플로우_및_메서드.md): 게임 플로우 및 메서드 동작 상세 설명
-- [게임 종료 로직](../maintenance/게임_종료_로직.md): 게임 종료 로직 및 모드 상호작용 상세 설명
-
----
-
-**참고**: 이 문서의 내용은 추정이며, 실제 게임 코드와 다를 수 있습니다. 정확한 정보는 게임 개발사(INTI CREATES)의 공식 문서를 참조하거나, 디컴파일러를 사용하여 직접 확인해야 합니다.
-
-
-
-
+- [커스텀_에셋_로딩_시스템.md](커스텀_에셋_로딩_시스템.md)
+- [게임_종료_시간_조정_가이드.md](../maintenance/게임_종료_시간_조정_가이드.md)
+- [코루틴_및_비동기_처리_패턴.md](../maintenance/코루틴_및_비동기_처리_패턴.md)
+- [HOOK_MAP.md](../maintenance/HOOK_MAP.md)

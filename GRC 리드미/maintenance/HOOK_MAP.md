@@ -41,6 +41,30 @@ Removal risk: reverting to an exact `"MusicSelectScene"` match reintroduces the 
 `_isPlayScene` state and the title/artwork bleed-through described above whenever
 Music Select is reached by any path other than the result scene.
 
+### `SceneDetector.OnUpdate`
+
+File: `GRC2/Core/SceneDetector.cs`
+
+Runs every frame after initialization. It:
+
+- calls `CustomKeySettings.PollFileChange()` once a second (log only, see the
+  config reload section below);
+- in play scenes (`BgmBgaInjector.IsPlayScene()`), handles **Space/Esc** as a pause
+  toggle: if the pause menu is open and active it calls
+  `cRythmGamePauseMenuHud.requestPushContinueButton()`, otherwise it forces the
+  private `cRythmGameManager.setPauseButtonPusable(true)` and calls the public
+  `requestPause()`. `setPauseButtonPusable` is bound once through
+  `AccessTools.MethodDelegate`, which is the mod's only reflection-based method
+  lookup; `mPauseMenuWork` is read through `FieldRefAccess`.
+
+Removal risk: keyboard pause/resume in play scenes stops working.
+
+### `SceneDetector.OnGUI`
+
+File: `GRC2/Core/SceneDetector.cs` → `GRC2/Core/GameHud.cs`
+
+Draws the judgment bar with IMGUI in play scenes only (see the GameHud section below).
+
 ## Required Hook Groups
 
 ### Music select list injection
@@ -190,16 +214,23 @@ Owner files:
 
 - `GRC2/Harmony/ArtWorkPatch.cs`
 - `GRC2/Harmony/TextPatch.cs`
+- `GRC2/Harmony/AudioClipPatch.cs` (`ArtworkUpdater`, not a patch: applies an
+  asynchronously loaded sprite through `mArtWorkAndMusicDetail.mArtWork`)
+- `GRC2/Core/PlaySceneArtworkInjector.cs` (not a patch: name-based `ArtWork`
+  image lookup in play scenes, started from `SceneDetector`)
 
 Patched game targets:
 
-- `IntiCreates.cMusicSelectArtWork.requestSetArtworkSprite`
-- `UnityEngine.UI.Text.set_text`
-- `TMPro.TMP_Text.set_text`
+- `IntiCreates.cMusicSelectArtWork.requestSetArtworkSprite` (prefix)
+- `UnityEngine.UI.Text.set_text` (prefix)
+- `TMPro.TMP_Text.set_text` (prefix)
 
 Purpose:
 
 - display custom title and artwork instead of the original song assets.
+  `TextPatch` only rewrites text in play/loading/result scenes while its switch
+  is on, and replaces the *whole* string when it contains the borrowed template
+  title.
 
 Removal risk:
 
@@ -308,6 +339,14 @@ Purpose:
   depend on Harmony prefix ordering relative to
   `ResultSceneUpdaterPatch.InitializePreFadePrefix` (which rewrites that same
   field for the borrowed-template-song fix documented above).
+
+Scope of the save block (checked against `Decompiled/`, 2026-09-28):
+`requestGameDataSaveToFile` is the game's only save entry point, and
+`SavableGameData` also holds `optionData`. With `BlockSave=1` the options menu,
+main menu, gallery, sound player, and tutorial-flag saves are dropped too, and
+the boot scene's first-save loop (`cBootSceneManageObject.coSaveInitializeGameData`,
+run when the save file is missing or broken) waits for `SaveDataSaveState.Saved`
+forever. See [알려진_문제.md](알려진_문제.md) A1/A2.
 
 Removal risk:
 
@@ -439,9 +478,9 @@ Planned (not implemented yet):
   `judgeType` from `onJudgeMent`'s Postfix);
 - **per-box customization** of the 3 rectangular touch hit-zones per side
   (`cFairyJudgeCircleTouchAreas.mTouchRect`, `NoteSubLaneType.Lane_1/2/3`) —
-  see [터치_판정_영역_시스템_분석.md](../systems/터치_판정_영역_시스템_분석.md)
-  for the confirmed structure and open question (`cEditorVisualRect`'s actual
-  fields still need to be checked before implementation).
+  see [터치_판정_영역_시스템_분석.md](../systems/터치_판정_영역_시스템_분석.md).
+  `cEditorVisualRect.Rect` is recomputed from its `RectTransform` on every read,
+  so a future patch has to move/resize the `RectTransform`, not `mRect`.
 
 ### Steam and DLC bypass
 
@@ -460,6 +499,20 @@ Patched targets:
 Purpose:
 
 - preserve the existing Steam fallback and local `DataAddon` mount behavior.
+- `cDlcDirector.Initialize` postfix registers every numeric folder under
+  `DataAddon/` (relative to the working directory, like the game itself) in
+  `cDlcDirector.DlcList` with its full path pre-filled, so the game's
+  `coMount` treats it as already mounted and `coCheckDLC` loads its
+  `catalog.json`.
+
+Current environment (2026-09-28): the game folder's `steam_api64.dll` is a
+Goldberg emulator build, so `SteamAPI.Init` succeeds and the `InitPostfix`
+fallback has never run (no `SteamAPI.Init returned false` in any log). If it
+ever runs, forcing `Init` to `true` makes `cDlcDirector.Initialize` call
+`SteamApps.GetDLCCount()` on an uninitialized API, which throws; the postfix
+above is then skipped and `sAddressableDirector` waits for
+`cDlcDirector.IsInitialize()` forever. The unpatched game tolerates a failed
+`Init` on its own. See [알려진_문제.md](알려진_문제.md) A3–A6.
 
 Removal risk:
 
@@ -489,8 +542,13 @@ Removal risk:
 
 ## Review Candidates
 
-No active review candidates are listed here yet. Add candidates only when the
-specific file, risk, and removal condition are known.
+Known, not-yet-fixed issues found in the 2026-09-28 review (with the owning file,
+evidence, and trigger conditions) are tracked in
+[알려진_문제.md](알려진_문제.md). The highest-risk ones for this map are:
+
+- `RecordBlockPatch.RequestSavePatch` blocks the boot scene's first save (A1);
+- `SteamApiHijacker.InitPostfix` would hang boot if Goldberg were missing (A3);
+- `BgmBgaInjector` keeps the previous album's BGA/BGM path (C1).
 
 ## Removed Diagnostic Code
 
@@ -518,8 +576,26 @@ of the current source baseline:
 - `BgmInjectorHooks` (removed 2026-08-09; folded into `BgmGameEndMonitor`)
 - `BgmLoader.TrySetClipName` (removed 2026-08-09; `AudioClip` has no `m_Name`
   field, so the reflection lookup was always null)
+- `Helpers/SteamManifestLocker` (removed 2026-06-06 in `a1bff38`; it marked
+  `appmanifest_2585040.acf` read-only on startup to stop Steam updates. Nothing
+  replaces it, so the manifest is currently writable)
 
 ## Cleanup Log
+
+### 2026-09-28
+
+Documentation-only pass; no source changes.
+
+- Rewrote the `systems/`, `bms/`, `architecture/`, and most `maintenance/`
+  documents against the current source and `Decompiled/`; they previously
+  described the removed reflection layer (`FieldAccessHelper`,
+  `NoteConstructorHelper`, `GameTypeLoader`, `SceneHandler`, `CoOpenPrefix`,
+  `PatchApplier`, …).
+- Moved four historical documents to `archive/`: the reflection guide and the
+  three performance reports.
+- Added `OnUpdate`/`OnGUI` entry points, the save-block scope, the Steam/DLC
+  environment note, and `SteamManifestLocker` to the removed list here.
+- Added [알려진_문제.md](알려진_문제.md) with the issues found in the review.
 
 ### 2026-08-09
 

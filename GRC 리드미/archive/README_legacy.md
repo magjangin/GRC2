@@ -883,7 +883,7 @@ build_debug.bat  # Debug 빌드
 
 ### 코드 구조 및 기술 문서 (신규 추가)
 - **[Harmony 패칭 시스템 상세 가이드](../harmony/Harmony_패칭_시스템_상세_가이드.md)**: Harmony 동적 패칭 메커니즘, Prefix/Postfix 패턴, 메서드 탐색 및 필터링 기법
-- **[리플렉션 및 필드 접근 시스템](../harmony/리플렉션_및_필드_접근_시스템.md)**: ReflectionHelper, FieldAccessHelper 상세 분석, 캐싱 전략 및 성능 최적화
+- **[리플렉션 및 필드 접근 시스템](리플렉션_및_필드_접근_시스템.md)**: ReflectionHelper, FieldAccessHelper 상세 분석, 캐싱 전략 및 성능 최적화
 - **[노트 생성 및 변환 파이프라인](../bms/노트_생성_및_변환_파이프라인.md)**: BmsNoteConverter, NoteCreateDataBuilder, 생성자 탐색 및 필드 초기화 전체 프로세스
 - **[BMS 파서 내부 구조 분석](../bms/BMS_파서_내부_구조_분석.md)**: BmsParser, BmsNoteDataParser, BmsTimeCalculator 파싱 알고리즘 및 데이터 모델
 - **[에러 처리 및 디버깅 시스템](에러_처리_및_디버깅_시스템_legacy.md)**: ErrorLogger, NoteArrayJsonDumper, 디버깅 도구 및 로깅 패턴
@@ -891,7 +891,7 @@ build_debug.bat  # Debug 빌드
 - **[커스텀 에셋 로딩 시스템](../systems/커스텀_에셋_로딩_시스템.md)**: CustomAssetManager, AssetLoader, 이미지/오디오 로딩 및 캐싱 메커니즘
 - **[Enum 및 타입 시스템 관리](../harmony/Enum_및_타입_시스템_관리.md)**: EnumValueHelper, GameTypeLoader, 타입 캐싱 및 변환 로직
 - **[코루틴 및 비동기 처리 패턴](../maintenance/코루틴_및_비동기_처리_패턴.md)**: Unity 코루틴 활용, BGA/BGM 동기화, 타임아웃 및 재시도 메커니즘
-- **[성능 최적화 기법 종합 가이드](../maintenance/성능_최적화_기법_종합_가이드.md)**: Dictionary 캐싱, 리플렉션 최적화, 메모리 관리 베스트 프랙티스
+- **[성능 최적화 기법 종합 가이드](성능_최적화_기법_종합_가이드.md)**: Dictionary 캐싱, 리플렉션 최적화, 메모리 관리 베스트 프랙티스
 
 ### 모드 시스템 분석 문서
 - **[아티스트 ID 기반 시스템 분석](../systems/아티스트_ID_기반_시스템_분석.md)**: 아티스트 ID별 첫 곡 정보 수집, MusicID 변경, 텍스트 교체 시스템 상세 분석
