@@ -1,5 +1,8 @@
 # 에러 처리 및 디버깅 시스템
 
+> **[보관 — 2026-09-29]** 진단용 코드(`GameTypeInspector`, `NoteArrayJsonDumper` 등)가 있던 시절의 문서입니다. 현재 남은 것은
+> `Helpers/ErrorLogger.cs`(`LogException`/`LogWarning`) 정도이며, 로그 확인 방법은 각 시스템 문서의 "로그로 확인하기"를 보세요.
+
 ## 개요
 
 프로젝트 전반의 에러 처리 패턴과 디버깅 도구를 분석합니다.

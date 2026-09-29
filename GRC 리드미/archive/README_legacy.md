@@ -1,5 +1,9 @@
 ﻿# GUNVOLT RECORDS Cychronicle - BMS 커스텀 차트 모드
 
+> **[보관 — 2026-09-29]** 리플렉션 계층, `Registration/`, `Hooks/`·`Handlers/` 폴더 등 지금은 없는 구조를 전제로 쓴
+> 예전 종합 문서입니다. 현재 기준은 [문서 인덱스](../README.md), [HOOK_MAP.md](../maintenance/HOOK_MAP.md),
+> [알려진_문제.md](../maintenance/알려진_문제.md)입니다. 옛 결정을 조사할 때만 참고하세요.
+
 GUNVOLT RECORDS Cychronicle 게임을 위한 MelonLoader 기반 커스텀 모드입니다. BMS 파일을 파싱하여 커스텀 차트를 주입하고, BGA/BGM을 교체하는 기능을 제공합니다.
 
 ## 테스트/확인 환경

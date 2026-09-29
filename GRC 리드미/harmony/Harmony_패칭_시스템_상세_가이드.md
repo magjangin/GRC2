@@ -122,3 +122,8 @@ dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --configuration Debug
 게임 업데이트로 타입이나 메서드가 바뀌면 컴파일 오류 또는 시작 시
 `PatchAll()` 오류로 드러납니다. `SceneDetector.InitializeHarmony()`는 예외
 메시지와 스택 트레이스를 MelonLoader 로그에 남깁니다.
+
+주의: `PatchAll()`은 패치 클래스를 순서대로 처리하다 실패하면 거기서 멈추고, 이 모드는 실패해도 `Msg` 수준 로그만
+남기고 초기화를 계속합니다. 게임 업데이트로 대상 하나가 사라지면 그 뒤 클래스의 패치가 빠진 채 모드가 반쯤만 동작할 수
+있습니다. 게임 업데이트 뒤에는 로그에서 `Harmony 패치 적용 실패`가 있는지 가장 먼저 확인하세요
+([알려진_문제.md](../maintenance/알려진_문제.md) H4).

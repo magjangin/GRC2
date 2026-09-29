@@ -199,7 +199,21 @@ reaches the array without an end note attached crashes `createAllNote`.
 
 Both cancel the whole injection and return `null`; `NoteArrayHooks` then leaves
 `mFairyNoteCreateDataArray` alone, so the original chart plays under the custom
-BGM/BGA instead of the game crashing.
+BGM/BGA instead of the game crashing. Nothing is shown in-game when this
+happens; the only notice is in the log ([알려진_문제.md](알려진_문제.md) H2).
+
+`createAllNote` is **not** only a play-scene call. The Music Select scene's
+option preview window (`cMusicSelectPreviewWindowManager.coUpdateNote`) calls
+`loadNoteData4OptionPreview` and then `requestSetCreatableCreateData(false)`
+(which calls `createAllNote`) on open and again at every loop point. The hook
+only checks `ShouldInjectCustomContent()` (custom chart selected, not in
+`SoundPlayerScene`/`MoviePlayer_MovieSelect`), so it also replaces the preview's
+note array with the BMS chart there — and at that point
+`ReloadCurrentAlbumAssets` has not run yet, so the chart is the previously
+loaded album's, not the selected one. Log evidence (2026-08-03 build,
+`MelonLoader/Logs/26-8-3_9-50-11.log` lines 318–341): two conversions in Music
+Select of the 361-note startup chart while the selected album had 362 notes.
+See [알려진_문제.md](알려진_문제.md) H1.
 
 Removal risk:
 
@@ -317,10 +331,14 @@ Purpose:
   reimplemented against compile-time decompiled types (the originals used
   runtime reflection/string-based member lookup because they predated the
   direct `Assembly-CSharp.dll` reference);
-- `AutoPlayPatch`/`JudgePerfectPatch` are off by default; the `AutoPlay` and
-  `AllPerfect` keys in `savecustomkey/config.txt` (created next to
-  the `hwa` folder on first launch) are the only way to turn them on — there is
-  no in-game toggle key. Both patches read `CustomKeySettings` on every call
+- `AutoPlayPatch`/`JudgePerfectPatch` are off when the `AutoPlay`/`AllPerfect`
+  keys are missing (code fallback is `false`), but the config file generated on
+  first launch (`CustomKeySettings.DefaultLines`) writes `AutoPlay=0` and
+  **`AllPerfect=1`** — so a fresh install starts with the all-perfect judge
+  override **on** (saves stay protected by the default `BlockSave=1`). The keys
+  in `savecustomkey/config.txt` (created next to the `hwa` folder on first
+  launch) are the only way to change them — there is no in-game toggle key.
+  See [알려진_문제.md](알려진_문제.md) H3. Both patches read `CustomKeySettings` on every call
   instead of caching a copy, and `CustomKeySettings.Reload()` re-reads the file
   on every scene load, so a config edit takes effect from the next play
   (retry included) without a game restart — see the section below;
@@ -548,7 +566,11 @@ evidence, and trigger conditions) are tracked in
 
 - `RecordBlockPatch.RequestSavePatch` blocks the boot scene's first save (A1);
 - `SteamApiHijacker.InitPostfix` would hang boot if Goldberg were missing (A3);
-- `BgmBgaInjector` keeps the previous album's BGA/BGM path (C1).
+- `BgmBgaInjector` keeps the previous album's BGA/BGM path (C1);
+- `NoteArrayHooks` also fires in the Music Select option preview and injects the
+  previously loaded album's chart there (H1);
+- `SceneDetector.InitializeHarmony` uses one `PatchAll` call, so a single missing
+  patch target after a game update can leave every later patch class unapplied (H4).
 
 ## Removed Diagnostic Code
 
@@ -581,6 +603,24 @@ of the current source baseline:
   replaces it, so the manifest is currently writable)
 
 ## Cleanup Log
+
+### 2026-09-29
+
+Documentation-only pass; no source changes.
+
+- Full re-read of `GRC2/`, `GRC2.Tests/`, build scripts and documents. Added
+  section H (new findings, with fix directions) and fix directions for the older
+  items to [알려진_문제.md](알려진_문제.md).
+- Corrected the AutoPlay/AllPerfect default description above (the generated
+  `config.txt` has `AllPerfect=1`).
+- Documented that `createAllNote` also fires in the Music Select option preview.
+- Verified and left alone: patches are **not** applied twice (per-selection hook
+  logs appear once); `NoteSwayPatch` does not accumulate x offsets because
+  `cNotecWorkBase.simulate` reassigns `localPosition` every frame
+  (`Decompiled/IntiCreates/cNotecWorkBase.cs:213`).
+- Moved the change history that lived in `GRC 리드미/README.md` to
+  [정리_이력.md](정리_이력.md); added missing `[보관]` banners to four archive
+  documents.
 
 ### 2026-09-28
 

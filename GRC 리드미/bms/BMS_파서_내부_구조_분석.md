@@ -22,6 +22,8 @@ public static List<BmsNote> ParseBmsFile(string filePath, bool printSummary = tr
 ```
 
 - 파일이 없으면 빈 리스트, 도중에 예외가 나면 그때까지 모은 노트를 반환합니다(BPM 단계에서 나면 빈 리스트).
+  주의: 노트 수집 이후 단계에서 예외가 나면 `Time`이 계산되지 않은(전부 0) 노트가 그대로 반환되어 주입 대상이 됩니다
+  ([알려진_문제.md](../maintenance/알려진_문제.md) H5).
 - 3·4·6단계는 [홀드_노트_처리_가이드.md](홀드_노트_처리_가이드.md)를 봅니다.
 
 ## 데이터 모델 ([BmsDataModels.cs](../../GRC2/Parsers/BmsDataModels.cs))
@@ -67,6 +69,8 @@ ChannelToLaneMap = {
 `ParseNoteData(measure, channel, data, valueWidth)`:
 
 1. `data`를 `valueWidth`(2 또는 3)자씩 끊어 16진수로 읽습니다(`ParseHexData`, 읽지 못한 조각은 버림).
+   조각을 버리면 슬롯 수가 줄어 **그 마디의 뒤쪽 노트가 조용히 밀립니다**(경고 없음). 채널 03~08의 BPM 데이터는 폭 지정 없이
+   항상 2자리로 읽어 3자리 모드에서는 어긋납니다([알려진_문제.md](../maintenance/알려진_문제.md) H5).
 2. 값이 0이 아니면 `tick = measure + i / 조각 수`로 노트를 만듭니다.
 3. `GetNoteType(value, out direction)`:
 

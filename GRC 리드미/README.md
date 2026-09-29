@@ -1,29 +1,27 @@
-# GRC2 Documentation
+# GRC2 문서 인덱스
 
-This folder is the current home for project documentation. Documents are grouped by maintenance use, not by original generation date.
+이 폴더가 프로젝트 문서의 현재 위치입니다. 문서는 만든 날짜가 아니라 유지보수 용도별로 묶었습니다.
+(2026-09-29 기준. 변경 이력은 [정리_이력.md](maintenance/정리_이력.md)와 HOOK_MAP의 Cleanup Log에 있습니다.)
 
-## Start Here
+## 먼저 볼 문서
 
-- [Current Hook Map](maintenance/HOOK_MAP.md): current Harmony and MelonLoader hook ownership.
-- [알려진_문제.md](maintenance/알려진_문제.md): issues found in the 2026-09-28 review that are not fixed yet
-  (read section A before reinstalling the game or moving to a new PC).
-- [게임_코드_분석.md](architecture/게임_코드_분석.md): topic index for every current document.
-- [BMS chart rules](bms/BMS_파싱_및_변환_로직_가이드.md): what a chart, BGM, and `info.txt` must look like.
-- [Harmony Layer README](../GRC2/Harmony/README.md): source-folder-level guide for `GRC2/Harmony`.
-- [Legacy README](archive/README_legacy.md): older comprehensive notes kept for reference only.
+- [HOOK_MAP.md](maintenance/HOOK_MAP.md): 현재 Harmony/MelonLoader 훅의 소유 파일·목적·제거 위험. **훅 소유 관계의 정본**입니다.
+- [알려진_문제.md](maintenance/알려진_문제.md): 아직 고치지 않은 문제와 고치는 방향
+  (게임을 새로 설치하거나 PC를 옮기기 전에 A절을 먼저 읽으세요).
+- [게임_코드_분석.md](architecture/게임_코드_분석.md): 모든 현재 문서의 주제별 인덱스.
+- [BMS 차트 작성 규칙](bms/BMS_파싱_및_변환_로직_가이드.md): 차트, BGM, `info.txt`가 갖춰야 할 형식.
+- [Harmony 레이어 README](../GRC2/Harmony/README.md): `GRC2/Harmony` 소스 폴더 안내.
+- [README_legacy.md](archive/README_legacy.md): 예전 종합 문서. 참고용으로만 남겼습니다.
 
-`HOOK_MAP.md` is the source of truth for hook ownership. As of 2026-09-28 every
-document outside `archive/` was rewritten against the current source and
-`Decompiled/`. The mod uses compile-time typed access to `Assembly-CSharp`;
-private fields go through `AccessTools.FieldRefAccess`, and the only
-reflection-based method lookup is `cRythmGameManager.setPauseButtonPusable`
-(`AccessTools.MethodDelegate` in `SceneDetector`).
+모드는 `Assembly-CSharp`를 컴파일 타임 타입으로 직접 참조합니다. 비공개 필드는 `AccessTools.FieldRefAccess`로 접근하고,
+문자열로 찾는 메서드는 `cRythmGameManager.setPauseButtonPusable`(`SceneDetector`의 `AccessTools.MethodDelegate`) 하나뿐입니다.
+`Decompiled/`(게임 원본 디컴파일)는 저작권상 git에 없으므로, 문서에서 "`Decompiled/`로 확인"이라고 적은 내용은 로컬에서만 재현할 수 있습니다.
 
-## Folders
+## 폴더
 
 ### `architecture`
 
-Game and mod structure notes:
+게임과 모드 구조:
 
 - `게임_아키텍처_개요.md`
 - `게임_코드_분석.md`
@@ -33,7 +31,7 @@ Game and mod structure notes:
 
 ### `systems`
 
-Runtime systems and user-visible mod behavior:
+런타임 시스템과 사용자에게 보이는 모드 동작:
 
 - `앨범_관리_시스템_분석.md`
 - `커스텀_곡_주입_시스템_분석.md`
@@ -45,7 +43,7 @@ Runtime systems and user-visible mod behavior:
 
 ### `bms`
 
-BMS parsing, note conversion, and note processing:
+BMS 파싱, 노트 변환, 노트 처리:
 
 - `BMS_파서_내부_구조_분석.md`
 - `BMS_파싱_및_변환_로직_가이드.md`
@@ -54,111 +52,31 @@ BMS parsing, note conversion, and note processing:
 
 ### `harmony`
 
-Harmony patching and game enum notes:
+Harmony 패칭과 게임 enum:
 
 - `Harmony_패칭_시스템_상세_가이드.md`
 - `Enum_및_타입_시스템_관리.md`
 
 ### `maintenance`
 
-Current maintenance references, known issues, cleanup history, and timing:
+유지보수 기준 문서, 알려진 문제, 정리 이력, 타이밍:
 
 - `HOOK_MAP.md`
 - `알려진_문제.md`
+- `정리_이력.md`: 소스 파일 수와 리팩터링 단계의 시간순 기록
 - `게임_종료_로직.md`
 - `게임_종료_시간_조정_가이드.md`
 - `코루틴_및_비동기_처리_패턴.md`
 
 ### `archive`
 
-Historical or pre-cleanup documents. These may mention removed code such as `HarmonyHookManager`, `BgaVideoHooks`, `GameTypeInspector`, `ReflectionHelper`, `FieldAccessHelper`, or `NoteArrayJsonDumper`.
+정리 전이거나 과거 맥락을 위한 문서입니다. 삭제된 코드(`HarmonyHookManager`, `BgaVideoHooks`, `GameTypeInspector`,
+`ReflectionHelper`, `FieldAccessHelper`, `NoteArrayJsonDumper` 등)를 언급할 수 있고, **현재 코드와 맞지 않습니다.**
+각 문서 맨 위의 `[보관]`/`[폐기됨]` 머리말을 먼저 확인하세요.
 
-Moved here on 2026-09-28 because they only describe the removed reflection layer:
-`리플렉션_및_필드_접근_시스템.md`, `성능_분석_및_최적화_권장사항.md`,
-`성능_최적화_기법_종합_가이드.md`, `최적화_완료_보고서.md`.
+- 리플렉션 계층만 설명해서 2026-09-28에 옮긴 문서: `리플렉션_및_필드_접근_시스템.md`, `성능_분석_및_최적화_권장사항.md`,
+  `성능_최적화_기법_종합_가이드.md`, `최적화_완료_보고서.md`
+- 예전 종합·비유 문서: `README_legacy.md`, `비유와_수학공식_가이드.md`, `코드_리뷰_및_비유.md`,
+  `에러_처리_및_디버깅_시스템_legacy.md`
 
-Use archive documents only when investigating old decisions.
-
-## Current Cleanup Baseline
-
-As of 2026-07-21:
-
-- Deleted no-op and diagnostic hook files.
-- Removed disabled note-array JSON dumping and field inspection helpers.
-- Removed disabled music-scroll sort/filter/update/get-cell logging hooks.
-- Removed the unreachable `CharactorLoadPatcher` and its unregistered dynamic-prefix path.
-- Removed dead, never-called files: `AssetLoader.cs`, `BgmArtworkUpdater.cs`, and the `AudioSourceFinder` cluster (4 files).
-- Removed orphaned XML doc comments left behind by earlier partial-class splits (`MusicScrollViewHooks.cs`, `BgmGameEndMonitor.cs`, `PreviewAudioManager.cs`, `BgmLoader.cs`, `HoldNoteProcessor.cs`).
-- Current managed source count is 108 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
-
-As of 2026-07-21 (file consolidation):
-
-- Merged every partial-class file set into a single file per class (16 classes, 61 files -> 16 files); deleted the empty `NoteArrayHooks.MusicDataAdjust.cs`.
-- Flattened folders that held only one merged class file (e.g. `Harmony/GameFlow/` -> `Harmony/GameFlowHooks.cs`).
-- Merged the six `Harmony/Registration/*Patcher.cs` files into `Harmony/Registration/Patchers.cs` (class names unchanged).
-- Current managed source count is 51 files under `GRC2/`, excluding `bin/obj` (`GRC2.Tests`: 2 files).
-
-As of 2026-07-26 (v0.2.0 Refactoring & Performance Update):
-
-- **Hook Cleanup**: Removed unregistered, empty, and logging-only hooks (Music Select, Sort, Filter, BGM state monitoring). Removed 7 unused diagnostic and helper files (`CharactorLoadPatch.cs`, `MusicTitlePatch.cs`, `CustomChartHandler.cs`, `BgmAudioStateChecker.cs`, `BgmFormattingUtils.cs`, `BgmMethodCallHooks.cs`, `BgmMonitorCoroutine.cs`). Registered only required Harmony patches. Wrapped original game-end coroutine instead of replacing it. Reduced key file line counts: `MusicScrollViewHooks.cs` (~390 lines), `GameFlowHooks.cs` (~160 lines), `Patchers.cs` (243 lines), `BgmGameEndMonitor.cs` (164 lines).
-- **Custom Song Select Performance Optimization**: Removed scene-wide `AudioSource` searches, targeting preview and ambience sources directly. Replaced synchronous cover image file reading & main-thread decoding with async loading and a 12-image cache. Added 80ms image debounce and 150ms preview BGM debounce on fast scroll. Added cancellation of in-flight audio requests on song change. Applied streaming load & 3-song cache for preview BGM. Reused preview `GameObject` and `AudioSource`. Added duplicate `MusicID` check.
-- **Ruby Text Fix**: Cleared `songTitleRuby` and `songTitleRubyDirect` fields to eliminate small text above custom titles while maintaining full title display and sorting functionality.
-
-As of 2026-07-26 (Harmony automatic patch migration):
-
-- Added direct compile-time references to `Assembly-CSharp.dll` and the
-  Steamworks managed assembly without copying them to fresh build output.
-- Replaced delayed reflection registration and manual `Harmony.Patch(...)`
-  calls with `[HarmonyPatch]` declarations and one `PatchAll()` startup call.
-- Removed `Harmony/Registration/Patchers.cs` and
-  `Injectors/PatchApplier.cs`.
-- Removed obsolete runtime type search and duplicate scene injection paths after
-  validating their owners against `Decompiled/`: `ReflectionHelper.cs`,
-  `GameTypeSearcher.cs`, `SceneHandler.cs`, and `ResultSceneInjector.cs`.
-- Bound preview audio to `cMusicSelectSceneUIUpdater`, result UI to
-  `initializePreFade`, BGM sync to `cBGMBeatManager`, and note types to direct
-  `Assembly-CSharp` types.
-- Current managed source count is 45 files under `GRC2/`, excluding `bin/obj`
-  (`GRC2.Tests`: 2 files).
-
-As of 2026-07-26 (reflection removal / lightweighting):
-
-Every remaining string-based member lookup was replaced with compile-time typed
-access, validated field by field against `Decompiled/`. The mod now contains a
-single reflection call in total.
-
-- Removed dead fallback paths that the decompiled source proved unreachable:
-  `NoteConstructorHelper.cs` (`NoteCreateData` has no explicit constructor, so
-  all 8 signature probes failed on every note before falling back to
-  `Activator`), writes to the nonexistent `mSample`/`sample` fields, and
-  `BgmLoader`'s `_sorce` fallback for a missing `setClip`.
-- Note pipeline: deleted `FieldAccessHelper.cs` and `Loaders/GameTypeLoader.cs`;
-  reduced `EnumValueHelper.cs` to typed mapping switches (no `Enum.Parse`, no
-  value cache). `NoteCreateData` fields are now assigned directly, and the
-  pipeline currency changed from `object` to `NoteCreateData`. Reverse mapping
-  no longer parses `ToString()` output.
-- BGM layer: `cBGMBeatManager`'s public methods (`setClip`, `getAudioClip`,
-  `getAudioSorce`, `requestPlayAudio`) are called directly; two `GetFields()`
-  sweeps were removed.
-- UI/scene hooks: private game fields are reached through cached
-  `AccessTools.FieldRefAccess` delegates (`mCellHaviableMusicDataList`,
-  `mFairyNoteCreateDataArray`, `mPreviewAudioSorce`, `mArtWorkImage`, etc.).
-  `MusicSelectData` is a struct, so the `MemberwiseClone` reflection became a
-  plain assignment.
-- The only remaining reflection at the time was `AudioClip.m_Name` in
-  `BgmLoader.cs`. (Corrected 2026-08-09: that lookup was always null and was
-  replaced with `audioClip.name`; see HOOK_MAP.)
-- `PlaySceneArtworkInjector`'s name-based lookup is intentionally kept: no
-  decompiled type owns the play-scene artwork object, and the result is cached
-  per scene.
-- Managed source count at that point: 42 files (~6,600 lines) under `GRC2/`,
-  excluding `bin/obj` (`GRC2.Tests`: 2 files).
-
-As of 2026-09-28 (documentation pass, no source changes):
-
-- Rewrote every non-archive document against the current source and
-  `Decompiled/`, moved four reflection-era documents to `archive/`, and added
-  `maintenance/알려진_문제.md`. Details are in the HOOK_MAP cleanup log.
-- Current managed source count is 43 files under `GRC2/` (including
-  `Properties/AssemblyInfo.cs`), excluding `bin/obj`; `GRC2.Tests` has 3 files
-  and 32 passing tests (`dotnet test GRC2.Tests\GRC2.Tests.csproj`).
+옛 결정을 조사할 때만 아카이브를 보세요.
