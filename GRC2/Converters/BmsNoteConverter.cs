@@ -16,9 +16,6 @@ namespace GRC2.Converters
     /// </summary>
     public static class BmsNoteConverter
     {
-        // 상세 로깅 플래그 (성능 최적화용, 기본 비활성화)
-        private static readonly bool EnableDetailedHoldNoteLogging = false;
-
         /// <summary>
         /// BMS 노트를 게임의 NoteCreateData 배열로 변환합니다.
         /// </summary>
@@ -142,61 +139,15 @@ namespace GRC2.Converters
                     Helpers.ErrorLogger.LogWarning(ex, "[BmsNoteConverter]", "마지막 노트 설정 중 오류");
                 }
 
-                return CreateTypedNoteArray(noteList, bmsNotes);
+                var noteArray = noteList.ToArray();
+                MelonLogger.Msg($"[BmsNoteConverter] 변환 완료: {noteArray.Length}개 노트");
+                return noteArray;
             }
             catch (Exception ex)
             {
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "변환 오류");
                 return null;
             }
-        }
-
-        private static NoteCreateData[] CreateTypedNoteArray(List<NoteCreateData> noteList, List<BmsNote> bmsNotes)
-        {
-            var array = noteList.ToArray();
-
-            if (EnableDetailedHoldNoteLogging)
-            {
-                LogHoldNotesForDebug(array, bmsNotes);
-            }
-
-            MelonLogger.Msg($"[BmsNoteConverter] 변환 완료: {array.Length}개 노트");
-            return array;
-        }
-
-        private static void LogHoldNotesForDebug(NoteCreateData[] array, List<BmsNote> bmsNotes)
-        {
-            int holdNoteCount = 0;
-
-            foreach (var noteObj in array)
-            {
-                if (!IsHoldNoteForDebug(noteObj, bmsNotes))
-                    continue;
-
-                holdNoteCount++;
-                var connectArray = noteObj.connectNodeDataArray;
-                if (connectArray != null && connectArray.Length > 0)
-                {
-                    MelonLogger.Msg($"[BmsNoteConverter] 홀드 노트[{holdNoteCount}]: perfectSample={noteObj.perfectSample}, connectNodeDataArray.Length={connectArray.Length}, 끝 노트 perfectSample={connectArray[0].perfectSample}");
-                }
-                else
-                {
-                    MelonLogger.Warning($"[BmsNoteConverter] ⚠️ 홀드 노트[{holdNoteCount}]: perfectSample={noteObj.perfectSample}, connectNodeDataArray가 비어있거나 null입니다!");
-                }
-            }
-
-            MelonLogger.Msg($"[BmsNoteConverter] 배열에 포함된 홀드 노트: {holdNoteCount}개 (전체: {array.Length}개)");
-        }
-
-        private static bool IsHoldNoteForDebug(NoteCreateData noteObj, List<BmsNote> bmsNotes)
-        {
-            var bmsNote = Builders.NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteObj, bmsNotes);
-            if (bmsNote != null && bmsNote.Type == NoteType.Hold)
-            {
-                return true;
-            }
-
-            return noteObj.noteTypeID == NoteTypeId.Hold || noteObj.noteTypeID == NoteTypeId.Hold_Middle;
         }
 
         private static void ProcessHoldEndNotes(List<NoteCreateData> noteList, List<BmsNote> holdEndNotes, List<BmsNote> bmsNotes)

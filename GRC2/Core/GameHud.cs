@@ -1,4 +1,3 @@
-using IntiCreates.RythmGame;
 using UnityEngine;
 
 namespace GRC2.Core
@@ -50,8 +49,8 @@ namespace GRC2.Core
             }
         }
 
-        /// <summary>judgeType/subSample(샘플 단위 오차)을 받아 판정바 마커 위치를 갱신합니다.</summary>
-        public static void ReportJudgment(JudgeType judgeType, int subSample, float samplesPerSecond)
+        /// <summary>subSample(샘플 단위 오차)을 받아 판정바 마커 위치를 갱신합니다. 판정 등급은 쓰지 않습니다.</summary>
+        public static void ReportJudgment(int subSample, float samplesPerSecond)
         {
             if (!CustomKeySettings.EnableJudgmentBar)
                 return;

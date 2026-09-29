@@ -5,6 +5,7 @@ using MelonLoader;
 using UnityEngine;
 using GRC2.Core;
 using GRC2.Helpers;
+using GRC2.Parsers;
 using HarmonyLib;
 using IntiCreates;
 using TMPro;
@@ -30,8 +31,6 @@ namespace GRC2.Harmony
 
         private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, UnityEngine.UI.Image> ArtworkImageRef =
             AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, UnityEngine.UI.Image>("mArtWorkImage");
-
-        private static readonly string[] DifficultyOrder = { "easy", "normal", "hard", "expert" };
 
         /// <summary>
         /// 원본 initializePreFade는 시작 직전 문지기(coOpenPreMusicStartWindow)가 원본 곡
@@ -95,9 +94,9 @@ namespace GRC2.Harmony
                 if (sceneInitParam == null) return;
 
                 int difficultyIndex = (int)sceneInitParam.difficulty;
-                if (difficultyIndex < 0 || difficultyIndex >= DifficultyOrder.Length) return;
+                if (difficultyIndex < 0 || difficultyIndex >= SongInfo.DifficultyKeys.Length) return;
 
-                string key = DifficultyOrder[difficultyIndex];
+                string key = SongInfo.DifficultyKeys[difficultyIndex];
                 if (!songInfo.DifficultyNumbers.TryGetValue(key, out int level)) return;
 
                 var musicLvUi = MusicLvUiRef(updater);

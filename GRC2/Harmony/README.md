@@ -39,7 +39,7 @@ BGM 주입이 계산한 종료 시각(`BgmFinishTimeManager`)과 같은 파일�
 | **`Harmony/`** | 게임 메서드 후킹 대상과 Prefix/Postfix 구현 |
 | **`Injectors/`** | BGM/BGA 등 런타임 리소스 주입 |
 | **`Parsers/` `Builders/` `Converters/` `Processors/`** | BMS 파싱 → 게임 `NoteCreateData` 변환 파이프라인 |
-| **`Helpers/`** | enum 매핑, 예외 로깅, 샘플/초 변환 |
+| **`Helpers/`** | enum 매핑, 예외 로깅, 샘플/초 변환, 캐릭터 이름·경로 정규화 |
 
 현재 훅 목록과 정리 이력은
 [`GRC 리드미/maintenance/HOOK_MAP.md`](../../GRC%20리드미/maintenance/HOOK_MAP.md)를

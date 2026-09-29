@@ -15,10 +15,6 @@ namespace GRC2.Processors
     public static class FairyNoteProcessor
     {
         private const int StartLookupSampleSlack = 8;
-        private const float BaseToleranceSeconds = 0.05f;
-        private const float BaseBpm = 120f;
-        private const float MinToleranceSeconds = 0.02f;
-        private const float MaxToleranceSeconds = 0.15f;
         private const float PreferredMatchWindowSeconds = 4.0f;
         private const float MinFairyDurationSeconds = 0.005f;
 
@@ -40,8 +36,8 @@ namespace GRC2.Processors
                 .ToList();
             if (fairyNotes.Count == 0) return;
 
-            float bpm = fairyNotes.FirstOrDefault(n => n.BaseBpm > 0f)?.BaseBpm ?? BaseBpm;
-            float timeTolerance = CalculateTimeTolerance(bpm);
+            float bpm = fairyNotes.FirstOrDefault(n => n.BaseBpm > 0f)?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
+            float timeTolerance = NoteProcessorHelper.CalculateTimeTolerance(bpm);
 
             int invalidated = ClearInvalidFairyLinks(fairyNotes, timeTolerance);
             int recovered = 0;
@@ -233,14 +229,6 @@ namespace GRC2.Processors
             }
         }
 
-        private static float CalculateTimeTolerance(float bpm)
-        {
-            if (bpm <= 0f) bpm = BaseBpm;
-
-            float tolerance = BaseToleranceSeconds * (BaseBpm / bpm);
-            return Math.Max(MinToleranceSeconds, Math.Min(MaxToleranceSeconds, tolerance));
-        }
-
         private static void LogFairyMatchSummary(IEnumerable<BmsNote> notes, string stage)
         {
             var fairyNotes = notes
@@ -310,13 +298,13 @@ namespace GRC2.Processors
             MelonLogger.Msg($"[FairyNoteProcessor] 페어리 끝 노트 처리 시작: {fairyEndNotes.Count}개");
             MelonLogger.Msg($"[FairyNoteProcessor] noteList 개수: {noteList.Count}개");
 
-            float bpm = fairyEndNotes.FirstOrDefault(n => n?.BaseBpm > 0f)?.BaseBpm ?? BaseBpm;
-            float timeTolerance = CalculateTimeTolerance(bpm);
+            float bpm = fairyEndNotes.FirstOrDefault(n => n?.BaseBpm > 0f)?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
+            float timeTolerance = NoteProcessorHelper.CalculateTimeTolerance(bpm);
 
             if (noteList.Count > 0)
             {
-                // 역매핑 캐시를 미리 구성해 둡니다.
-                try { NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteList[0], allBmsNotes); } catch { /* ignore */ }
+                // 역매핑 캐시를 미리 구성해 둡니다. (GetBmsNoteFromNoteCreateData는 내부에서 예외를 삼켜 null을 돌려줍니다.)
+                NoteCreateDataBuilder.GetBmsNoteFromNoteCreateData(noteList[0], allBmsNotes);
             }
 
             var startNoteMap = BuildFairyStartLookup(noteList, allBmsNotes);

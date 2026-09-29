@@ -55,14 +55,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Builders\NoteCreateDataBuilder.cs" />
+    <Compile Include="Builders\NoteFieldInitializer.cs" />
     <Compile Include="Converters\BmsNoteConverter.cs" />
     <Compile Include="Core\AlbumManager.cs" />
+    <Compile Include="Core\ArtworkImageFinder.cs" />
     <Compile Include="Core\CustomAssetManager.cs" />
     <Compile Include="Core\CustomKeySettings.cs" />
     <Compile Include="Core\GameHud.cs" />
     <Compile Include="Core\PlaySceneArtworkInjector.cs" />
     <Compile Include="Core\SceneDetector.cs" />
     <Compile Include="Harmony\ArtWorkPatch.cs" />
+    <Compile Include="Harmony\ArtworkUpdater.cs" />
     <Compile Include="Harmony\AudioClipPatch.cs" />
     <Compile Include="Harmony\AutoPlayPatch.cs" />
     <Compile Include="Harmony\BgaCrossfadePatch.cs" />
@@ -79,19 +82,23 @@
     <Compile Include="Harmony\ResultSceneUpdaterPatch.cs" />
     <Compile Include="Harmony\SteamApiHijacker.cs" />
     <Compile Include="Harmony\TextPatch.cs" />
+    <Compile Include="Helpers\CharacterNames.cs" />
     <Compile Include="Helpers\EnumValueHelper.cs" />
     <Compile Include="Helpers\ErrorLogger.cs" />
     <Compile Include="Helpers\NoteSampleTime.cs" />
+    <Compile Include="Helpers\PathHelper.cs" />
     <Compile Include="Injectors\BgaBgmSyncManager.cs" />
     <Compile Include="Injectors\BgaInjector.cs" />
     <Compile Include="Injectors\BgmBgaInjector.cs" />
     <Compile Include="Injectors\BgmGameEndMonitor.cs" />
     <Compile Include="Injectors\BgmInjector.cs" />
     <Compile Include="Injectors\BgmLoader.cs" />
+    <Compile Include="Injectors\BgmSearcher.cs" />
     <Compile Include="Parsers\BmsDataModels.cs" />
     <Compile Include="Parsers\BmsNoteDataParser.cs" />
     <Compile Include="Parsers\BmsParser.cs" />
     <Compile Include="Parsers\BmsSummaryPrinter.cs" />
+    <Compile Include="Parsers\SongInfo.cs" />
     <Compile Include="Parsers\SongInfoParser.cs" />
     <Compile Include="Processors\FairyNoteProcessor.cs" />
     <Compile Include="Processors\HoldNoteProcessor.cs" />

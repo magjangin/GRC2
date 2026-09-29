@@ -2,77 +2,9 @@ using System;
 using System.Collections;
 using MelonLoader;
 using UnityEngine;
-using GRC2;
 
 namespace GRC2.Core
 {
-    internal static class ArtworkImageFinder
-    {
-        public const string DefaultArtworkObjectName = "ArtWork";
-
-        public static bool IsCachedImageValid(UnityEngine.UI.Image image, int sceneHash)
-        {
-            return image != null &&
-                image &&
-                UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetHashCode() == sceneHash;
-        }
-
-        public static UnityEngine.UI.Image FindArtworkImage(string objectName = DefaultArtworkObjectName)
-        {
-            var image = FindImageByGameObjectName(objectName);
-            if (image != null)
-                return image;
-
-            image = FindImageUnderSceneRoots(objectName);
-            if (image != null)
-                return image;
-
-            return FindImageByScanningImages(objectName);
-        }
-
-        private static UnityEngine.UI.Image FindImageByGameObjectName(string objectName)
-        {
-            GameObject artWorkObj = GameObject.Find(objectName);
-            return artWorkObj != null ? artWorkObj.GetComponent<UnityEngine.UI.Image>() : null;
-        }
-
-        private static UnityEngine.UI.Image FindImageUnderSceneRoots(string objectName)
-        {
-            var rootObjects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
-            foreach (var root in rootObjects)
-            {
-                Transform found = root?.transform.Find(objectName);
-                if (found == null)
-                    continue;
-
-                var image = found.GetComponent<UnityEngine.UI.Image>();
-                if (image != null)
-                    return image;
-            }
-
-            return null;
-        }
-
-        private static UnityEngine.UI.Image FindImageByScanningImages(string objectName)
-        {
-            UnityEngine.UI.Image[] images = UnityEngine.Object.FindObjectsOfType<UnityEngine.UI.Image>();
-            if (images == null)
-                return null;
-
-            foreach (var image in images)
-            {
-                if (image != null &&
-                    image.gameObject != null &&
-                    image.gameObject.name.Equals(objectName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return image;
-                }
-            }
-
-            return null;
-        }
-    }
-
     /// <summary>
     /// 플레이 씬에서 커스텀 아트워크 주입을 담당하는 클래스
     /// </summary>
@@ -91,11 +23,9 @@ namespace GRC2.Core
             // 재시작 시 캐시 무효화 (씬이 다시 로드되면 GameObject가 새로 생성되므로)
             ResetCache();
 
-            // 성능 최적화: 먼저 즉시 적용 시도 (대기 없이)
-            if (TryInjectArtworkImmediately())
-            {
-                return; // 즉시 적용 성공하면 코루틴 불필요
-            }
+            // 먼저 한 번 즉시 적용해 봅니다(대기 없이). 게임이 나중에 스프라이트를 덮어쓸 수 있으므로
+            // 즉시 적용의 성공 여부와 상관없이 아래 코루틴이 항상 한 번 더 확인합니다.
+            ApplyArtworkImmediately();
 
             // 이미 실행 중인 코루틴이 있으면 중지
             if (_artworkInjectionCoroutine != null)
@@ -104,7 +34,6 @@ namespace GRC2.Core
                 _artworkInjectionCoroutine = null;
             }
 
-            // 새 코루틴 시작 (즉시 적용 실패 시에만)
             _artworkInjectionCoroutine = MelonLoader.MelonCoroutines.Start(InjectArtworkInPlaySceneCoroutine());
         }
 
@@ -119,19 +48,19 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// 아트워크 즉시 적용 시도 (성능 최적화 - 대기 없이)
+        /// 아트워크를 대기 없이 한 번 적용해 봅니다. 대상 Image를 아직 못 찾았거나 비활성이면 아무것도 하지 않습니다.
         /// </summary>
-        private static bool TryInjectArtworkImmediately()
+        private static void ApplyArtworkImmediately()
         {
             try
             {
                 if (CustomAssetManager.IsSceneWhereInjectionDisallowed())
-                    return false;
+                    return;
 
                 Sprite customSprite = CustomAssetManager.GetCustomArtwork();
                 if (customSprite == null)
                 {
-                    return false;
+                    return;
                 }
 
                 // 캐시된 Image가 유효한지 확인
@@ -145,7 +74,7 @@ namespace GRC2.Core
                         !_cachedArtWorkImage.gameObject.activeInHierarchy ||
                         !_cachedArtWorkImage.enabled)
                     {
-                        return false;
+                        return;
                     }
                 }
 
@@ -153,15 +82,12 @@ namespace GRC2.Core
                 if (_cachedArtWorkImage != null && _cachedArtWorkImage)
                 {
                     _cachedArtWorkImage.sprite = customSprite;
-                    // 게임이 나중에 스프라이트를 덮어쓸 수 있으므로, 코루틴도 실행하여 재확인
-                    return false; // 즉시 적용했지만 코루틴도 실행하여 재확인
                 }
             }
             catch (Exception ex)
             {
                 Helpers.ErrorLogger.LogWarning(ex, "[PlaySceneArtworkInjector]", "즉시 적용 중 오류");
             }
-            return false;
         }
 
         /// <summary>

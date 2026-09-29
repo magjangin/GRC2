@@ -10,23 +10,24 @@ namespace GRC2.Injectors
 {
     public static class BgmBgaInjector
     {
-        private static string _hwaFolderPath;
         private static string _bgaFilePath;
         private static string _bgmFilePath;
         private static object _injectionCoroutine;
         private static bool _isPlayScene = false;
 
+        /// <summary>
+        /// 주입 경로의 초기값을 정합니다. AlbumManager가 이미 폴더를 스캔했으므로 다시 훑지 않고,
+        /// hwa 루트 앨범("root")의 첫 BGA/BGM(BGM은 ogg 우선)을 씁니다. 루트에 파일이 없으면 null입니다.
+        /// 이후 주입 루프가 현재 앨범의 파일로 갱신합니다.
+        /// </summary>
         public static void Initialize(string hwaFolderPath)
         {
-            _hwaFolderPath = hwaFolderPath;
-            
-            // BGA 파일 검색 (mp4)
-            var bgaFiles = Directory.GetFiles(_hwaFolderPath, "*.mp4", SearchOption.TopDirectoryOnly)
-                .ToList();
-            
-            if (bgaFiles.Count > 0)
+            AlbumInfo rootAlbum = AlbumManager.GetAllAlbums().Values.FirstOrDefault(album =>
+                string.Equals(album.AlbumFolderPath, hwaFolderPath, StringComparison.OrdinalIgnoreCase));
+
+            _bgaFilePath = rootAlbum?.BgaFiles.FirstOrDefault();
+            if (_bgaFilePath != null)
             {
-                _bgaFilePath = bgaFiles[0];
                 MelonLogger.Msg($"[BgmBgaInjector] BGA 파일 발견: {Path.GetFileName(_bgaFilePath)}");
             }
             else
@@ -34,20 +35,9 @@ namespace GRC2.Injectors
                 MelonLogger.Msg("[BgmBgaInjector] BGA 파일을 찾을 수 없습니다.");
             }
 
-            // BGM 파일 검색 (mp3, wav, ogg) - 성능 최적화: 한 번의 검색으로 처리
-            var bgmFiles = Directory.EnumerateFiles(_hwaFolderPath, "*.*", SearchOption.TopDirectoryOnly)
-                .Where(f =>
-                {
-                    var ext = Path.GetExtension(f).ToLowerInvariant();
-                    return ext == ".mp3" || ext == ".wav" || ext == ".ogg";
-                })
-                .ToList();
-
-            if (bgmFiles.Count > 0)
+            _bgmFilePath = AlbumManager.PickBgmFile(rootAlbum?.BgmFiles);
+            if (_bgmFilePath != null)
             {
-                // OGG 파일 우선 선택
-                var oggFile = bgmFiles.FirstOrDefault(f => f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase));
-                _bgmFilePath = oggFile ?? bgmFiles[0];
                 MelonLogger.Msg($"[BgmBgaInjector] BGM 파일 발견: {Path.GetFileName(_bgmFilePath)}");
             }
             else
@@ -66,8 +56,7 @@ namespace GRC2.Injectors
             }
             else if (!_isPlayScene)
             {
-                // 이미 플레이 씬이 아니면 false로 설정 (처음 호출 시에만)
-                _isPlayScene = false;
+                // 이미 플레이 씬 상태가 아니므로 _isPlayScene은 그대로 false입니다.
                 MelonLogger.Msg($"[BgmBgaInjector] StartInjection 호출: 일반 씬, _isPlayScene=false");
             }
             else

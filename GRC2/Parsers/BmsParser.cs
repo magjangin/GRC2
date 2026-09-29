@@ -13,9 +13,6 @@ namespace GRC2.Parsers
     /// </summary>
     public static class BmsParser
     {
-        // BPM 관련 상세 로그 제어 플래그 (성능 최적화용, 기본 비활성화)
-        private static readonly bool EnableBpmLogging = false;
-
         // 정규식 캐싱 (성능 최적화)
         private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled);
         private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)", RegexOptions.Compiled);
@@ -125,10 +122,6 @@ namespace GRC2.Parsers
                     {
                         baseBpm = float.Parse(match.Groups[1].Value);
                         baseFreq = 60f / baseBpm;
-                        if (EnableBpmLogging)
-                        {
-                            MelonLogger.Msg($"[BmsParser] 기본 BPM: {baseBpm}");
-                        }
                     }
                 }
 
@@ -139,10 +132,6 @@ namespace GRC2.Parsers
                     var bpmIndex = Convert.ToInt32(bpmMatch.Groups[1].Value, 16);
                     var bpmValue = float.Parse(bpmMatch.Groups[2].Value);
                     bpmIndexTable[bpmIndex] = bpmValue;
-                    if (EnableBpmLogging)
-                    {
-                        MelonLogger.Msg($"[BmsParser] BPM 인덱스 {bpmIndex:X2}: {bpmValue}");
-                    }
                 }
             }
         }

@@ -25,27 +25,6 @@ namespace GRC2.Processors
             return $"{lane}_{isLeft}_{endSample}";
         }
         /// <summary>
-        /// BPM 기반 시간 오차 허용 범위 계산 (동적)
-        /// BPM이 높을수록 타이밍이 더 까다로워지므로 허용 범위를 축소
-        /// BPM이 낮을수록 타이밍이 느슨해지므로 허용 범위를 확대
-        /// </summary>
-        private static float CalculateTimeTolerance(float bpm)
-        {
-            // 기준: BPM 120 = 0.05초
-            // 공식: 0.05 * (120 / BPM)
-            // 예: BPM 240 = 0.025초, BPM 60 = 0.10초
-            const float BASE_TOLERANCE = 0.05f; // 기본 허용 범위 (초)
-            const float BASE_BPM = 120f;        // 기본 BPM
-
-            if (bpm <= 0) bpm = BASE_BPM;
-
-            float tolerance = BASE_TOLERANCE * (BASE_BPM / bpm);
-
-            // 최소/최대 범위 설정 (BPM 변동으로 인한 극단적 값 방지)
-            return Math.Max(0.02f, Math.Min(0.15f, tolerance));
-        }
-
-        /// <summary>
         /// 홀드 노트 시작(02)과 끝(19)을 매칭하고 Duration을 계산합니다.
         /// </summary>
         public static void MatchHoldNotes(List<BmsNote> notes)
@@ -262,8 +241,8 @@ namespace GRC2.Processors
             int totalStartCount = holdStartMap.Values.Sum(list => list.Count);
             MelonLogger.Msg($"[HoldNoteProcessor] 홀드 시작 노트 맵 생성 완료: {totalStartCount}개 (키 {holdStartMap.Count}개, noteList 매칭: {matchedCount}개, 매칭 실패: {unmatchedCount}개)");
 
-            float baseBpm = holdEndNotes.FirstOrDefault()?.BaseBpm ?? 120f;
-            float timeTolerance = CalculateTimeTolerance(baseBpm);
+            float baseBpm = holdEndNotes.FirstOrDefault()?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
+            float timeTolerance = NoteProcessorHelper.CalculateTimeTolerance(baseBpm);
             MelonLogger.Msg($"[HoldNoteProcessor] BPM: {baseBpm}, 시간 오차 허용 범위: {timeTolerance:F4}초");
 
             var holdStartByLane = BuildHoldStartByLane(holdStartMap);

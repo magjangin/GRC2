@@ -33,7 +33,7 @@ namespace GRC2.Core
         /// </summary>
         public static void LoadCustomArtwork(string imagePath)
         {
-            string normalizedPath = NormalizeExistingPath(imagePath);
+            string normalizedPath = PathHelper.GetExistingFullPathOrNull(imagePath);
             if (normalizedPath == null)
             {
                 return;
@@ -73,7 +73,7 @@ namespace GRC2.Core
             string imagePath,
             Action<Sprite> onLoaded = null)
         {
-            string normalizedPath = NormalizeExistingPath(imagePath);
+            string normalizedPath = PathHelper.GetExistingFullPathOrNull(imagePath);
             if (normalizedPath == null)
             {
                 return;
@@ -111,7 +111,7 @@ namespace GRC2.Core
         public static bool TryGetCustomArtwork(string imagePath, out Sprite sprite)
         {
             sprite = null;
-            string normalizedPath = NormalizePath(imagePath);
+            string normalizedPath = PathHelper.GetFullPathOrNull(imagePath);
             if (normalizedPath == null ||
                 !ArtworkCache.TryGetValue(normalizedPath, out sprite) ||
                 sprite == null)
@@ -309,28 +309,6 @@ namespace GRC2.Core
         public static bool ShouldInjectCustomContent()
         {
             return !IsSceneWhereInjectionDisallowed() && IsCustomChartSelected();
-        }
-
-        private static string NormalizeExistingPath(string path)
-        {
-            string normalizedPath = NormalizePath(path);
-            return normalizedPath != null && File.Exists(normalizedPath)
-                ? normalizedPath
-                : null;
-        }
-
-        private static string NormalizePath(string path)
-        {
-            try
-            {
-                return string.IsNullOrWhiteSpace(path)
-                    ? null
-                    : Path.GetFullPath(path);
-            }
-            catch
-            {
-                return null;
-            }
         }
     }
 }

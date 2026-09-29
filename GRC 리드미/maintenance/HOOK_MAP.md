@@ -228,7 +228,7 @@ Owner files:
 
 - `GRC2/Harmony/ArtWorkPatch.cs`
 - `GRC2/Harmony/TextPatch.cs`
-- `GRC2/Harmony/AudioClipPatch.cs` (`ArtworkUpdater`, not a patch: applies an
+- `GRC2/Harmony/ArtworkUpdater.cs` (`ArtworkUpdater`, not a patch: applies an
   asynchronously loaded sprite through `mArtWorkAndMusicDetail.mArtWork`)
 - `GRC2/Core/PlaySceneArtworkInjector.cs` (not a patch: name-based `ArtWork`
   image lookup in play scenes, started from `SceneDetector`)
@@ -604,7 +604,40 @@ of the current source baseline:
 
 ## Cleanup Log
 
-### 2026-09-29
+### 2026-09-29 (structure cleanup)
+
+Behavior-preserving cleanup of duplicated and dead code (build: 0 warnings;
+tests: 55 passing, 23 of them new characterization tests for the shared helpers).
+No hook, hook target or patch behavior changed.
+
+- De-duplicated: character-name aliases → `Helpers/CharacterNames.cs`
+  (was `AlbumManager.NormalizeArtistId` + `MusicScrollViewHooks.NormalizeCharacterName`);
+  difficulty keys → `SongInfo.DifficultyKeys`; hold/fairy match tolerance →
+  `NoteProcessorHelper.CalculateTimeTolerance`; the judgment bar's 48000 →
+  `NoteSampleTime.SampleRate`; path normalisation → `Helpers/PathHelper.cs`;
+  BGM pick rule (ogg first) → `AlbumManager.PickBgmFile`;
+  `BgmBgaInjector.Initialize` now reuses the root album from `AlbumManager`
+  instead of re-scanning the folder (same initial values as before, so the
+  stale-path problem in 알려진_문제.md C1 is unchanged).
+- Split single files that held unrelated classes: `ArtworkUpdater.cs`,
+  `BgmSearcher.cs`, `ArtworkImageFinder.cs`, `NoteFieldInitializer.cs`,
+  `SongInfo.cs` (same namespaces). `BgmFinishTimeManager` stays in
+  `BgmGameEndMonitor.cs` on purpose (shared state, see above).
+- Removed dead code: `PlaySceneArtworkInjector.TryInjectArtworkImmediately`
+  (always returned `false`; now the void `ApplyArtworkImmediately`), the
+  never-enabled `EnableDetailedHoldNoteLogging` block with its two helpers in
+  `BmsNoteConverter`, `BmsParser.EnableBpmLogging`, `BgmInjector.LogShown`,
+  an unused local in `BgaInjector`, a no-op assignment in
+  `BgmBgaInjector.StartInjection`, an empty `catch` in `FairyNoteProcessor`,
+  and `GameHud.ReportJudgment`'s unused `judgeType` parameter.
+- `GRC2.csproj` lists the seven new source files (`EnableDefaultCompileItems`
+  is still `false`).
+- Left alone: the `BmsNote → NoteCreateData` reverse-mapping redesign (needs
+  in-game verification), `RegisterArtistFirstSong`'s double registration, the
+  `BgaBgmSyncManager` log tags, and the tuple-keyed dictionary in
+  `NoteSpeedChaosPatch`. See [알려진_문제.md](알려진_문제.md) H10.
+
+### 2026-09-29 (documentation pass)
 
 Documentation-only pass; no source changes.
 

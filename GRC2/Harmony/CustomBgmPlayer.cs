@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using MelonLoader;
 using System;
 using System.Collections;
@@ -32,7 +33,7 @@ namespace GRC2.Harmony
 
         public static IEnumerator InjectCustomBgm(string bgmFilePath)
         {
-            string normalizedPath = NormalizePath(bgmFilePath);
+            string normalizedPath = PathHelper.GetExistingFullPathOrNull(bgmFilePath);
             if (string.IsNullOrEmpty(normalizedPath))
             {
                 yield break;
@@ -234,18 +235,5 @@ namespace GRC2.Harmony
             }
         }
 
-        private static string NormalizePath(string path)
-        {
-            try
-            {
-                return string.IsNullOrWhiteSpace(path) || !File.Exists(path)
-                    ? null
-                    : Path.GetFullPath(path);
-            }
-            catch
-            {
-                return null;
-            }
-        }
     }
 }

@@ -20,8 +20,10 @@
 | `Roro` | 1 | `Roro` |
 | `Luxair` | 2 | `Luxair`, `룩시아` |
 
-한글 표기 변환은 [AlbumManager.cs](../../GRC2/Core/AlbumManager.cs)의 `NormalizeArtistId()`와
-[MusicScrollViewHooks.cs](../../GRC2/Harmony/MusicScrollViewHooks.cs)의 `NormalizeCharacterName()` 두 곳에 같은 내용으로 있습니다.
+한글 표기 변환은 [CharacterNames.cs](../../GRC2/Helpers/CharacterNames.cs)의 `CharacterNames.Normalize()` 한 곳에 있고,
+[AlbumManager.cs](../../GRC2/Core/AlbumManager.cs)(첫 곡 등록·조회)와
+[MusicScrollViewHooks.cs](../../GRC2/Harmony/MusicScrollViewHooks.cs)(`artistID` 결정)가 이것을 씁니다.
+(2026-09-29 이전에는 `AlbumManager.NormalizeArtistId()`와 `MusicScrollViewHooks.NormalizeCharacterName()` 두 곳에 같은 내용이 있었습니다.)
 
 ## 1. 캐릭터별 첫 곡 등록
 

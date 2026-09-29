@@ -15,6 +15,27 @@ namespace GRC2.Processors
     /// </summary>
     public static class NoteProcessorHelper
     {
+        /// <summary>BMS에 <c>#BPM</c>이 없거나 0 이하일 때 허용 오차 계산에 쓰는 기준 BPM입니다.</summary>
+        public const float DefaultBpm = 120f;
+
+        private const float BaseToleranceSeconds = 0.05f; // DefaultBpm에서의 허용 오차
+        private const float MinToleranceSeconds = 0.02f;
+        private const float MaxToleranceSeconds = 0.15f;
+
+        /// <summary>
+        /// BPM 기반 시간 오차 허용 범위(초)를 계산합니다.
+        /// BPM이 높을수록 타이밍이 까다로우므로 범위를 줄이고, 낮을수록 늘립니다.
+        /// 공식: 0.05 × (120 / BPM), 결과는 0.02~0.15초로 제한합니다.
+        /// 예: BPM 240 = 0.025초, BPM 120 = 0.05초, BPM 60 = 0.10초.
+        /// </summary>
+        public static float CalculateTimeTolerance(float bpm)
+        {
+            if (bpm <= 0f) bpm = DefaultBpm;
+
+            float tolerance = BaseToleranceSeconds * (DefaultBpm / bpm);
+            return Math.Max(MinToleranceSeconds, Math.Min(MaxToleranceSeconds, tolerance));
+        }
+
         /// <summary>
         /// 끝 노트를 시작 노트의 connectNodeDataArray에 추가합니다.
         /// </summary>

@@ -8,18 +8,6 @@ using MelonLoader;
 namespace GRC2.Parsers
 {
     /// <summary>
-    /// 곡 정보를 저장하는 클래스
-    /// </summary>
-    public class SongInfo
-    {
-        public string Title { get; set; } = "custom chart";
-        public string Artist { get; set; } = "";
-        public string Character { get; set; } = ""; // 캐릭터 (아티스트 ID로 사용)
-        public List<string> Difficulties { get; set; } = new List<string>();
-        public Dictionary<string, int> DifficultyNumbers { get; set; } = new Dictionary<string, int>();
-    }
-
-    /// <summary>
     /// hwa 폴더의 txt 파일에서 곡 정보를 파싱하는 클래스
     /// </summary>
     public static class SongInfoParser

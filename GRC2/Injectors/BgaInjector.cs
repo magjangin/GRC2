@@ -24,7 +24,6 @@ namespace GRC2.Injectors
 
         public static IEnumerator TryInjectBgaCoroutine(string bgaFilePath)
         {
-            VideoPlayer videoPlayer = null;
             VideoPlayer[] videoPlayers = null;
             try
             {
@@ -60,9 +59,6 @@ namespace GRC2.Injectors
                 // 활성화된 VideoPlayer가 없으면 조용히 종료 (플레이 씬이 아닐 수 있음)
                 yield break;
             }
-
-            // videoPlayer 변수는 첫 번째로 설정 (하위 호환성)
-            videoPlayer = activeVideoPlayers[0];
 
             // 파일 경로를 file:// URL로 변환
             var fileUrl = "file://" + bgaFilePath.Replace("\\", "/");

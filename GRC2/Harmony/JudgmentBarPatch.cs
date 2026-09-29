@@ -1,4 +1,5 @@
 using GRC2.Core;
+using GRC2.Helpers;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
@@ -13,8 +14,6 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cNotecWorkBase), "onJudgeMent")]
     public static class JudgmentBarPatch
     {
-        private const float SAMPLE_RATE = 48000f;
-
         [HarmonyPostfix]
         private static void Postfix(cNotecWorkBase.OnJudgeParam judgeParam)
         {
@@ -23,7 +22,7 @@ namespace GRC2.Harmony
 
             try
             {
-                GameHud.ReportJudgment(judgeParam.judgeType, judgeParam.subSample, SAMPLE_RATE);
+                GameHud.ReportJudgment(judgeParam.subSample, NoteSampleTime.SampleRate);
             }
             catch (System.Exception ex)
             {

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using GRC2.Core;
+using GRC2.Helpers;
+using GRC2.Parsers;
 using HarmonyLib;
 using IntiCreates;
 using IntiCreates.RythmGame;
@@ -24,11 +26,6 @@ namespace GRC2.Harmony
         // MusicID 0~53은 실제 곡, 54~511은 SAVEABLE_ID_END(512) 전의 빈 영역입니다.
         private const int CustomMusicIdStart = 54;
         private const int CustomMusicIdEnd = 511;
-
-        private static readonly string[] DifficultyOrder =
-        {
-            "easy", "normal", "hard", "expert"
-        };
 
         private static readonly Dictionary<MusicID, TemplateSong> TemplateSongs =
             new Dictionary<MusicID, TemplateSong>();
@@ -218,13 +215,13 @@ namespace GRC2.Harmony
 
         private static void ApplyDifficultyLevels(ref MusicSelectData data, AlbumInfo album)
         {
-            int length = Math.Max(data.musicLVArray?.Length ?? DifficultyOrder.Length, DifficultyOrder.Length);
+            int length = Math.Max(data.musicLVArray?.Length ?? SongInfo.DifficultyKeys.Length, SongInfo.DifficultyKeys.Length);
             var levels = new int[length];
 
-            for (int i = 0; i < DifficultyOrder.Length; i++)
+            for (int i = 0; i < SongInfo.DifficultyKeys.Length; i++)
             {
                 if (album.SongInfo?.DifficultyNumbers != null &&
-                    album.SongInfo.DifficultyNumbers.TryGetValue(DifficultyOrder[i], out int level))
+                    album.SongInfo.DifficultyNumbers.TryGetValue(SongInfo.DifficultyKeys[i], out int level))
                 {
                     levels[i] = level;
                 }
@@ -247,28 +244,14 @@ namespace GRC2.Harmony
                 return;
 
             // 알려지지 않은 캐릭터는 안정적인 템플릿 값을 유지합니다.
-            if (Enum.TryParse(NormalizeCharacterName(character), ignoreCase: true, result: out PCD.MainCharactor artist))
+            if (Enum.TryParse(CharacterNames.Normalize(character), ignoreCase: true, result: out PCD.MainCharactor artist))
                 data.artistID = artist;
-        }
-
-        private static string NormalizeCharacterName(string value)
-        {
-            string normalized = value?.Trim() ?? string.Empty;
-            if (normalized.Equals("르호", StringComparison.OrdinalIgnoreCase) ||
-                normalized.Equals("Morpho", StringComparison.OrdinalIgnoreCase))
-                return "Morpho";
-            if (normalized.Equals("Roro", StringComparison.OrdinalIgnoreCase))
-                return "Roro";
-            if (normalized.Equals("룩시아", StringComparison.OrdinalIgnoreCase) ||
-                normalized.Equals("Luxair", StringComparison.OrdinalIgnoreCase))
-                return "Luxair";
-            return normalized;
         }
 
         private static void ResetPerSongProgress(ref MusicSelectData data)
         {
-            data.highScoreArray = new int[data.highScoreArray?.Length ?? DifficultyOrder.Length];
-            data.clearBadgeArray = new ResultClearBadge[data.clearBadgeArray?.Length ?? DifficultyOrder.Length];
+            data.highScoreArray = new int[data.highScoreArray?.Length ?? SongInfo.DifficultyKeys.Length];
+            data.clearBadgeArray = new ResultClearBadge[data.clearBadgeArray?.Length ?? SongInfo.DifficultyKeys.Length];
         }
 
         private sealed class TemplateSong

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using GRC2.Helpers;
 using GRC2.Parsers;
 using IntiCreates;
 using MelonLoader;
@@ -54,37 +55,10 @@ namespace GRC2.Core
                 return;
             }
 
-            string normalizedKey = NormalizeArtistId(artistId);
+            string normalizedKey = CharacterNames.Normalize(artistId);
             _artistIdToFirstSong[normalizedKey] = (musicId, title);
             _artistIdToFirstSong[artistId] = (musicId, title);
             MelonLogger.Msg($"[AlbumManager] 아티스트 첫 곡 등록: {artistId} (정규화: {normalizedKey}) -> MusicID: {musicId}, 제목: '{title}'");
-        }
-
-        private static string NormalizeArtistId(string artistId)
-        {
-            if (string.IsNullOrWhiteSpace(artistId))
-                return artistId;
-
-            var normalized = artistId.Trim();
-            if (string.Equals(normalized, "르호", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(normalized, "Morpho", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Morpho";
-            }
-
-            if (string.Equals(normalized, "Roro", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(normalized, "roro", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Roro";
-            }
-
-            if (string.Equals(normalized, "Luxair", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(normalized, "룩시아", StringComparison.OrdinalIgnoreCase))
-            {
-                return "Luxair";
-            }
-
-            return normalized;
         }
 
         public static (MusicID musicId, string title)? GetArtistFirstSong(string artistId)
@@ -97,10 +71,10 @@ namespace GRC2.Core
                 return songInfo;
             }
 
-            var normalizedId = NormalizeArtistId(artistId);
+            var normalizedId = CharacterNames.Normalize(artistId);
             foreach (var kvp in _artistIdToFirstSong)
             {
-                var normalizedKey = NormalizeArtistId(kvp.Key);
+                var normalizedKey = CharacterNames.Normalize(kvp.Key);
                 if (string.Equals(normalizedKey, normalizedId, StringComparison.OrdinalIgnoreCase))
                 {
                     return kvp.Value;
@@ -157,12 +131,20 @@ namespace GRC2.Core
         /// </summary>
         public static string GetCurrentBgmFile()
         {
-            if (_currentAlbum == null || _currentAlbum.BgmFiles.Count == 0)
+            return _currentAlbum == null ? null : PickBgmFile(_currentAlbum.BgmFiles);
+        }
+
+        /// <summary>
+        /// BGM 후보 중 .ogg를 우선하고 없으면 첫 파일을 고릅니다. 후보가 없으면 null입니다.
+        /// </summary>
+        public static string PickBgmFile(IList<string> bgmFiles)
+        {
+            if (bgmFiles == null || bgmFiles.Count == 0)
                 return null;
 
-            var oggFile = _currentAlbum.BgmFiles.FirstOrDefault(f =>
+            var oggFile = bgmFiles.FirstOrDefault(f =>
                 f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase));
-            return oggFile ?? _currentAlbum.BgmFiles[0];
+            return oggFile ?? bgmFiles[0];
         }
 
         /// <summary>
