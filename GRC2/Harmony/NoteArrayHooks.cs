@@ -6,6 +6,7 @@ using GRC2.Parsers;
 using GRC2.Converters;
 using HarmonyLib;
 using GRC2.Core;
+using GRC2.Injectors;
 using IntiCreates;
 
 namespace GRC2.Harmony
@@ -73,6 +74,17 @@ namespace GRC2.Harmony
         {
             try
             {
+                // createAllNote는 플레이 씬 말고 곡 선택 씬의 옵션 미리보기 창
+                // (cMusicSelectPreviewWindowManager.coUpdateNote)에서도 열 때와 루프마다 불립니다.
+                // 그 노트 배열은 게임의 샘플 노트이고, 이 시점의 _bmsNotes는 선택한 앨범이 아니라
+                // 마지막으로 적재된 앨범의 차트라 갈아끼우면 엉뚱한 차트가 나옵니다.
+                // 플레이 씬은 SceneDetector가 FairyModeScene 로드 때 플레이 씬 상태를 켜 두므로
+                // 플레이의 createAllNote는 항상 이 검사를 통과합니다.
+                if (!BgmBgaInjector.IsPlayScene())
+                {
+                    return;
+                }
+
                 if (!CustomAssetManager.ShouldInjectCustomContent())
                 {
                     MelonLogger.Msg($"[NoteArrayHooks] ⚠️ BMS 노트 주입 건너뜀 (메서드: {methodName}, 씬 금지 또는 커스텀 미선택)");

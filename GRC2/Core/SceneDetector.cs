@@ -98,11 +98,8 @@ namespace GRC2.Core
 
                 // 자동 패치는 이미 적용되어 있으므로 주입할 BMS 데이터만 갱신합니다.
                 NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
-                
-                // BgmBgaInjector 초기화
-                MelonLogger.Msg("[SceneDetector] BgmBgaInjector 초기화 시작...");
-                BgmBgaInjector.Initialize(_hwaFolderPath);
-                MelonLogger.Msg("[SceneDetector] BgmBgaInjector 초기화 완료");
+
+                // BGA/BGM 주입 경로는 주입 루프가 매번 현재 앨범에서 읽으므로 따로 초기화할 것이 없습니다.
 
                 _isInitialized = true;
                 MelonLogger.Msg("[SceneDetector] 모드 초기화 완료");

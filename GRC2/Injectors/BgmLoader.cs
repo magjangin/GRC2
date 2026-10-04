@@ -30,7 +30,9 @@ namespace GRC2.Injectors
             long fileSizeBytes = GetFileSizeBytes(bgmFilePath);
             int maxWaitFrames = CalcTimeoutFrames(fileSizeBytes);
 
-            var fileUrl = "file://" + bgmFilePath.Replace("\\", "/");
+            // 문자열을 이어 붙이면 경로에 '#', '%', '?'가 있을 때 URL이 잘못 해석됩니다.
+            // 곡 선택 프리뷰(CustomBgmPlayer)가 같은 파일을 이미 이 방식으로 읽습니다.
+            var fileUrl = new Uri(Path.GetFullPath(bgmFilePath)).AbsoluteUri;
             UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(fileUrl, GetAudioType(bgmFilePath));
             request.SendWebRequest();
 

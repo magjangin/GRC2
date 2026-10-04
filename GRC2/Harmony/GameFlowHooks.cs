@@ -17,6 +17,23 @@ namespace GRC2.Harmony
         private static readonly AccessTools.FieldRef<cMusicSelectPreMusicStartWindowManager, Image> PreMusicArtworkImageRef =
             AccessTools.FieldRefAccess<cMusicSelectPreMusicStartWindowManager, Image>("mArtworkImage");
 
+        /// <summary>cMusicSelectSceneUIUpdater.initializePreDataLoad가 실행되는 동안에만 true입니다.</summary>
+        private static bool _inMusicSelectPreDataLoad;
+
+        public static void InitializePreDataLoadPrefix()
+        {
+            _inMusicSelectPreDataLoad = true;
+        }
+
+        /// <summary>
+        /// Finalizer라서 원본이 예외를 던져도 실행됩니다(반환형이 void면 원본 예외는 그대로 전파됩니다).
+        /// 플래그가 켜진 채 남으면 갤러리 등 다른 화면에서 커스텀 ID가 다시 "사용 가능"으로 보입니다.
+        /// </summary>
+        public static void InitializePreDataLoadFinalizer()
+        {
+            _inMusicSelectPreDataLoad = false;
+        }
+
         public static void BackToPreScreenPrefix()
         {
             try
@@ -155,10 +172,16 @@ namespace GRC2.Harmony
         /// false를 반환합니다. 그 결과 곡 선택 씬 재진입 시 getMusicIDUsable이 lastPlayedMusicID를
         /// 무시하고 FIRST_VER_DATA_TOP으로 되돌아가, 위에서 저장을 바로잡아도 커서가 여전히
         /// 엉뚱한 곡에 위치합니다. 등록된 커스텀 ID에 한해 "사용 가능"으로 인정해 되돌려줍니다.
+        ///
+        /// 이 인정은 곡 선택 씬의 initializePreDataLoad가 실행되는 동안에만 합니다. getIsUsableMusicID는
+        /// 갤러리 기록/통계 화면(0~511 전체를 돌며 곡 정보를 조회)과 세이브 초기화도 부르는데, 그쪽에서
+        /// 커스텀 ID를 "사용 가능"으로 알리면 존재하지 않는 곡이 목록·통계에 끼어듭니다.
+        /// 곡 선택에서 커스텀 ID의 사용 가능 여부를 묻는 곳은 initializePreDataLoad의
+        /// getMusicIDUsable(lastPlayedMusicID) 하나뿐입니다.
         /// </summary>
         public static void GetIsUsableMusicIDPostfix(soRythmGameMusicDataMap.MusicID id, ref bool __result)
         {
-            if (__result || CustomAssetManager.IsSceneWhereInjectionDisallowed())
+            if (__result || !_inMusicSelectPreDataLoad)
                 return;
 
             if (AlbumManager.IsCustomChartMusicID(id))
@@ -265,6 +288,22 @@ namespace GRC2.Harmony
             private static void Postfix(bool isRhythmGameStart)
             {
                 SetCurrentSelectDataToGameDataPostfix(isRhythmGameStart);
+            }
+        }
+
+        [HarmonyPatch(typeof(cMusicSelectSceneUIUpdater), "initializePreDataLoad")]
+        private static class InitializePreDataLoadPatch
+        {
+            [HarmonyPrefix]
+            private static void Prefix()
+            {
+                InitializePreDataLoadPrefix();
+            }
+
+            [HarmonyFinalizer]
+            private static void Finalizer()
+            {
+                InitializePreDataLoadFinalizer();
             }
         }
 

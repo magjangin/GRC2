@@ -131,20 +131,12 @@ namespace GRC2.Core
         /// </summary>
         public static string GetCurrentBgmFile()
         {
-            return _currentAlbum == null ? null : PickBgmFile(_currentAlbum.BgmFiles);
-        }
-
-        /// <summary>
-        /// BGM 후보 중 .ogg를 우선하고 없으면 첫 파일을 고릅니다. 후보가 없으면 null입니다.
-        /// </summary>
-        public static string PickBgmFile(IList<string> bgmFiles)
-        {
-            if (bgmFiles == null || bgmFiles.Count == 0)
+            if (_currentAlbum == null || _currentAlbum.BgmFiles.Count == 0)
                 return null;
 
-            var oggFile = bgmFiles.FirstOrDefault(f =>
+            var oggFile = _currentAlbum.BgmFiles.FirstOrDefault(f =>
                 f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase));
-            return oggFile ?? bgmFiles[0];
+            return oggFile ?? _currentAlbum.BgmFiles[0];
         }
 
         /// <summary>

@@ -30,7 +30,6 @@ SceneDetector.OnInitializeMelon()
   -> hwa 폴더 준비, CustomKeySettings.Initialize (savecustomkey/config.txt)
   -> 앨범과 BMS 데이터 로드
   -> NoteArrayHooks.UpdateBmsNotes(...)
-  -> BgmBgaInjector.Initialize(hwa)
 ```
 
 `Assembly-CSharp.dll`은 MelonLoader가 모드를 초기화하기 전에 게임

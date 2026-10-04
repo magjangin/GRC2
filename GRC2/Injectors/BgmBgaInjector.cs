@@ -15,37 +15,6 @@ namespace GRC2.Injectors
         private static object _injectionCoroutine;
         private static bool _isPlayScene = false;
 
-        /// <summary>
-        /// 주입 경로의 초기값을 정합니다. AlbumManager가 이미 폴더를 스캔했으므로 다시 훑지 않고,
-        /// hwa 루트 앨범("root")의 첫 BGA/BGM(BGM은 ogg 우선)을 씁니다. 루트에 파일이 없으면 null입니다.
-        /// 이후 주입 루프가 현재 앨범의 파일로 갱신합니다.
-        /// </summary>
-        public static void Initialize(string hwaFolderPath)
-        {
-            AlbumInfo rootAlbum = AlbumManager.GetAllAlbums().Values.FirstOrDefault(album =>
-                string.Equals(album.AlbumFolderPath, hwaFolderPath, StringComparison.OrdinalIgnoreCase));
-
-            _bgaFilePath = rootAlbum?.BgaFiles.FirstOrDefault();
-            if (_bgaFilePath != null)
-            {
-                MelonLogger.Msg($"[BgmBgaInjector] BGA 파일 발견: {Path.GetFileName(_bgaFilePath)}");
-            }
-            else
-            {
-                MelonLogger.Msg("[BgmBgaInjector] BGA 파일을 찾을 수 없습니다.");
-            }
-
-            _bgmFilePath = AlbumManager.PickBgmFile(rootAlbum?.BgmFiles);
-            if (_bgmFilePath != null)
-            {
-                MelonLogger.Msg($"[BgmBgaInjector] BGM 파일 발견: {Path.GetFileName(_bgmFilePath)}");
-            }
-            else
-            {
-                MelonLogger.Msg("[BgmBgaInjector] BGM 파일을 찾을 수 없습니다.");
-            }
-        }
-
         public static void StartInjection(bool isPlayScene = false)
         {
             // 플레이 씬이면 무조건 true로 설정 (다른 씬에서 false로 덮어씌워지는 것 방지)
@@ -120,20 +89,26 @@ namespace GRC2.Injectors
                     continue;
                 }
 
-                // 현재 선택된 앨범의 파일 경로 다시 확인 (앨범 변경 대응)
+                // 현재 선택된 앨범의 파일 경로를 매번 그대로 따라갑니다(앨범 변경 대응).
+                // 현재 앨범에 해당 파일이 없으면 null이 되어 그 주입은 건너뜁니다. 예전에는 비어 있으면
+                // 갱신하지 않아 직전 앨범(또는 hwa 루트)의 BGA/BGM이 다른 곡에 들어갔습니다.
                 var currentBgaFile = Core.AlbumManager.GetCurrentBgaFile();
                 var currentBgmFile = Core.AlbumManager.GetCurrentBgmFile();
-                
-                if (!string.IsNullOrEmpty(currentBgaFile) && currentBgaFile != _bgaFilePath)
+
+                if (currentBgaFile != _bgaFilePath)
                 {
                     _bgaFilePath = currentBgaFile;
-                    MelonLogger.Msg($"[BgmBgaInjector] BGA 파일 경로 업데이트: {Path.GetFileName(_bgaFilePath)}");
+                    MelonLogger.Msg(_bgaFilePath != null
+                        ? $"[BgmBgaInjector] BGA 파일 경로 업데이트: {Path.GetFileName(_bgaFilePath)}"
+                        : "[BgmBgaInjector] 현재 앨범에 BGA 파일이 없어 원본 BGA를 그대로 씁니다.");
                 }
-                
-                if (!string.IsNullOrEmpty(currentBgmFile) && currentBgmFile != _bgmFilePath)
+
+                if (currentBgmFile != _bgmFilePath)
                 {
                     _bgmFilePath = currentBgmFile;
-                    MelonLogger.Msg($"[BgmBgaInjector] BGM 파일 경로 업데이트: {Path.GetFileName(_bgmFilePath)}");
+                    MelonLogger.Msg(_bgmFilePath != null
+                        ? $"[BgmBgaInjector] BGM 파일 경로 업데이트: {Path.GetFileName(_bgmFilePath)}"
+                        : "[BgmBgaInjector] 현재 앨범에 BGM 파일이 없어 원본 BGM을 그대로 씁니다.");
                 }
 
                 // BGA는 플레이 씬에서만 시도

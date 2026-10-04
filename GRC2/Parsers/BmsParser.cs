@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -102,6 +103,19 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
+        /// BPM 숫자를 읽습니다. 소수점은 시스템 문화권과 무관하게 항상 '.'로 읽고,
+        /// 숫자가 아니거나(예: "1.2.3") 0 이하·무한대·NaN이면 false입니다.
+        /// BPM이 0이면 박 길이(60 / BPM)가 무한대가 되어 모든 노트 시간이 망가지므로 값으로 받지 않습니다.
+        /// </summary>
+        public static bool TryParseBpm(string text, out float bpm)
+        {
+            return float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out bpm)
+                && bpm > 0f
+                && !float.IsInfinity(bpm)
+                && !float.IsNaN(bpm);
+        }
+
+        /// <summary>
         /// BPM 정보 수집: 기본 BPM + #BPMXX: value 인덱스 테이블 (채널 03-08 데이터에서 인덱스로 참조)
         /// </summary>
         private static void CollectBpmInfo(string[] lines, ref float baseBpm, ref float baseFreq,
@@ -120,8 +134,15 @@ namespace GRC2.Parsers
                     var match = BpmRegex.Match(line);
                     if (match.Success)
                     {
-                        baseBpm = float.Parse(match.Groups[1].Value);
-                        baseFreq = 60f / baseBpm;
+                        if (TryParseBpm(match.Groups[1].Value, out var parsedBaseBpm))
+                        {
+                            baseBpm = parsedBaseBpm;
+                            baseFreq = 60f / baseBpm;
+                        }
+                        else
+                        {
+                            MelonLogger.Warning($"[BmsParser] BPM 값을 읽지 못해 이 줄을 무시합니다: {line.Trim()}");
+                        }
                     }
                 }
 
@@ -130,8 +151,14 @@ namespace GRC2.Parsers
                 if (bpmMatch.Success)
                 {
                     var bpmIndex = Convert.ToInt32(bpmMatch.Groups[1].Value, 16);
-                    var bpmValue = float.Parse(bpmMatch.Groups[2].Value);
-                    bpmIndexTable[bpmIndex] = bpmValue;
+                    if (TryParseBpm(bpmMatch.Groups[2].Value, out var bpmValue))
+                    {
+                        bpmIndexTable[bpmIndex] = bpmValue;
+                    }
+                    else
+                    {
+                        MelonLogger.Warning($"[BmsParser] BPM 값을 읽지 못해 이 줄을 무시합니다: {line.Trim()}");
+                    }
                 }
             }
         }

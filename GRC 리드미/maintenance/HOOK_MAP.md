@@ -15,7 +15,8 @@ Main startup path. It:
 - locates the game `hwa` folder;
 - scans albums, song metadata, custom artwork, and BMS files;
 - supplies parsed BMS data to the already-registered note-array hook;
-- initializes BGM/BGA injectors.
+- (the BGM/BGA injection loop needs no initialisation: it reads the current
+  album's paths every tick; `BgmBgaInjector.Initialize` was removed 2026-10-04).
 
 ### `SceneDetector.OnSceneWasLoaded`
 
@@ -104,6 +105,8 @@ Patched game targets:
 - `IntiCreates.cMusicSelectSceneUIUpdater.coOpenPreMusicStartWindow`
 - `IntiCreates.cMusicSelectSceneUIUpdater.backToPreScreen`
 - `IntiCreates.cMusicSelectSceneUIUpdater.setCurrentSelectDataToGameData`
+- `IntiCreates.cMusicSelectSceneUIUpdater.initializePreDataLoad` (prefix + finalizer;
+  only raises/clears the flag below)
 - `IntiCreates.cMusicSelectPreMusicStartWindowManager.requestOpenWindow`
 - `IntiCreates.soRythmGameMusicDataMap.getIsUsableMusicID`
 
@@ -141,15 +144,29 @@ The fix instead leaves `mCurentMusicId` alone and patches around it:
   `initializePreDataLoad`'s `getMusicIDUsable(lastPlayedMusicID)` call falls
   back to `MusicID.FIRST_VER_DATA_TOP` on the next Music Select entry even
   after the save fix above — a `getIsUsableMusicID` **postfix** returns `true`
-  for ids `AlbumManager.IsCustomChartMusicID` recognizes (outside scenes where
-  injection is disallowed), so the scene's own
+  for ids `AlbumManager.IsCustomChartMusicID` recognizes, so the scene's own
   `getNeedsScrollCountUntilID`-based selection logic finds and scrolls to the
   actual injected cell unmodified.
+
+The `getIsUsableMusicID` postfix is **gated to `initializePreDataLoad`**: a
+prefix on that method raises `_inMusicSelectPreDataLoad` and a `[HarmonyFinalizer]`
+(which also runs when the original throws; a `void` finalizer lets the original
+exception propagate — checked against the bundled Harmony 2.10.2) clears it.
+Before 2026-10-04 the postfix was only skipped in `SoundPlayerScene` /
+`MoviePlayer_MovieSelect`, so it also ran for the Gallery's record/statistics
+screens (`cGallerySceneRecodeMusicUIWindowManager.initMusicDataMap` and
+`cGallerySceneRecodeStatisticalUIWindowManager.updateRacodeData` loop over every
+id 0–511 and call it) and for the save-data defaults, making unregistered song
+slots look like real songs there. The only Music Select consumer is
+`initializePreDataLoad`'s `getMusicIDUsable(lastPlayedMusicID)`. See
+[알려진_문제.md](알려진_문제.md) H14.
 
 Removal risk of the two new postfixes: cursor/highscore attribution reverts
 to landing on the borrowed template song instead of the custom chart when
 returning to Music Select, and result-scene high scores/clear badges may
-again be written against the template song's save slot.
+again be written against the template song's save slot. Removing the
+`initializePreDataLoad` prefix/finalizer pair (or the flag check) either
+disables the cursor restore or reintroduces the Gallery leak.
 
 `PreviewAudioManager` mutes by stopping the source, zeroing its volume, and
 clearing `clip` (never `.mute = true`). `sSoundManager2D` pools every
@@ -205,15 +222,22 @@ happens; the only notice is in the log ([알려진_문제.md](알려진_문제.m
 `createAllNote` is **not** only a play-scene call. The Music Select scene's
 option preview window (`cMusicSelectPreviewWindowManager.coUpdateNote`) calls
 `loadNoteData4OptionPreview` and then `requestSetCreatableCreateData(false)`
-(which calls `createAllNote`) on open and again at every loop point. The hook
-only checks `ShouldInjectCustomContent()` (custom chart selected, not in
-`SoundPlayerScene`/`MoviePlayer_MovieSelect`), so it also replaces the preview's
-note array with the BMS chart there — and at that point
-`ReloadCurrentAlbumAssets` has not run yet, so the chart is the previously
+(which calls `createAllNote`) on open and again at every loop point. Until
+2026-10-04 the hook only checked `ShouldInjectCustomContent()` (custom chart
+selected, not in `SoundPlayerScene`/`MoviePlayer_MovieSelect`), so it also
+replaced the preview's note array with the BMS chart there — and at that point
+`ReloadCurrentAlbumAssets` had not run yet, so the chart was the previously
 loaded album's, not the selected one. Log evidence (2026-08-03 build,
 `MelonLoader/Logs/26-8-3_9-50-11.log` lines 318–341): two conversions in Music
 Select of the 361-note startup chart while the selected album had 362 notes.
-See [알려진_문제.md](알려진_문제.md) H1.
+
+`NoteArrayHooks.TryInjectBmsNotes` now returns first unless
+`BgmBgaInjector.IsPlayScene()` is true. `SceneDetector` raises that flag when
+`FairyModeScene`/`PlayMovieScene`/`RenderCutinScene` loads (Unity fires
+`sceneLoaded` before the new scene's `Start` coroutines, which is where the
+play-scene `createAllNote` comes from — the 2026-08-03 log shows the scene-load
+line at 32.696 before the first play conversion at 32.959) and clears it when
+Music Select or the result scene loads. See [알려진_문제.md](알려진_문제.md) H1.
 
 Removal risk:
 
@@ -566,11 +590,15 @@ evidence, and trigger conditions) are tracked in
 
 - `RecordBlockPatch.RequestSavePatch` blocks the boot scene's first save (A1);
 - `SteamApiHijacker.InitPostfix` would hang boot if Goldberg were missing (A3);
-- `BgmBgaInjector` keeps the previous album's BGA/BGM path (C1);
-- `NoteArrayHooks` also fires in the Music Select option preview and injects the
-  previously loaded album's chart there (H1);
 - `SceneDetector.InitializeHarmony` uses one `PatchAll` call, so a single missing
-  patch target after a game update can leave every later patch class unapplied (H4).
+  patch target after a game update can leave every later patch class unapplied (H4);
+- the Space/Esc pause handler in `SceneDetector` forces the game's pause button
+  on, bypassing the loading / last-note / game-over / clear-animation guards (H13).
+
+Fixed 2026-10-04: `BgmBgaInjector` no longer keeps the previous album's BGA/BGM
+path (C1); `NoteArrayHooks` no longer injects into the Music Select option
+preview (H1); the `getIsUsableMusicID` postfix no longer leaks into the Gallery
+(H14).
 
 ## Removed Diagnostic Code
 
@@ -604,6 +632,39 @@ of the current source baseline:
 
 ## Cleanup Log
 
+### 2026-10-04 (verified fixes)
+
+Only issues that were confirmed against `Decompiled/`, the logs and tests were
+changed (build: 0 warnings; tests: 71 passing, 16 new). Checked against the
+installed game DLLs with reflection: all 36 `[HarmonyPatch]` targets resolve
+without ambiguity, all 39 prefix/postfix/finalizer methods match their target's
+parameter names and types, all 51 static initialisers (including every
+`FieldRefAccess`) run, and the new gate logic and the `void` finalizer behave as
+documented (`PatchAll` itself cannot run outside Unity: patching a method that
+contains an internal call throws `ECall methods must be packaged into a system
+module`).
+
+- H1: `NoteArrayHooks.TryInjectBmsNotes` returns unless `BgmBgaInjector.IsPlayScene()`
+  — the Music Select option preview keeps its own sample notes.
+- H14: `getIsUsableMusicID` postfix is gated to `initializePreDataLoad` through a
+  prefix/finalizer pair (first use of `[HarmonyFinalizer]` in this mod); the
+  Gallery's record/statistics screens no longer see custom ids as songs.
+- C1: the BGA/BGM injection loop follows the current album's paths, `null`
+  included, so an album without BGA/BGM no longer gets another album's files.
+  That made `BgmBgaInjector.Initialize` (whose values were never read after the
+  first loop tick) dead, so it and its `SceneDetector` call were removed, and
+  `AlbumManager.PickBgmFile` — added in the previous cleanup only for it — was
+  inlined back.
+- G: `BgmLoader` builds its URL with `new Uri(...).AbsoluteUri` like the preview
+  player does. `BgaInjector`'s `VideoPlayer.url` is unchanged because whether
+  `VideoPlayer` accepts percent-encoded URLs is unverified.
+- E2: `BmsParser.TryParseBpm` (invariant culture, rejects non-numbers, <= 0,
+  infinity); a bad BPM line is skipped with a warning instead of failing the chart.
+- Not changed on purpose: the Space/Esc pause handler (H13, needs in-game
+  verification), `BlockSave`/`AllPerfect` defaults and the Steam fallback
+  (policy decisions), `PatchAll` per-class isolation (H4, Harmony failure
+  behaviour unverified).
+
 ### 2026-09-29 (structure cleanup)
 
 Behavior-preserving cleanup of duplicated and dead code (build: 0 warnings;
@@ -619,6 +680,8 @@ No hook, hook target or patch behavior changed.
   `BgmBgaInjector.Initialize` now reuses the root album from `AlbumManager`
   instead of re-scanning the folder (same initial values as before, so the
   stale-path problem in 알려진_문제.md C1 is unchanged).
+  (Superseded 2026-10-04: C1 was fixed, `Initialize` and `PickBgmFile` were
+  removed again — see the entry above.)
 - Split single files that held unrelated classes: `ArtworkUpdater.cs`,
   `BgmSearcher.cs`, `ArtworkImageFinder.cs`, `NoteFieldInitializer.cs`,
   `SongInfo.cs` (same namespaces). `BgmFinishTimeManager` stays in
