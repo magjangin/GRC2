@@ -484,8 +484,16 @@ Owner files:
 
 Patched game targets:
 
-- `IntiCreates.cNotecWorkBase.onJudgeMent` (judgment-bar data source, separate
-  Postfix from `JudgePerfectPatch`'s Prefix on the same method)
+- `IntiCreates.cNotecWorkBase.onJudgeMent` (judgment-bar data source; a
+  `Priority.First` Prefix records the real `judgeType` before
+  `JudgePerfectPatch`'s Prefix can force `PERFECT`, and the Postfix forwards it
+  with `subSample`. MISS (the original passes `subSample = 0`) only updates the
+  label; Hold_Middle notes, hold continue/end judgments
+  (`cFairyHoldNoteWork.mIsJudgedFirst` already set) and slide starts
+  (`cFairySlideNoteWork.mIsJudgedFirstNote` not yet set, position-judged with
+  `subSample = 0`) are skipped; slide ends only update the label because their
+  300–450ms windows dwarf the bar. Tap ranges are read from the live
+  `cFairyModeNotesManager.tap_*JudgeRange` fields)
 - `IntiCreates.cNotecWorkBase.simulate` (NoteSway; only the base implementation
   — slide/fairy-cursor notes and the post-touch phase of hold notes have their
   own position code and are not covered)
