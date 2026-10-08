@@ -124,14 +124,14 @@ namespace GRC2.Converters
                     return null; // 주입 금지
                 }
 
-                // 마지막 노트 찾기 및 isLast 설정
+                // 원본 로더의 후처리(정렬, 동시 노트 연결, 근접 플래그, isLast)를 옮깁니다(H15).
                 try
                 {
-                    SetLastNoteFlag(noteList);
+                    ApplyLoaderPostProcessing(noteList);
                 }
                 catch (Exception ex)
                 {
-                    Helpers.ErrorLogger.LogWarning(ex, "[BmsNoteConverter]", "마지막 노트 설정 중 오류");
+                    Helpers.ErrorLogger.LogWarning(ex, "[BmsNoteConverter]", "로더 후처리 중 오류");
                 }
 
                 var noteArray = noteList.ToArray();
@@ -301,50 +301,114 @@ namespace GRC2.Converters
             return null; // 모든 끝 노트가 있음
         }
 
-        private static void SetLastNoteFlag(List<NoteCreateData> noteList)
+        /// <summary>
+        /// 원본 로더(FairyNoteEditorLoader.loadFairyNoteDatasJsonToArray)의 후처리를 같은 순서와 조건으로 옮깁니다(H15).
+        /// 1) perfectSample 순 정렬, 2) 동시 노트 연결, 3) 근접 플래그, 4) 배열 마지막 원소에 isLast.
+        /// 부스트(Boost_ButForSystem)와 isCritical은 BMS로 표현할 수 없어 옮기지 않습니다.
+        /// 주의: 근접 플래그(isNearByFrontFlick4TapOrHold, isNearByFrontSlideEnd4Flick)는 판정 후보 창을 바꿉니다. 게임에서 판정을 확인한 뒤 머지하세요.
+        /// </summary>
+        private static void ApplyLoaderPostProcessing(List<NoteCreateData> noteList)
         {
             if (noteList == null || noteList.Count == 0)
             {
                 return;
             }
 
-            try
+            // 원본은 OrderBy(안정 정렬)를 씁니다. 같은 시각의 노트 순서가 같아야 isLast가 같은 노트에 붙습니다.
+            var notes = noteList.Where(n => n != null).OrderBy(n => n.perfectSample).ToList();
+            noteList.Clear();
+            noteList.AddRange(notes);
+            if (notes.Count == 0)
             {
-                int maxPerfectSample = int.MinValue;
-                NoteCreateData lastNote = null;
+                return;
+            }
 
-                // 모든 노트와 connectNodeDataArray의 끝 노트를 확인하여 가장 큰 perfectSample 찾기
-                foreach (var noteObj in noteList)
+            foreach (var note4 in notes)
+            {
+                // 원본: flag는 이 노트를 처리하기 시작할 때 동시 노트 연결이 없었는지를 봅니다.
+                bool flag = note4.simultaneouslyNote == null;
+                bool flag2 = note4.noteTypeID == NoteTypeId.Touch || note4.noteTypeID == NoteTypeId.Hold;
+                bool flag3 = note4.noteTypeID == NoteTypeId.Flick;
+
+                foreach (var note5 in notes)
                 {
-                    if (noteObj.perfectSample > maxPerfectSample)
+                    if (note4.noteTypeID == NoteTypeId.Hold && note5.noteTypeID == NoteTypeId.Flick &&
+                        note4.perfectSample == note5.perfectSample)
                     {
-                        maxPerfectSample = noteObj.perfectSample;
-                        lastNote = noteObj;
+                        note4.isSameTimingWithFlick = true;
                     }
 
-                    var connectArray = noteObj.connectNodeDataArray;
-                    if (connectArray == null) continue;
-
-                    foreach (var connectNode in connectArray)
+                    // 원본은 차이의 하한을 두지 않습니다. 뒤에 있는 플릭도 차이가 음수라 이 조건을 만족합니다. 그대로 옮깁니다.
+                    if (flag2 && note5.noteTypeID == NoteTypeId.Flick && note4.perfectSample - note5.perfectSample <= 9600)
                     {
-                        if (connectNode != null && connectNode.perfectSample > maxPerfectSample)
+                        note4.isNearByFrontFlick4TapOrHold = true;
+                    }
+
+                    if (flag3 && note5.noteTypeID == NoteTypeId.Fairy)
+                    {
+                        var fairyEnd = FirstConnectNode(note5);
+                        if (fairyEnd != null)
                         {
-                            maxPerfectSample = connectNode.perfectSample;
-                            lastNote = connectNode;
+                            int diff = note4.perfectSample - fairyEnd.perfectSample;
+                            if (diff <= 3000 && diff >= 0)
+                            {
+                                note4.isNearByFrontSlideEnd4Flick = true;
+                            }
                         }
                     }
-                }
 
-                // 마지막 노트에 isLast 설정
-                if (lastNote != null)
-                {
-                    lastNote.isLast = true;
+                    if (flag && note4.laneLeftRightID != note5.laneLeftRightID)
+                    {
+                        LinkSimultaneousNotes(note4, note5);
+                    }
                 }
             }
-            catch (Exception ex)
+
+            // 원본은 정렬된 배열의 마지막 원소(최상위 노트)에 isLast를 붙입니다.
+            notes[notes.Count - 1].isLast = true;
+        }
+
+        /// <summary>좌우 레인이 다른 두 노트가 같은 시각이면 동시 노트로 잇습니다. 원본 로더의 조건을 그대로 옮긴 것입니다.</summary>
+        private static void LinkSimultaneousNotes(NoteCreateData note4, NoteCreateData note5)
+        {
+            if (note4.perfectSample == note5.perfectSample)
             {
-                Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "SetLastNoteFlag 오류");
+                note4.simultaneouslyNote = note5;
+                note5.simultaneouslyNote = note4;
             }
+
+            var end4 = FirstConnectNode(note4);
+            var end5 = FirstConnectNode(note5);
+
+            if (note4.noteTypeID == NoteTypeId.Hold && end4 != null && end4.perfectSample == note5.perfectSample)
+            {
+                end4.simultaneouslyNote = note5;
+                note5.simultaneouslyNote = end4;
+                note5.isSimultaneouslyNoteConnectNote = true;
+            }
+
+            if (note5.noteTypeID == NoteTypeId.Hold && end5 != null && end5.perfectSample == note4.perfectSample)
+            {
+                note4.simultaneouslyNote = end5;
+                note4.isSimultaneouslyNoteConnectNote = true;
+                end5.simultaneouslyNote = note4;
+            }
+
+            if (note4.noteTypeID == NoteTypeId.Hold && note5.noteTypeID == NoteTypeId.Hold &&
+                end4 != null && end5 != null && end5.perfectSample == end4.perfectSample)
+            {
+                end4.simultaneouslyNote = end5;
+                end5.simultaneouslyNote = end4;
+                end4.isSimultaneouslyNoteConnectNote = true;
+                end5.isSimultaneouslyNoteConnectNote = true;
+            }
+        }
+
+        /// <summary>끝 노트(connectNodeDataArray[0])를 돌려줍니다. 없으면 null입니다.</summary>
+        private static NoteCreateData FirstConnectNode(NoteCreateData note)
+        {
+            var nodes = note.connectNodeDataArray;
+            return nodes != null && nodes.Length > 0 ? nodes[0] : null;
         }
     }
 }
