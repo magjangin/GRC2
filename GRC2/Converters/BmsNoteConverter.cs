@@ -323,6 +323,24 @@ namespace GRC2.Converters
                 return;
             }
 
+            // 안쪽 루프가 노트마다 모든 노트를 다시 훑던 플릭·페어리 조건은 한 번만 구해 둡니다(P2).
+            // 결과는 같습니다. 플릭은 샘플 집합과 최댓값이면 충분하고, 플릭 조건은 가장 늦은 플릭에서 가장 쉽게 만족합니다.
+            int maxFlickSample = int.MinValue;
+            var flickSamples = new HashSet<int>();
+            var fairies = new List<NoteCreateData>();
+            foreach (var note in notes)
+            {
+                if (note.noteTypeID == NoteTypeId.Flick)
+                {
+                    maxFlickSample = Math.Max(maxFlickSample, note.perfectSample);
+                    flickSamples.Add(note.perfectSample);
+                }
+                else if (note.noteTypeID == NoteTypeId.Fairy)
+                {
+                    fairies.Add(note);
+                }
+            }
+
             foreach (var note4 in notes)
             {
                 // 원본: flag는 이 노트를 처리하기 시작할 때 동시 노트 연결이 없었는지를 봅니다.
@@ -330,36 +348,44 @@ namespace GRC2.Converters
                 bool flag2 = note4.noteTypeID == NoteTypeId.Touch || note4.noteTypeID == NoteTypeId.Hold;
                 bool flag3 = note4.noteTypeID == NoteTypeId.Flick;
 
-                foreach (var note5 in notes)
+                if (note4.noteTypeID == NoteTypeId.Hold && flickSamples.Contains(note4.perfectSample))
                 {
-                    if (note4.noteTypeID == NoteTypeId.Hold && note5.noteTypeID == NoteTypeId.Flick &&
-                        note4.perfectSample == note5.perfectSample)
-                    {
-                        note4.isSameTimingWithFlick = true;
-                    }
+                    note4.isSameTimingWithFlick = true;
+                }
 
-                    // 원본은 차이의 하한을 두지 않습니다. 뒤에 있는 플릭도 차이가 음수라 이 조건을 만족합니다. 그대로 옮깁니다.
-                    if (flag2 && note5.noteTypeID == NoteTypeId.Flick && note4.perfectSample - note5.perfectSample <= 9600)
-                    {
-                        note4.isNearByFrontFlick4TapOrHold = true;
-                    }
+                // 원본은 차이의 하한을 두지 않습니다. 뒤에 있는 플릭도 차이가 음수라 이 조건을 만족합니다. 그대로 옮깁니다.
+                if (flag2 && maxFlickSample != int.MinValue && note4.perfectSample - maxFlickSample <= 9600)
+                {
+                    note4.isNearByFrontFlick4TapOrHold = true;
+                }
 
-                    if (flag3 && note5.noteTypeID == NoteTypeId.Fairy)
+                if (flag3)
+                {
+                    foreach (var fairy in fairies)
                     {
-                        var fairyEnd = FirstConnectNode(note5);
-                        if (fairyEnd != null)
+                        var fairyEnd = FirstConnectNode(fairy);
+                        if (fairyEnd == null)
                         {
-                            int diff = note4.perfectSample - fairyEnd.perfectSample;
-                            if (diff <= 3000 && diff >= 0)
-                            {
-                                note4.isNearByFrontSlideEnd4Flick = true;
-                            }
+                            continue;
+                        }
+
+                        int diff = note4.perfectSample - fairyEnd.perfectSample;
+                        if (diff <= 3000 && diff >= 0)
+                        {
+                            note4.isNearByFrontSlideEnd4Flick = true;
                         }
                     }
+                }
 
-                    if (flag && note4.laneLeftRightID != note5.laneLeftRightID)
+                // 동시 노트 연결은 원본처럼 노트 순서대로 훑습니다. 연결이 이미 있는 노트(flag가 꺼진 노트)는 건너뜁니다.
+                if (flag)
+                {
+                    foreach (var note5 in notes)
                     {
-                        LinkSimultaneousNotes(note4, note5);
+                        if (note4.laneLeftRightID != note5.laneLeftRightID)
+                        {
+                            LinkSimultaneousNotes(note4, note5);
+                        }
                     }
                 }
             }
