@@ -1,6 +1,5 @@
 using MelonLoader;
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 using GRC2.Core;
 using GRC2.Injectors;
@@ -63,7 +62,6 @@ namespace GRC2.Harmony
                 if (!_isTextReplacementEnabled || !IsPlayOrLoadingScene()) return;
 
                 string currentOriginalTitle = AlbumManager.GetOriginalTitle(AlbumManager.GetCurrentMusicID());
-                HashSet<string> allOriginalTitles = AlbumManager.GetAllOriginalTitles();
 
                 var currentSongInfo = AlbumManager.GetCurrentSongInfo();
                 if (currentSongInfo == null) return;
@@ -73,7 +71,7 @@ namespace GRC2.Harmony
 
                 // 원제목과 완전히 같은 문자열은 통째로 바꾸고, 원제목을 포함한 긴 문자열은 그 부분만 바꿉니다(D3).
                 // 예전에는 포함만 해도 문자열 전체를 바꿔서 "원제목이 들어간 문구"가 제목만 남았습니다.
-                if (allOriginalTitles.Contains(value))
+                if (AlbumManager.IsOriginalTitle(value))
                 {
                     value = songTitle;
                 }

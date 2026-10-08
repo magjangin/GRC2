@@ -258,11 +258,12 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// 모든 원제목 집합입니다. 호출마다 새로 만들지 않고 캐시한 집합을 돌려주므로 호출하는 쪽은 바꾸면 안 됩니다(H9).
+        /// 값이 어떤 원제목과 완전히 같은지 봅니다. 캐시한 집합은 밖으로 내보내지 않습니다(H9).
+        /// 집합을 돌려주면 호출하는 쪽이 바꿔 버릴 수 있어서 조회만 제공합니다.
         /// </summary>
-        public static HashSet<string> GetAllOriginalTitles()
+        public static bool IsOriginalTitle(string value)
         {
-            return _allOriginalTitles;
+            return !string.IsNullOrEmpty(value) && _allOriginalTitles.Contains(value);
         }
 
         private static void RebuildOriginalTitleSet()
