@@ -342,26 +342,30 @@ namespace GRC2.Core
                 }
 
                 var currentBmsFile = AlbumManager.GetCurrentBmsFile();
-                if (!string.IsNullOrEmpty(currentBmsFile))
+                if (string.IsNullOrEmpty(currentBmsFile))
                 {
-                    if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
+                    // 현재 앨범에 BMS가 없으면 이전 앨범의 차트가 남지 않도록 빈 목록을 넘깁니다(C2).
+                    // 빈 목록이면 주입이 건너뛰어져 원본 차트가 나옵니다.
+                    ParsedBmsNotes = new List<BmsNote>();
+                    _lastParsedBmsFile = null;
+                    NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                    MelonLogger.Msg("[SceneDetector] 현재 앨범에 BMS가 없어 노트 주입 목록을 비웠습니다.");
+                }
+                else if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
+                {
+                    MelonLogger.Msg($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
+                    if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
                     {
-                        MelonLogger.Msg($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
-                        if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
-                        {
-                            notes = BmsParser.ParseBmsFile(currentBmsFile);
-                            ParsedBmsNotesByFile[currentBmsFile] = notes ?? new List<BmsNote>();
-                        }
-
-                        ParsedBmsNotes = notes ?? new List<BmsNote>();
-                        _lastParsedBmsFile = currentBmsFile;
-
-                        if (ParsedBmsNotes != null && ParsedBmsNotes.Count > 0)
-                        {
-                            NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
-                            MelonLogger.Msg($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
-                        }
+                        notes = BmsParser.ParseBmsFile(currentBmsFile);
+                        ParsedBmsNotesByFile[currentBmsFile] = notes ?? new List<BmsNote>();
                     }
+
+                    ParsedBmsNotes = notes ?? new List<BmsNote>();
+                    _lastParsedBmsFile = currentBmsFile;
+
+                    // 노트가 0개여도 넘깁니다. 예전에는 0개면 넘기지 않아 이전 앨범의 차트가 남았습니다(C2).
+                    NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                    MelonLogger.Msg($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
                 }
             }
             catch (Exception ex)

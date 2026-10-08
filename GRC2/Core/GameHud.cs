@@ -46,6 +46,10 @@ namespace GRC2.Core
 
         private static Texture2D _whiteTex;
         private static GUIStyle _labelStyle;
+
+        private static string _warningText;
+        private static float _warningUntil = -1f;
+        private static GUIStyle _warningStyle;
         private static readonly Dictionary<long, Texture2D> CapsuleTexCache = new Dictionary<long, Texture2D>();
 
         /// <summary>SceneDetector.OnGUI()에서 매 프레임 호출합니다. 플레이 씬이 아니면 아무것도 그리지 않습니다.</summary>
@@ -53,13 +57,11 @@ namespace GRC2.Core
         {
             if (!isPlayScene)
             {
-                // 다음 곡에 이전 곡의 틱/라벨이 남지 않도록 플레이 씬을 벗어나면 비웁니다.
+                // 다음 곡에 이전 곡의 틱/라벨/경고가 남지 않도록 플레이 씬을 벗어나면 비웁니다.
                 ClearHits();
+                ClearWarning();
                 return;
             }
-
-            if (!CustomKeySettings.EnableJudgmentBar)
-                return;
 
             // OnGUI는 프레임당 Layout/Repaint 등 여러 이벤트로 불립니다. 실제로 그려지는 건 Repaint뿐입니다.
             Event guiEvent = Event.current;
@@ -68,8 +70,14 @@ namespace GRC2.Core
 
             try
             {
-                EnsureWhiteTexture();
-                DrawJudgmentBar();
+                // 경고는 판정바 설정과 관계없이 보입니다. 주입이 취소됐는데 아무 표시가 없으면 원인을 알 수 없습니다(H2).
+                DrawWarning();
+
+                if (CustomKeySettings.EnableJudgmentBar)
+                {
+                    EnsureWhiteTexture();
+                    DrawJudgmentBar();
+                }
             }
             catch (System.Exception ex)
             {
@@ -117,6 +125,31 @@ namespace GRC2.Core
                 return;
 
             SetLabel(JudgeNames[MissIndex], JudgeColors[MissIndex], Time.unscaledTime);
+        }
+
+        /// <summary>플레이 화면 위쪽에 경고 문구를 seconds초 동안 보입니다. 로그에만 남으면 플레이 중에는 알 수 없습니다(H2).</summary>
+        public static void ShowWarning(string text, float seconds)
+        {
+            _warningText = text;
+            _warningUntil = Time.unscaledTime + seconds;
+        }
+
+        private static void ClearWarning()
+        {
+            _warningText = null;
+            _warningUntil = -1f;
+        }
+
+        private static void DrawWarning()
+        {
+            if (string.IsNullOrEmpty(_warningText) || Time.unscaledTime >= _warningUntil)
+                return;
+
+            if (_warningStyle == null)
+                _warningStyle = new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 20, alignment = TextAnchor.UpperCenter };
+
+            _warningStyle.normal.textColor = new Color(1f, 0.35f, 0.35f, 1f);
+            GUI.Label(new Rect(0f, 40f, Screen.width, 40f), _warningText, _warningStyle);
         }
 
         private static void ClearHits()
