@@ -17,7 +17,8 @@ namespace GRC2.Parsers
         // 정규식 캐싱 (성능 최적화)
         // 헤더 명령(#BPM, #WAV)은 대소문자를 구분하지 않습니다(#wav001도 같은 키로 봅니다).
         private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        // #BPMxx 뒤의 콜론은 있어도 되고 없어도 됩니다(표준은 공백 구분, E1).
+        private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2})(?::|\s)\s*([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MeasureRegex = new Regex(@"^#(\d{3})(\d{2}):", RegexOptions.Compiled);
         private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
@@ -74,8 +75,9 @@ namespace GRC2.Parsers
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"[BmsParser] 파싱 오류: {ex.Message}\n{ex.StackTrace}");
-                return notes;
+                // 노트 수집 이후 단계가 실패하면 Time이 계산되지 않은 노트가 남습니다. 주입되지 않도록 이 파일의 노트를 모두 버립니다(H5).
+                MelonLogger.Error($"[BmsParser] 파싱 오류 (이 파일의 노트를 모두 버립니다): {ex.Message}\n{ex.StackTrace}");
+                return new List<BmsNote>();
             }
         }
 
@@ -207,24 +209,33 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
-        /// BPM 변화 처리: 채널 03-08 데이터는 measure 내 슬롯별 BPM 인덱스(hex). 인덱스→실제 BPM은 bpmIndexTable 사용.
+        /// BPM 변화 처리. 채널 03은 값(16진수)이 BPM 자체이고, 채널 08은 값이 #BPMxx 표의 인덱스입니다(E1).
+        /// 04·05·06·07은 BGA 채널이라 BPM 변화가 아닙니다. 예전에는 이 채널들도 BPM 인덱스로 읽었습니다.
         /// </summary>
         private static void ProcessBpmChange(int channel, string data, int currentMeasure, float baseBpm,
             Dictionary<int, float> bpmIndexTable, List<BpmChange> bpmChanges)
         {
-            if (channel < 0x03 || channel > 0x08) return;
+            if (channel != 0x03 && channel != 0x08) return;
 
-            var hexValues = BmsNoteDataParser.ParseHexData(data);
-            var measureLength = hexValues.Count;
+            var values = BmsNoteDataParser.ParseHexData(data);
+            var measureLength = values.Count;
             if (measureLength == 0) return;
 
-            for (int i = 0; i < hexValues.Count; i++)
+            for (int i = 0; i < values.Count; i++)
             {
-                var bpmIndexRef = hexValues[i];
-                if (bpmIndexRef <= 0) continue;
+                var value = values[i];
+                if (value <= 0) continue;
 
-                // BPM 인덱스 테이블에서 실제 BPM 조회 (없으면 기본 BPM)
-                var bpmValue = (bpmIndexTable != null && bpmIndexTable.TryGetValue(bpmIndexRef, out var v)) ? v : baseBpm;
+                float bpmValue;
+                if (channel == 0x03)
+                {
+                    bpmValue = value;
+                }
+                else
+                {
+                    // BPM 인덱스 테이블에서 실제 BPM 조회 (없으면 기본 BPM)
+                    bpmValue = (bpmIndexTable != null && bpmIndexTable.TryGetValue(value, out var v)) ? v : baseBpm;
+                }
 
                 // measure 내 위치 반영 (0.0~1.0)
                 var positionInMeasure = (float)i / measureLength;
