@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using GRC2.Core;
 using GRC2.Helpers;
 using GRC2.Parsers;
@@ -50,6 +51,27 @@ namespace GRC2.Harmony
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[MusicScrollViewHooks] 커스텀 곡 목록 주입 오류: {ex.Message}");
+            }
+        }
+
+        private static bool _warnedRangeOverlap;
+
+        /// <summary>
+        /// 커스텀 ID 범위(54~511)에 원본 MusicID 값이 들어 있으면 경고합니다. 게임에 곡이 추가되면 겹칠 수 있습니다(C4).
+        /// </summary>
+        private static void WarnIfCustomRangeOverlapsOriginal()
+        {
+            if (_warnedRangeOverlap)
+                return;
+            _warnedRangeOverlap = true;
+
+            foreach (MusicID id in Enum.GetValues(typeof(MusicID)))
+            {
+                int idValue = (int)id;
+                if (idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd)
+                {
+                    MelonLogger.Warning($"[MusicScrollViewHooks] 커스텀 ID 범위({CustomMusicIdStart}~{CustomMusicIdEnd})와 원본 MusicID {id}({idValue})가 겹칩니다.");
+                }
             }
         }
 
@@ -104,8 +126,17 @@ namespace GRC2.Harmony
 
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
+            // 앨범 순서를 키 이름순으로 고정합니다. 딕셔너리 열거 순서에 기대면 폴더를 추가·삭제할 때 ID가 밀립니다(C4).
+            // 같은 폴더 구성이면 항상 같은 ID가 붙습니다. (ID를 폴더 이름에 영구 매핑하는 것은 아직 하지 않았습니다.)
+            var orderedAlbums = albums
+                .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(kvp => kvp.Value)
+                .ToList();
+
+            WarnIfCustomRangeOverlapsOriginal();
+
             int injectedCount = 0;
-            foreach (AlbumInfo album in albums.Values)
+            foreach (AlbumInfo album in orderedAlbums)
             {
                 int customIdValue = CustomMusicIdStart + injectedCount;
                 if (customIdValue > CustomMusicIdEnd)

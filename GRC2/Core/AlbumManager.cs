@@ -137,9 +137,33 @@ namespace GRC2.Core
             if (_currentAlbum == null || _currentAlbum.BgmFiles.Count == 0)
                 return null;
 
-            var oggFile = _currentAlbum.BgmFiles.FirstOrDefault(f =>
-                f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase));
-            return oggFile ?? _currentAlbum.BgmFiles[0];
+            return ChooseBgmFile(_currentAlbum.BgmFiles);
+        }
+
+        /// <summary>
+        /// BGM 후보를 고릅니다. ogg, mp3 순으로 쓰고, wav는 파일명이 music/bgm/song으로 시작하는 것만 씁니다.
+        /// 키음(Hold end.wav 등)이 BGM으로 뽑히지 않게 하려는 것입니다(C3). 맞는 파일이 없으면 null이라 원본 BGM이 나옵니다.
+        /// </summary>
+        private static string ChooseBgmFile(List<string> candidates)
+        {
+            var sorted = candidates.OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase).ToList();
+
+            return sorted.FirstOrDefault(f => HasExtension(f, ".ogg"))
+                ?? sorted.FirstOrDefault(f => HasExtension(f, ".mp3"))
+                ?? sorted.FirstOrDefault(f => HasExtension(f, ".wav") && IsBgmFileName(f));
+        }
+
+        private static bool HasExtension(string path, string extension)
+        {
+            return path.EndsWith(extension, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsBgmFileName(string path)
+        {
+            string name = Path.GetFileNameWithoutExtension(path);
+            return name.StartsWith("music", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("bgm", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("song", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -351,6 +375,12 @@ namespace GRC2.Core
                 {
                     return null;
                 }
+
+                // 열거 순서는 보장되지 않으므로 파일 목록을 이름순으로 정렬해 "첫 번째 파일"이 항상 같게 합니다(H8).
+                albumInfo.BmsFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.ImageFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.BgaFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.BgmFiles.Sort(StringComparer.OrdinalIgnoreCase);
 
                 if (!string.IsNullOrEmpty(albumInfo.TxtFile))
                 {

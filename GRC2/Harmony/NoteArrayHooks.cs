@@ -17,6 +17,9 @@ namespace GRC2.Harmony
         private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
             AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
 
+        /// <summary>주입이 취소됐을 때 플레이 화면에 경고를 띄우는 시간(초)입니다.</summary>
+        private const float WarningSeconds = 8f;
+
         private static List<BmsNote> _bmsNotes = new List<BmsNote>();
 
         /// <summary>
@@ -47,11 +50,13 @@ namespace GRC2.Harmony
                     MelonLogger.Error("═══════════════════════════════════════════════════════════════");
                     MelonLogger.Error("[NoteArrayHooks] ❌ BMS 노트 주입이 취소되었습니다. 변환 결과가 null입니다. 이전 로그(BmsNoteConverter 등)와 BMS 파일을 확인하세요.");
                     MelonLogger.Error("═══════════════════════════════════════════════════════════════");
+                    GameHud.ShowWarning("BMS 차트 주입 취소: 원본 차트가 나옵니다 (로그 확인)", WarningSeconds);
                     return; // 주입 금지
                 }
                 if (noteCreateDataArray.Length == 0)
                 {
                     MelonLogger.Warning("[NoteArrayHooks] 변환된 노트가 없습니다.");
+                    GameHud.ShowWarning("BMS 차트에 노트가 없어 원본 차트가 나옵니다 (로그 확인)", WarningSeconds);
                     return;
                 }
 
