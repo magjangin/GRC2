@@ -43,6 +43,12 @@ namespace GRC2.Core
         private static Dictionary<MusicID, AlbumInfo> _musicIdToAlbumMap = new Dictionary<MusicID, AlbumInfo>();
         private static Dictionary<MusicID, string> _musicIdToOriginalTitleMap = new Dictionary<MusicID, string>();
 
+        /// <summary>_musicIdToOriginalTitleMap의 값만 모은 집합입니다. 제목이 바뀔 때만 다시 만듭니다(H9: 텍스트 설정마다 새로 만들지 않게).</summary>
+        private static readonly HashSet<string> _allOriginalTitles = new HashSet<string>();
+
+        /// <summary>앨범 → 커스텀 MusicID의 역방향 사전입니다. 텍스트 설정마다 선형 탐색하지 않게 둡니다(H9).</summary>
+        private static readonly Dictionary<AlbumInfo, MusicID> _albumToMusicId = new Dictionary<AlbumInfo, MusicID>();
+
         /// <summary>
         /// 아티스트 ID별 첫 곡 정보 저장 (아티스트ID -> (MusicID, 제목))
         /// </summary>
@@ -175,17 +181,8 @@ namespace GRC2.Core
         {
             if (album == null) return null;
 
-            // _musicIdToAlbumMap에서 앨범에 해당하는 MusicID 찾기
-            foreach (var kvp in _musicIdToAlbumMap)
-            {
-                if (kvp.Value == album)
-                {
-                    return kvp.Key;
-                }
-            }
-
-            // 매핑이 없으면 null 반환
-            return null;
+            // 역방향 사전에서 바로 찾습니다. 매핑이 없으면 null입니다.
+            return _albumToMusicId.TryGetValue(album, out MusicID musicId) ? musicId : (MusicID?)null;
         }
 
         public static IReadOnlyDictionary<string, AlbumInfo> GetAllAlbums()
@@ -218,7 +215,17 @@ namespace GRC2.Core
         {
             if (album != null)
             {
+                // 앨범 하나는 ID 하나입니다. 같은 앨범이 다른 ID에 붙어 있던 옛 연결은 지웁니다.
+                if (_albumToMusicId.TryGetValue(album, out MusicID previousId) &&
+                    !previousId.Equals(musicID) &&
+                    _musicIdToAlbumMap.TryGetValue(previousId, out AlbumInfo previousAlbum) &&
+                    previousAlbum == album)
+                {
+                    _musicIdToAlbumMap.Remove(previousId);
+                }
+
                 _musicIdToAlbumMap[musicID] = album;
+                _albumToMusicId[album] = musicID;
                 MelonLogger.Msg($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
             }
         }
@@ -232,7 +239,13 @@ namespace GRC2.Core
         {
             if (!string.IsNullOrWhiteSpace(originalTitle))
             {
+                _musicIdToOriginalTitleMap.TryGetValue(musicID, out string previousTitle);
                 _musicIdToOriginalTitleMap[musicID] = originalTitle;
+                if (previousTitle != originalTitle)
+                {
+                    RebuildOriginalTitleSet();
+                }
+
                 MelonLogger.Msg($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
             }
         }
@@ -244,17 +257,24 @@ namespace GRC2.Core
             return originalTitle;
         }
 
+        /// <summary>
+        /// 모든 원제목 집합입니다. 호출마다 새로 만들지 않고 캐시한 집합을 돌려주므로 호출하는 쪽은 바꾸면 안 됩니다(H9).
+        /// </summary>
         public static HashSet<string> GetAllOriginalTitles()
         {
-            var titles = new HashSet<string>();
+            return _allOriginalTitles;
+        }
+
+        private static void RebuildOriginalTitleSet()
+        {
+            _allOriginalTitles.Clear();
             foreach (var title in _musicIdToOriginalTitleMap.Values)
             {
                 if (!string.IsNullOrWhiteSpace(title))
                 {
-                    titles.Add(title);
+                    _allOriginalTitles.Add(title);
                 }
             }
-            return titles;
         }
 
         #endregion
@@ -273,6 +293,8 @@ namespace GRC2.Core
                 _musicIdToAlbumMap.Clear();
                 _musicIdToOriginalTitleMap.Clear();
                 _artistIdToFirstSong.Clear();
+                _allOriginalTitles.Clear();
+                _albumToMusicId.Clear();
 
                 MelonLogger.Msg("[AlbumManager] 앨범 폴더 스캔 시작");
 

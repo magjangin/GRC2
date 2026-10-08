@@ -1,5 +1,6 @@
 using MelonLoader;
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using GRC2.Core;
 using GRC2.Helpers;
@@ -69,22 +70,30 @@ namespace GRC2.Harmony
                 if (!_isTextReplacementEnabled || !IsPlayOrLoadingScene()) return;
 
                 string currentOriginalTitle = AlbumManager.GetOriginalTitle(AlbumManager.GetCurrentMusicID());
-                var allOriginalTitles = AlbumManager.GetAllOriginalTitles();
+                HashSet<string> allOriginalTitles = AlbumManager.GetAllOriginalTitles();
 
-                bool shouldReplace = (!string.IsNullOrEmpty(currentOriginalTitle) && value.Contains(currentOriginalTitle)) ||
-                                     allOriginalTitles.Contains(value);
+                var currentSongInfo = AlbumManager.GetCurrentSongInfo();
+                if (currentSongInfo == null) return;
 
-                if (shouldReplace)
+                string songTitle = currentSongInfo.Title;
+                string oldValue = value;
+
+                // 원제목과 완전히 같은 문자열은 통째로 바꾸고, 원제목을 포함한 긴 문자열은 그 부분만 바꿉니다(D3).
+                // 예전에는 포함만 해도 문자열 전체를 바꿔서 "원제목이 들어간 문구"가 제목만 남았습니다.
+                if (allOriginalTitles.Contains(value))
                 {
-                    var currentSongInfo = AlbumManager.GetCurrentSongInfo();
-                    if (currentSongInfo == null) return;
-
-                    string oldValue = value;
-                    string replaced = currentSongInfo.Title;
-                    value = replaced;
-
-                    MelonLogger.Msg($"[TextPatch] ✅ 텍스트 교체: '{oldValue}' -> '{replaced}'");
+                    value = songTitle;
                 }
+                else if (!string.IsNullOrEmpty(currentOriginalTitle) && value.Contains(currentOriginalTitle))
+                {
+                    value = value.Replace(currentOriginalTitle, songTitle);
+                }
+                else
+                {
+                    return;
+                }
+
+                MelonLogger.Msg($"[TextPatch] ✅ 텍스트 교체: '{oldValue}' -> '{value}'");
             }
             catch (Exception ex)
             {

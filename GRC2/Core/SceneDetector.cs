@@ -461,6 +461,7 @@ namespace GRC2.Core
                     MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
+                    AudioClipPatch.ResetHandledSelection();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
                 {
