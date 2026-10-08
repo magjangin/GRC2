@@ -3,7 +3,6 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GRC2.Core;
-using GRC2.Helpers;
 using GRC2.Injectors;
 using HarmonyLib;
 
@@ -32,32 +31,26 @@ namespace GRC2.Harmony
         /// <summary>
         /// 현재 씬이 플레이 씬 또는 로딩 씬인지 확인
         /// </summary>
+        /// <summary>씬 이름으로 본 교체 대상 여부입니다. 씬이 로드될 때 SceneDetector가 한 번 정합니다.</summary>
+        private static bool _isReplacementSceneByName;
+
+        /// <summary>
+        /// 씬이 로드될 때 SceneDetector가 호출합니다. 텍스트 설정마다 활성 씬 이름 문자열을 새로 만들지 않게 미리 정해 둡니다(P3).
+        /// 플레이 씬: FairyModeScene, PlayMovieScene / 로딩 씬: RenderCutinScene / 결과 씬: RythmGameResultScene.
+        /// </summary>
+        public static void OnSceneLoaded(string sceneName)
+        {
+            _isReplacementSceneByName =
+                sceneName == "FairyModeScene" ||
+                sceneName == "PlayMovieScene" ||
+                sceneName == "RenderCutinScene" ||
+                sceneName == "RythmGameResultScene";
+        }
+
         private static bool IsPlayOrLoadingScene()
         {
-            try
-            {
-                // BgmBgaInjector의 플레이 씬 상태 확인
-                if (BgmBgaInjector.IsPlayScene())
-                {
-                    return true;
-                }
-
-                // 현재 씬 이름 확인
-                // 플레이 씬: FairyModeScene, PlayMovieScene
-                // 로딩 씬: RenderCutinScene
-                // 결과 씬: RythmGameResultScene (결과 화면에서도 커스텀 차트 제목 표시 필요)
-                string sceneName = UnityEngine.SceneManagement.SceneManager.GetActiveScene().name;
-                return sceneName == "FairyModeScene" ||
-                       sceneName == "PlayMovieScene" ||
-                       sceneName == "RenderCutinScene" ||
-                       sceneName == "RythmGameResultScene";
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(ex, "[TextPatch] IsPlayOrLoadingScene", "씬 이름 확인 실패");
-            }
-            
-            return false;
+            // BgmBgaInjector의 플레이 씬 상태(FairyModeScene 로드 때 켜짐)와 씬 이름 판정을 함께 씁니다.
+            return BgmBgaInjector.IsPlayScene() || _isReplacementSceneByName;
         }
 
         public static void SetTextPrefix(ref string value)

@@ -401,6 +401,7 @@ namespace GRC2.Core
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             MelonLogger.Msg($"[SceneDetector] 씬 로드: {sceneName} (BuildIndex: {buildIndex})");
+            TextPatch.OnSceneLoaded(sceneName);
 
             if (!_isInitialized)
             {
