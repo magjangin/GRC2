@@ -15,6 +15,26 @@ namespace GRC2.Harmony
     {
         private static soRythmGameMusicDataMap.MusicID? _lastHandledMusicId;
 
+        /// <summary>
+        /// 원본 coChangePreviewBGM은 noticeChangedMusic 안에서 프리뷰 소스의 clip.name을 바로 읽습니다.
+        /// 음소거하면서 clip을 비워 둔 상태면 NullReferenceException으로 원본 프리뷰가 나오지 않으므로(D1),
+        /// 원본이 실행되기 전에 음소거를 풀어 clip을 돌려놓습니다. 커스텀 곡이면 postfix에서 다시 음소거합니다.
+        /// </summary>
+        [HarmonyPrefix]
+        public static void NoticeChangedMusicPrefix()
+        {
+            PreviewAudioManager.RestoreMutedAudioSources();
+        }
+
+        /// <summary>
+        /// 곡 선택 씬이 다시 열리면 같은 커스텀 곡을 다시 처리하도록 기억을 지웁니다.
+        /// 기억이 남아 있으면 되돌아온 뒤 같은 곡을 골라도 프리뷰가 나오지 않았습니다(D2).
+        /// </summary>
+        public static void ResetHandledSelection()
+        {
+            _lastHandledMusicId = null;
+        }
+
         [HarmonyPostfix]
         public static void NoticeChangedMusicPostfix(
             cMusicSelectSceneUIUpdater __instance,

@@ -43,6 +43,12 @@ namespace GRC2.Core
         private static Dictionary<MusicID, AlbumInfo> _musicIdToAlbumMap = new Dictionary<MusicID, AlbumInfo>();
         private static Dictionary<MusicID, string> _musicIdToOriginalTitleMap = new Dictionary<MusicID, string>();
 
+        /// <summary>_musicIdToOriginalTitleMap의 값만 모은 집합입니다. 제목이 바뀔 때만 다시 만듭니다(H9: 텍스트 설정마다 새로 만들지 않게).</summary>
+        private static readonly HashSet<string> _allOriginalTitles = new HashSet<string>();
+
+        /// <summary>앨범 → 커스텀 MusicID의 역방향 사전입니다. 텍스트 설정마다 선형 탐색하지 않게 둡니다(H9).</summary>
+        private static readonly Dictionary<AlbumInfo, MusicID> _albumToMusicId = new Dictionary<AlbumInfo, MusicID>();
+
         /// <summary>
         /// 아티스트 ID별 첫 곡 정보 저장 (아티스트ID -> (MusicID, 제목))
         /// </summary>
@@ -137,9 +143,33 @@ namespace GRC2.Core
             if (_currentAlbum == null || _currentAlbum.BgmFiles.Count == 0)
                 return null;
 
-            var oggFile = _currentAlbum.BgmFiles.FirstOrDefault(f =>
-                f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase));
-            return oggFile ?? _currentAlbum.BgmFiles[0];
+            return ChooseBgmFile(_currentAlbum.BgmFiles);
+        }
+
+        /// <summary>
+        /// BGM 후보를 고릅니다. ogg, mp3 순으로 쓰고, wav는 파일명이 music/bgm/song으로 시작하는 것만 씁니다.
+        /// 키음(Hold end.wav 등)이 BGM으로 뽑히지 않게 하려는 것입니다(C3). 맞는 파일이 없으면 null이라 원본 BGM이 나옵니다.
+        /// </summary>
+        private static string ChooseBgmFile(List<string> candidates)
+        {
+            var sorted = candidates.OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase).ToList();
+
+            return sorted.FirstOrDefault(f => HasExtension(f, ".ogg"))
+                ?? sorted.FirstOrDefault(f => HasExtension(f, ".mp3"))
+                ?? sorted.FirstOrDefault(f => HasExtension(f, ".wav") && IsBgmFileName(f));
+        }
+
+        private static bool HasExtension(string path, string extension)
+        {
+            return path.EndsWith(extension, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsBgmFileName(string path)
+        {
+            string name = Path.GetFileNameWithoutExtension(path);
+            return name.StartsWith("music", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("bgm", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("song", StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -175,17 +205,8 @@ namespace GRC2.Core
         {
             if (album == null) return null;
 
-            // _musicIdToAlbumMap에서 앨범에 해당하는 MusicID 찾기
-            foreach (var kvp in _musicIdToAlbumMap)
-            {
-                if (kvp.Value == album)
-                {
-                    return kvp.Key;
-                }
-            }
-
-            // 매핑이 없으면 null 반환
-            return null;
+            // 역방향 사전에서 바로 찾습니다. 매핑이 없으면 null입니다.
+            return _albumToMusicId.TryGetValue(album, out MusicID musicId) ? musicId : (MusicID?)null;
         }
 
         public static IReadOnlyDictionary<string, AlbumInfo> GetAllAlbums()
@@ -218,7 +239,17 @@ namespace GRC2.Core
         {
             if (album != null)
             {
+                // 앨범 하나는 ID 하나입니다. 같은 앨범이 다른 ID에 붙어 있던 옛 연결은 지웁니다.
+                if (_albumToMusicId.TryGetValue(album, out MusicID previousId) &&
+                    !previousId.Equals(musicID) &&
+                    _musicIdToAlbumMap.TryGetValue(previousId, out AlbumInfo previousAlbum) &&
+                    previousAlbum == album)
+                {
+                    _musicIdToAlbumMap.Remove(previousId);
+                }
+
                 _musicIdToAlbumMap[musicID] = album;
+                _albumToMusicId[album] = musicID;
                 MelonLogger.Msg($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
             }
         }
@@ -232,7 +263,13 @@ namespace GRC2.Core
         {
             if (!string.IsNullOrWhiteSpace(originalTitle))
             {
+                _musicIdToOriginalTitleMap.TryGetValue(musicID, out string previousTitle);
                 _musicIdToOriginalTitleMap[musicID] = originalTitle;
+                if (previousTitle != originalTitle)
+                {
+                    RebuildOriginalTitleSet();
+                }
+
                 MelonLogger.Msg($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
             }
         }
@@ -244,17 +281,25 @@ namespace GRC2.Core
             return originalTitle;
         }
 
-        public static HashSet<string> GetAllOriginalTitles()
+        /// <summary>
+        /// 값이 어떤 원제목과 완전히 같은지 봅니다. 캐시한 집합은 밖으로 내보내지 않습니다(H9).
+        /// 집합을 돌려주면 호출하는 쪽이 바꿔 버릴 수 있어서 조회만 제공합니다.
+        /// </summary>
+        public static bool IsOriginalTitle(string value)
         {
-            var titles = new HashSet<string>();
+            return !string.IsNullOrEmpty(value) && _allOriginalTitles.Contains(value);
+        }
+
+        private static void RebuildOriginalTitleSet()
+        {
+            _allOriginalTitles.Clear();
             foreach (var title in _musicIdToOriginalTitleMap.Values)
             {
                 if (!string.IsNullOrWhiteSpace(title))
                 {
-                    titles.Add(title);
+                    _allOriginalTitles.Add(title);
                 }
             }
-            return titles;
         }
 
         #endregion
@@ -273,6 +318,8 @@ namespace GRC2.Core
                 _musicIdToAlbumMap.Clear();
                 _musicIdToOriginalTitleMap.Clear();
                 _artistIdToFirstSong.Clear();
+                _allOriginalTitles.Clear();
+                _albumToMusicId.Clear();
 
                 MelonLogger.Msg("[AlbumManager] 앨범 폴더 스캔 시작");
 
@@ -351,6 +398,12 @@ namespace GRC2.Core
                 {
                     return null;
                 }
+
+                // 열거 순서는 보장되지 않으므로 파일 목록을 이름순으로 정렬해 "첫 번째 파일"이 항상 같게 합니다(H8).
+                albumInfo.BmsFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.ImageFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.BgaFiles.Sort(StringComparer.OrdinalIgnoreCase);
+                albumInfo.BgmFiles.Sort(StringComparer.OrdinalIgnoreCase);
 
                 if (!string.IsNullOrEmpty(albumInfo.TxtFile))
                 {

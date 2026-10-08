@@ -68,9 +68,20 @@ namespace GRC2.Injectors
             int lastNoteSample = 0;
             foreach (var note in noteArray)
             {
-                if (note != null && note.perfectSample > lastNoteSample)
+                if (note == null)
+                    continue;
+
+                lastNoteSample = Math.Max(lastNoteSample, note.perfectSample);
+
+                // 홀드·페어리의 끝 노트는 connectNodeDataArray에 있습니다. 여기를 빼면 끝 노트가 BGM보다 늦을 때 잘립니다(B3).
+                var connectNodes = note.connectNodeDataArray;
+                if (connectNodes == null)
+                    continue;
+
+                foreach (var connectNode in connectNodes)
                 {
-                    lastNoteSample = note.perfectSample;
+                    if (connectNode != null)
+                        lastNoteSample = Math.Max(lastNoteSample, connectNode.perfectSample);
                 }
             }
 

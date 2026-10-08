@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.IO;
+using GRC2.Helpers;
 using IntiCreates;
 using MelonLoader;
 using UnityEngine;
@@ -13,11 +14,11 @@ namespace GRC2.Injectors
     /// </summary>
     internal static class BgmLoader
     {
-        private const int BaseTimeoutFrames = 600;       // 기본 10초 (60fps 기준)
-        private const int MaxTimeoutFrames = 3600;       // 최대 60초
-        private const int LogIntervalFrames = 120;       // 2초마다 로딩 진행 로그
-        private const float FramesPerSecond = 60.0f;
-        private const double FramesPerMbPerSec = 6.0;    // 10MB당 60프레임
+        // 시간은 프레임 수가 아니라 실제 시간(초)으로 셉니다. 프레임으로 세면 144Hz 화면에서 2.4배 짧아집니다(F3).
+        private const float BaseTimeoutSeconds = 10f;     // 기본 10초
+        private const float MaxTimeoutSeconds = 60f;      // 최대 60초
+        private const float LogIntervalSeconds = 2f;      // 2초마다 로딩 진행 로그
+        private const double SecondsPerMb = 0.1;          // 10MB당 1초
 
         /// <summary>
         /// AudioClip을 로드하고 cBGMBeatManager에 주입합니다.
@@ -28,33 +29,39 @@ namespace GRC2.Injectors
             Action<bool> setInjectedCallback)
         {
             long fileSizeBytes = GetFileSizeBytes(bgmFilePath);
-            int maxWaitFrames = CalcTimeoutFrames(fileSizeBytes);
+            float maxWaitSeconds = CalcTimeoutSeconds(fileSizeBytes);
 
             // 문자열을 이어 붙이면 경로에 '#', '%', '?'가 있을 때 URL이 잘못 해석됩니다.
             // 곡 선택 프리뷰(CustomBgmPlayer)가 같은 파일을 이미 이 방식으로 읽습니다.
             var fileUrl = new Uri(Path.GetFullPath(bgmFilePath)).AbsoluteUri;
             UnityWebRequest request = UnityWebRequestMultimedia.GetAudioClip(fileUrl, GetAudioType(bgmFilePath));
-            request.SendWebRequest();
 
-            yield return WaitForRequest(request, maxWaitFrames);
-
-            if (!request.isDone)
+            // 로딩 중에 StopInjection으로 코루틴이 멈춰도 요청이 남지 않도록 finally에서 해제합니다(H7).
+            try
             {
-                MelonLogger.Error($"[BgmLoader] BGM 로딩 타임아웃 (최대 {maxWaitFrames / FramesPerSecond:F1}초)");
+                request.SendWebRequest();
+
+                yield return WaitForRequest(request, maxWaitSeconds);
+
+                if (!request.isDone)
+                {
+                    MelonLogger.Error($"[BgmLoader] BGM 로딩 타임아웃 (최대 {maxWaitSeconds:F1}초)");
+                    yield break;
+                }
+
+                if (request.result == UnityWebRequest.Result.Success)
+                {
+                    InjectLoadedClip(request, bgmFilePath, bgmBeatManager, setInjectedCallback);
+                }
+                else
+                {
+                    MelonLogger.Warning($"[BgmLoader] BGM 로드 실패: {request.error}");
+                }
+            }
+            finally
+            {
                 request.Dispose();
-                yield break;
             }
-
-            if (request.result == UnityWebRequest.Result.Success)
-            {
-                InjectLoadedClip(request, bgmFilePath, bgmBeatManager, setInjectedCallback);
-            }
-            else
-            {
-                MelonLogger.Warning($"[BgmLoader] BGM 로드 실패: {request.error}");
-            }
-
-            request.Dispose();
         }
 
         private static void InjectLoadedClip(
@@ -80,6 +87,12 @@ namespace GRC2.Injectors
 
                 var clipNameForLog = string.IsNullOrEmpty(audioClip.name) ? fileName : audioClip.name;
                 MelonLogger.Msg($"[BgmLoader] 주입할 BGM: {clipNameForLog}, 길이: {audioClip.length:F3}초 ({audioClip.samples} 샘플)");
+
+                // 노트 시계는 NoteSampleTime.SampleRate(48000Hz)로 계산합니다. 다른 샘플레이트의 BGM이면 노트가 그 비율만큼 밀립니다(B1).
+                if (audioClip.frequency != NoteSampleTime.SampleRate)
+                {
+                    MelonLogger.Error($"[BgmLoader] ⚠ BGM 샘플레이트가 {audioClip.frequency}Hz입니다. 노트 타이밍이 맞으려면 48000Hz로 다시 저장해야 합니다.");
+                }
 
                 bgmBeatManager.setClip(audioClip, false);
                 VerifyInjection(bgmBeatManager, audioClip, fileName);
@@ -124,27 +137,26 @@ namespace GRC2.Injectors
             }
         }
 
-        private static int CalcTimeoutFrames(long fileSizeBytes)
+        private static float CalcTimeoutSeconds(long fileSizeBytes)
         {
-            if (fileSizeBytes <= 0) return BaseTimeoutFrames;
+            if (fileSizeBytes <= 0) return BaseTimeoutSeconds;
             double fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
-            int additional = (int)(fileSizeMB * FramesPerMbPerSec);
-            return Math.Min(BaseTimeoutFrames + additional, MaxTimeoutFrames);
+            double additional = fileSizeMB * SecondsPerMb;
+            return (float)Math.Min(BaseTimeoutSeconds + additional, MaxTimeoutSeconds);
         }
 
-        private static IEnumerator WaitForRequest(UnityWebRequest request, int maxWaitFrames)
+        private static IEnumerator WaitForRequest(UnityWebRequest request, float maxWaitSeconds)
         {
-            int waitCount = 0;
-            int lastLogFrame = 0;
-            while (!request.isDone && waitCount < maxWaitFrames)
+            float start = Time.realtimeSinceStartup;
+            float nextLogAt = start + LogIntervalSeconds;
+            while (!request.isDone && Time.realtimeSinceStartup - start < maxWaitSeconds)
             {
-                waitCount++;
-                if (waitCount - lastLogFrame >= LogIntervalFrames)
+                if (Time.realtimeSinceStartup >= nextLogAt)
                 {
-                    float elapsed = waitCount / FramesPerSecond;
+                    float elapsed = Time.realtimeSinceStartup - start;
                     float progress = request.downloadProgress * 100.0f;
                     MelonLogger.Msg($"[BgmLoader] BGM 로딩 중... ({elapsed:F1}초 경과, {progress:F1}%)");
-                    lastLogFrame = waitCount;
+                    nextLogAt += LogIntervalSeconds;
                 }
                 yield return null;
             }

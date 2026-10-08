@@ -222,10 +222,6 @@ namespace GRC2.Core
         private static readonly AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
             AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
 
-        // setPauseButtonPusable은 private이므로 열린 인스턴스 델리게이트로 한 번만 바인딩합니다.
-        private static readonly Action<IntiCreates.cRythmGameManager, bool> SetPauseButtonPusable =
-            AccessTools.MethodDelegate<Action<IntiCreates.cRythmGameManager, bool>>(
-                AccessTools.Method(typeof(IntiCreates.cRythmGameManager), "setPauseButtonPusable"));
 
         private static void HandlePauseKeyInput()
         {
@@ -256,10 +252,10 @@ namespace GRC2.Core
 
                 if (!isPausing)
                 {
-                    // 일시정지 버튼 활성화 상태 강제 후 메뉴 열기
-                    SetPauseButtonPusable?.Invoke(manager, true);
+                    // 원본은 로딩·시작·클리어 연출 중에 일시정지 버튼을 잠급니다. 예전에는 여기서 잠금을 강제로 풀었기 때문에
+                    // 그 구간에서도 Space/Esc로 메뉴가 열렸습니다(H13). 이제 잠금은 그대로 두고, 원본 requestPause가 스스로 판단합니다.
                     manager.requestPause();
-                    MelonLogger.Msg("[SceneDetector] ⏸️ 키 입력 (Space/ESC) -> 일시정지 메뉴 오픈 (requestPause)");
+                    MelonLogger.Msg("[SceneDetector] ⏸️ 키 입력 (Space/ESC) -> 일시정지 요청 (원본이 잠금 상태면 무시됨)");
                 }
             }
             catch (Exception ex)
@@ -396,26 +392,30 @@ namespace GRC2.Core
                 }
 
                 var currentBmsFile = AlbumManager.GetCurrentBmsFile();
-                if (!string.IsNullOrEmpty(currentBmsFile))
+                if (string.IsNullOrEmpty(currentBmsFile))
                 {
-                    if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
+                    // 현재 앨범에 BMS가 없으면 이전 앨범의 차트가 남지 않도록 빈 목록을 넘깁니다(C2).
+                    // 빈 목록이면 주입이 건너뛰어져 원본 차트가 나옵니다.
+                    ParsedBmsNotes = new List<BmsNote>();
+                    _lastParsedBmsFile = null;
+                    NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                    MelonLogger.Msg("[SceneDetector] 현재 앨범에 BMS가 없어 노트 주입 목록을 비웠습니다.");
+                }
+                else if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
+                {
+                    MelonLogger.Msg($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
+                    if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
                     {
-                        MelonLogger.Msg($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
-                        if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
-                        {
-                            notes = BmsParser.ParseBmsFile(currentBmsFile);
-                            ParsedBmsNotesByFile[currentBmsFile] = notes ?? new List<BmsNote>();
-                        }
-
-                        ParsedBmsNotes = notes ?? new List<BmsNote>();
-                        _lastParsedBmsFile = currentBmsFile;
-
-                        if (ParsedBmsNotes != null && ParsedBmsNotes.Count > 0)
-                        {
-                            NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
-                            MelonLogger.Msg($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
-                        }
+                        notes = BmsParser.ParseBmsFile(currentBmsFile);
+                        ParsedBmsNotesByFile[currentBmsFile] = notes ?? new List<BmsNote>();
                     }
+
+                    ParsedBmsNotes = notes ?? new List<BmsNote>();
+                    _lastParsedBmsFile = currentBmsFile;
+
+                    // 노트가 0개여도 넘깁니다. 예전에는 0개면 넘기지 않아 이전 앨범의 차트가 남았습니다(C2).
+                    NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                    MelonLogger.Msg($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
                 }
             }
             catch (Exception ex)
@@ -455,6 +455,7 @@ namespace GRC2.Core
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             MelonLogger.Msg($"[SceneDetector] 씬 로드: {sceneName} (BuildIndex: {buildIndex})");
+            TextPatch.OnSceneLoaded(sceneName);
 
             if (!_isInitialized)
             {
@@ -515,6 +516,7 @@ namespace GRC2.Core
                     MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
+                    AudioClipPatch.ResetHandledSelection();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
                 {

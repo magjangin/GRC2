@@ -13,9 +13,9 @@ namespace GRC2.Harmony
     public static class SteamApiHijacker
     {
         /// <summary>
-        /// Steam API 초기화 실패 여부
+        /// SteamAPI.Init의 결과. null이면 아직 호출되지 않은 것입니다. Init 실패를 true로 바꾸지 않습니다(A3).
         /// </summary>
-        public static bool IsBypassed { get; private set; } = false;
+        public static bool? SteamInitResult { get; private set; }
 
         #region Harmony Patches
 
@@ -27,24 +27,34 @@ namespace GRC2.Harmony
 
         public static void InitPostfix(ref bool __result)
         {
+            // 원본 게임은 Init 실패를 로그만 남기고 계속 진행합니다. 여기서 true로 바꾸면 SteamManager.Initialized가 켜져
+            // cDlcDirector 등이 초기화되지 않은 Steamworks를 호출해 예외가 납니다(알려진 문제 A3). 그래서 결과를 그대로 둡니다.
+            SteamInitResult = __result;
             if (!__result)
             {
-                MelonLogger.Msg("[SteamApiHijacker] SteamAPI.Init returned false. Bypassing and forcing to true.");
-                IsBypassed = true;
-                __result = true;
+                MelonLogger.Msg("[SteamApiHijacker] SteamAPI.Init returned false. 결과는 그대로 두고, 콜백/Shutdown 호출만 건너뜁니다.");
             }
         }
 
+        /// <summary>Init이 성공했을 때만 원본 콜백을 실행합니다. 초기화되지 않은 Steamworks 콜백은 예외를 냅니다.</summary>
         public static bool RunCallbacksPrefix()
         {
-            if (IsBypassed) return false; // 우회 상태면 본래 콜백 무시
-            return true;
+            return SteamInitResult == true;
         }
 
+        /// <summary>Init이 성공했을 때만 원본 Shutdown을 실행합니다.</summary>
         public static bool ShutdownPrefix()
         {
-            if (IsBypassed) return false; // 우회 상태면 본래 셧다운 무시
-            return true;
+            return SteamInitResult == true;
+        }
+
+        /// <summary>
+        /// Init이 실패한 환경(스팀 미실행, Goldberg 없음)에서는 Steamworks가 언어를 읽을 수 없어 예외가 납니다.
+        /// 그때만 OS 언어로 대신 답합니다. Init을 아직 호출하지 않았다면 원본을 그대로 씁니다.
+        /// </summary>
+        public static string FallbackGameLanguage()
+        {
+            return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ko" ? "korean" : "english";
         }
 
         public static bool BIsDlcInstalledPrefix(ref bool __result)
@@ -82,7 +92,10 @@ namespace GRC2.Harmony
                     return;
                 }
 
-                string dataAddonPath = Path.GetFullPath("DataAddon");
+                // 작업 폴더 기준(Path.GetFullPath)으로 찾으면 런처나 바로가기로 실행할 때 DataAddon을 못 찾습니다.
+                // 게임 폴더(dataPath의 상위)를 기준으로 찾습니다(A6).
+                string gameFolder = Path.GetDirectoryName(UnityEngine.Application.dataPath);
+                string dataAddonPath = Path.Combine(gameFolder, "DataAddon");
                 MelonLogger.Msg($"[SteamApiHijacker] cDlcDirector.Initialize Postfix - Scanning {dataAddonPath}...");
 
                 if (!Directory.Exists(dataAddonPath))
@@ -93,13 +106,24 @@ namespace GRC2.Harmony
 
                 foreach (string dir in Directory.GetDirectories(dataAddonPath))
                 {
-                    string dirName = Path.GetFileName(dir);
-                    if (!int.TryParse(dirName, out int index))
-                        continue;
+                    // 폴더 하나가 실패해도 나머지 DLC 등록은 계속합니다(H6).
+                    try
+                    {
+                        string dirName = Path.GetFileName(dir);
+                        if (!int.TryParse(dirName, out int index))
+                        {
+                            MelonLogger.Msg($"[SteamApiHijacker]   -> 숫자가 아닌 폴더는 건너뜁니다: {dirName}");
+                            continue;
+                        }
 
-                    string fullPath = Path.GetFullPath(dir);
-                    dlcList[index] = new cDlcDirector.cDlcInfo { mMountPath = fullPath };
-                    MelonLogger.Msg($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
+                        string fullPath = Path.GetFullPath(dir);
+                        dlcList[index] = new cDlcDirector.cDlcInfo { mMountPath = fullPath };
+                        MelonLogger.Msg($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
+                    }
+                    catch (Exception ex)
+                    {
+                        MelonLogger.Error($"[SteamApiHijacker] DLC 폴더 등록 실패 ({dir}): {ex.Message}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -205,6 +229,21 @@ namespace GRC2.Harmony
             private static void Postfix(cDlcDirector __instance)
             {
                 InitializePostfix(__instance);
+            }
+        }
+
+        [HarmonyPatch(typeof(SteamApps), "GetCurrentGameLanguage")]
+        private static class GetCurrentGameLanguagePatch
+        {
+            [HarmonyPrefix]
+            private static bool Prefix(ref string __result)
+            {
+                // Init이 아직 호출되지 않았다면(null) 원본을 그대로 씁니다.
+                if (SteamInitResult != false)
+                    return true;
+
+                __result = FallbackGameLanguage();
+                return false;
             }
         }
 

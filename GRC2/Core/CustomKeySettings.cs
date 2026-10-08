@@ -18,6 +18,43 @@ namespace GRC2.Core
         private const string FolderName = "savecustomkey";
         private const string FileName = "config.txt";
 
+        // 기본값은 이 한 곳에만 둡니다. 프로퍼티 초기값, 키가 없을 때의 대체값, 새로 만드는 설정 파일이 모두 이 값을 씁니다(H3).
+        private const bool DefaultAutoPlay = false;
+        private const bool DefaultAllPerfect = false;
+        private const bool DefaultBlockSave = true;
+        private const bool DefaultEnableJudgmentBar = true;
+        private const bool DefaultJudgmentBarVertical = true;
+        private const bool DefaultJudgmentBarCapsule = false;
+        private const bool DefaultJudgmentBarLeft = true;
+        private const bool DefaultNoteSway = false;
+        private const float DefaultNoteSwayAmplitude = 20f;
+        private const float DefaultNoteSwaySpeed = 0.8f;
+        private const bool DefaultNoteSwayDamping = true;
+        private const float DefaultNoteSwayDampingTime = 0.4f;
+        private const bool DefaultNoteSpeedChaos = false;
+        private const float DefaultNoteSpeedChaosMin = 0.6f;
+        private const float DefaultNoteSpeedChaosMax = 1.8f;
+        private const bool DefaultNoteSpeedChaosPerLane = true;
+
+        // 허용 범위. 범위를 벗어난 값은 가장 가까운 한계로 맞추고 경고를 남깁니다. 0이면 노트가 멈추고 음수면 거꾸로 가므로 하한을 둡니다(H3).
+        private const float MinNoteSwayAmplitude = 0f;
+        private const float MaxNoteSwayAmplitude = 200f;
+        private const float MinNoteSwaySpeed = 0f;
+        private const float MaxNoteSwaySpeed = 10f;
+        private const float MinNoteSwayDampingTime = 0.01f;
+        private const float MaxNoteSwayDampingTime = 5f;
+        private const float MinNoteSpeedChaos = 0.1f;
+        private const float MaxNoteSpeedChaos = 10f;
+
+        /// <summary>이 모드가 아는 설정 키입니다. 여기 없는 키는 오타일 수 있어 경고합니다.</summary>
+        private static readonly HashSet<string> KnownKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "AutoPlay", "AllPerfect", "BlockSave",
+            "EnableJudgmentBar", "JudgmentBarVertical", "JudgmentBarCapsule", "JudgmentBarLeft",
+            "NoteSway", "NoteSwayAmplitude", "NoteSwaySpeed", "NoteSwayDamping", "NoteSwayDampingTime",
+            "NoteSpeedChaos", "NoteSpeedChaosMin", "NoteSpeedChaosMax", "NoteSpeedChaosPerLane"
+        };
+
         /// <summary>Initialize에서 확정한 설정 파일 경로. Reload/PollFileChange는 이 경로만 사용합니다.</summary>
         private static string _filePath;
 
@@ -27,25 +64,25 @@ namespace GRC2.Core
         /// <summary>마지막으로 "변경 감지 로그를 띄운" 파일 수정 시각. 같은 수정에 로그가 반복되지 않게 합니다.</summary>
         private static DateTime _announcedWriteTimeUtc = DateTime.MinValue;
 
-        public static bool AutoPlay { get; private set; }
-        public static bool AllPerfect { get; private set; }
-        public static bool BlockSave { get; private set; } = true;
+        public static bool AutoPlay { get; private set; } = DefaultAutoPlay;
+        public static bool AllPerfect { get; private set; } = DefaultAllPerfect;
+        public static bool BlockSave { get; private set; } = DefaultBlockSave;
 
-        public static bool EnableJudgmentBar { get; private set; } = true;
-        public static bool JudgmentBarVertical { get; private set; } = true;
-        public static bool JudgmentBarCapsule { get; private set; }
-        public static bool JudgmentBarLeft { get; private set; } = true;
+        public static bool EnableJudgmentBar { get; private set; } = DefaultEnableJudgmentBar;
+        public static bool JudgmentBarVertical { get; private set; } = DefaultJudgmentBarVertical;
+        public static bool JudgmentBarCapsule { get; private set; } = DefaultJudgmentBarCapsule;
+        public static bool JudgmentBarLeft { get; private set; } = DefaultJudgmentBarLeft;
 
-        public static bool NoteSway { get; private set; }
-        public static float NoteSwayAmplitude { get; private set; } = 20f;
-        public static float NoteSwaySpeed { get; private set; } = 0.8f;
-        public static bool NoteSwayDamping { get; private set; } = true;
-        public static float NoteSwayDampingTime { get; private set; } = 0.4f;
+        public static bool NoteSway { get; private set; } = DefaultNoteSway;
+        public static float NoteSwayAmplitude { get; private set; } = DefaultNoteSwayAmplitude;
+        public static float NoteSwaySpeed { get; private set; } = DefaultNoteSwaySpeed;
+        public static bool NoteSwayDamping { get; private set; } = DefaultNoteSwayDamping;
+        public static float NoteSwayDampingTime { get; private set; } = DefaultNoteSwayDampingTime;
 
-        public static bool NoteSpeedChaos { get; private set; }
-        public static float NoteSpeedChaosMin { get; private set; } = 0.6f;
-        public static float NoteSpeedChaosMax { get; private set; } = 1.8f;
-        public static bool NoteSpeedChaosPerLane { get; private set; } = true;
+        public static bool NoteSpeedChaos { get; private set; } = DefaultNoteSpeedChaos;
+        public static float NoteSpeedChaosMin { get; private set; } = DefaultNoteSpeedChaosMin;
+        public static float NoteSpeedChaosMax { get; private set; } = DefaultNoteSpeedChaosMax;
+        public static bool NoteSpeedChaosPerLane { get; private set; } = DefaultNoteSpeedChaosPerLane;
 
         public static void Initialize(string gameFolder)
         {
@@ -172,6 +209,10 @@ namespace GRC2.Core
                 $"PerLane={NoteSpeedChaosPerLane})";
         }
 
+        private static string Bit(bool value) => value ? "1" : "0";
+
+        private static string Num(float value) => value.ToString(CultureInfo.InvariantCulture);
+
         private static readonly string[] DefaultLines =
         {
             "# 이 파일은 게임을 재시작하지 않아도 반영됩니다. 저장해두면 다음 플레이(리트라이 포함)부터 적용됩니다.",
@@ -180,54 +221,54 @@ namespace GRC2.Core
             "# 지원 형식: 1/0, true/false, 참/거짓, 켜기/끄기(켜짐/꺼짐), 활성화/비활성화, on/off, enable/disable, enabled/disabled, y/n, yes/no, 트루/폴스",
             "",
             "# 오토 플레이 (1 = 켜짐, 0 = 꺼짐)",
-            "AutoPlay=0",
+            $"AutoPlay={Bit(DefaultAutoPlay)}",
             "",
-            "# 올 퍼펙트 판정 조작 - BLUESTAR (1 = 켜짐, 0 = 꺼짐)",
-            "AllPerfect=1",
+            "# 올 퍼펙트 판정 조작 - BLUESTAR (1 = 켜짐, 0 = 꺼짐). 기본은 꺼짐입니다.",
+            $"AllPerfect={Bit(DefaultAllPerfect)}",
             "",
-            "# 베스트 스코어 / 랭킹 저장 차단 (1 = 켜짐, 0 = 꺼짐)",
-            "BlockSave=1",
+            "# 베스트 스코어 / 랭킹 저장 차단 (1 = 켜짐, 0 = 꺼짐). 결과 화면에서만 막습니다.",
+            $"BlockSave={Bit(DefaultBlockSave)}",
             "",
             "# 실시간 판정바 표시 (1 = 켜짐, 0 = 꺼짐)",
-            "EnableJudgmentBar=1",
+            $"EnableJudgmentBar={Bit(DefaultEnableJudgmentBar)}",
             "",
             "# 판정바 형태 (1 = 세로 판정바, 0 = 가로 판정바)",
-            "JudgmentBarVertical=1",
+            $"JudgmentBarVertical={Bit(DefaultJudgmentBarVertical)}",
             "",
             "# 판정바 모양 (1 = 알약(캡슐) 모양, 0 = 사각 바)",
-            "JudgmentBarCapsule=0",
+            $"JudgmentBarCapsule={Bit(DefaultJudgmentBarCapsule)}",
             "",
             "# 세로 판정바를 화면 어느 쪽에 둘지 (1 = 왼쪽, 0 = 오른쪽). 가로 판정바에는 영향 없음(항상 중앙).",
-            "JudgmentBarLeft=1",
+            $"JudgmentBarLeft={Bit(DefaultJudgmentBarLeft)}",
             "",
             "# 노트가 눈송이처럼 좌우로 흔들리며 내려오는 연출 (1 = 켜짐, 0 = 꺼짐)",
             "# 판정에는 전혀 영향이 없는 순수 시각 효과입니다.",
-            "NoteSway=0",
+            $"NoteSway={Bit(DefaultNoteSway)}",
             "",
-            "# 흔들림 폭 (픽셀). 너무 크면 레인 밖으로 나가 잘릴 수 있습니다.",
-            "NoteSwayAmplitude=20",
+            "# 흔들림 폭. 대략 픽셀 단위지만 실제로는 값 × 0.01을 로컬 좌표에 더합니다. 너무 크면 레인 밖으로 나가 잘릴 수 있습니다.",
+            $"NoteSwayAmplitude={Num(DefaultNoteSwayAmplitude)}",
             "",
             "# 흔들림 속도 (초당 왕복 횟수)",
-            "NoteSwaySpeed=0.8",
+            $"NoteSwaySpeed={Num(DefaultNoteSwaySpeed)}",
             "",
             "# 판정선에 가까워지면 흔들림을 잦아들게 함 (1 = 켜짐, 0 = 꺼짐)",
             "# 끄면 판정선에 닿는 순간까지 계속 흔들립니다.",
-            "NoteSwayDamping=1",
+            $"NoteSwayDamping={Bit(DefaultNoteSwayDamping)}",
             "",
             "# 판정선 도달 몇 초 전부터 흔들림이 잦아들지",
-            "NoteSwayDampingTime=0.4",
+            $"NoteSwayDampingTime={Num(DefaultNoteSwayDampingTime)}",
             "",
             "# [챌린지] 노트마다 낙하 속도를 제각각으로 (1 = 켜짐, 0 = 꺼짐)",
             "# 노트끼리 서로 추월하므로 읽기가 매우 어려워집니다. 판정에는 영향이 없습니다.",
-            "NoteSpeedChaos=0",
+            $"NoteSpeedChaos={Bit(DefaultNoteSpeedChaos)}",
             "",
             "# 속도 배율 범위 (1 = 원래 속도). 예: 0.6 ~ 1.8",
-            "NoteSpeedChaosMin=0.6",
-            "NoteSpeedChaosMax=1.8",
+            $"NoteSpeedChaosMin={Num(DefaultNoteSpeedChaosMin)}",
+            $"NoteSpeedChaosMax={Num(DefaultNoteSpeedChaosMax)}",
             "",
             "# 1 = 레인마다 속도가 다름(같은 레인 안에서는 순서 유지, 읽을 수는 있음)",
             "# 0 = 노트마다 속도가 다름(완전 카오스)",
-            "NoteSpeedChaosPerLane=1"
+            $"NoteSpeedChaosPerLane={Bit(DefaultNoteSpeedChaosPerLane)}"
         };
 
         /// <summary>
@@ -253,23 +294,35 @@ namespace GRC2.Core
             if (values.Count == 0)
                 return false;
 
-            AutoPlay = ParseBool(values, "AutoPlay", false);
-            AllPerfect = ParseBool(values, "AllPerfect", false);
-            BlockSave = ParseBool(values, "BlockSave", true);
-            EnableJudgmentBar = ParseBool(values, "EnableJudgmentBar", true);
-            JudgmentBarVertical = ParseBool(values, "JudgmentBarVertical", true);
-            JudgmentBarCapsule = ParseBool(values, "JudgmentBarCapsule", false);
-            JudgmentBarLeft = ParseBool(values, "JudgmentBarLeft", true);
-            NoteSway = ParseBool(values, "NoteSway", false);
-            NoteSwayAmplitude = ParseFloat(values, "NoteSwayAmplitude", 20f);
-            NoteSwaySpeed = ParseFloat(values, "NoteSwaySpeed", 0.8f);
-            NoteSwayDamping = ParseBool(values, "NoteSwayDamping", true);
-            NoteSwayDampingTime = ParseFloat(values, "NoteSwayDampingTime", 0.4f);
-            NoteSpeedChaos = ParseBool(values, "NoteSpeedChaos", false);
-            NoteSpeedChaosMin = ParseFloat(values, "NoteSpeedChaosMin", 0.6f);
-            NoteSpeedChaosMax = ParseFloat(values, "NoteSpeedChaosMax", 1.8f);
-            NoteSpeedChaosPerLane = ParseBool(values, "NoteSpeedChaosPerLane", true);
+            WarnUnknownKeys(values);
+
+            AutoPlay = ParseBool(values, "AutoPlay", DefaultAutoPlay);
+            AllPerfect = ParseBool(values, "AllPerfect", DefaultAllPerfect);
+            BlockSave = ParseBool(values, "BlockSave", DefaultBlockSave);
+            EnableJudgmentBar = ParseBool(values, "EnableJudgmentBar", DefaultEnableJudgmentBar);
+            JudgmentBarVertical = ParseBool(values, "JudgmentBarVertical", DefaultJudgmentBarVertical);
+            JudgmentBarCapsule = ParseBool(values, "JudgmentBarCapsule", DefaultJudgmentBarCapsule);
+            JudgmentBarLeft = ParseBool(values, "JudgmentBarLeft", DefaultJudgmentBarLeft);
+            NoteSway = ParseBool(values, "NoteSway", DefaultNoteSway);
+            NoteSwayAmplitude = ParseRangedFloat(values, "NoteSwayAmplitude", DefaultNoteSwayAmplitude, MinNoteSwayAmplitude, MaxNoteSwayAmplitude);
+            NoteSwaySpeed = ParseRangedFloat(values, "NoteSwaySpeed", DefaultNoteSwaySpeed, MinNoteSwaySpeed, MaxNoteSwaySpeed);
+            NoteSwayDamping = ParseBool(values, "NoteSwayDamping", DefaultNoteSwayDamping);
+            NoteSwayDampingTime = ParseRangedFloat(values, "NoteSwayDampingTime", DefaultNoteSwayDampingTime, MinNoteSwayDampingTime, MaxNoteSwayDampingTime);
+            NoteSpeedChaos = ParseBool(values, "NoteSpeedChaos", DefaultNoteSpeedChaos);
+            NoteSpeedChaosMin = ParseRangedFloat(values, "NoteSpeedChaosMin", DefaultNoteSpeedChaosMin, MinNoteSpeedChaos, MaxNoteSpeedChaos);
+            NoteSpeedChaosMax = ParseRangedFloat(values, "NoteSpeedChaosMax", DefaultNoteSpeedChaosMax, MinNoteSpeedChaos, MaxNoteSpeedChaos);
+            NoteSpeedChaosPerLane = ParseBool(values, "NoteSpeedChaosPerLane", DefaultNoteSpeedChaosPerLane);
             return true;
+        }
+
+        /// <summary>오타나 옛 키를 조용히 무시하면 설정이 안 먹는 이유를 알 수 없으므로 한 번씩 알립니다(H3).</summary>
+        private static void WarnUnknownKeys(Dictionary<string, string> values)
+        {
+            foreach (var key in values.Keys)
+            {
+                if (!KnownKeys.Contains(key))
+                    MelonLogger.Warning($"[CustomKeySettings] 알 수 없는 설정 키를 무시합니다: {key}");
+            }
         }
 
         /// <summary>
@@ -282,13 +335,22 @@ namespace GRC2.Core
             if (!values.TryGetValue(key, out var raw))
                 return fallback;
 
+            if (!string.IsNullOrWhiteSpace(raw) && !TryParseBoolKeyword(raw, out _))
+                MelonLogger.Warning($"[CustomKeySettings] {key}={raw} 은(는) 알 수 없는 값이라 기본값 {fallback}을 씁니다.");
+
             return ParseBool(raw, fallback);
         }
 
         public static bool ParseBool(string raw, bool fallback)
         {
+            return TryParseBoolKeyword(raw, out bool value) ? value : fallback;
+        }
+
+        private static bool TryParseBoolKeyword(string raw, out bool value)
+        {
+            value = false;
             if (string.IsNullOrWhiteSpace(raw))
-                return fallback;
+                return false;
 
             switch (raw.Trim().ToLowerInvariant())
             {
@@ -304,6 +366,7 @@ namespace GRC2.Core
                 case "enabled":
                 case "y":
                 case "yes":
+                    value = true;
                     return true;
 
                 case "0":
@@ -318,22 +381,38 @@ namespace GRC2.Core
                 case "disabled":
                 case "n":
                 case "no":
-                    return false;
+                    value = false;
+                    return true;
 
                 default:
-                    return fallback;
+                    return false;
             }
         }
 
-        private static float ParseFloat(Dictionary<string, string> values, string key, float fallback)
+        /// <summary>
+        /// 실수를 읽고 허용 범위로 맞춥니다. NaN과 무한대는 읽지 않은 것으로 보고 기본값을 씁니다(H3).
+        /// 키가 없으면 조용히 기본값을 씁니다.
+        /// </summary>
+        private static float ParseRangedFloat(Dictionary<string, string> values, string key, float fallback, float min, float max)
         {
-            if (values.TryGetValue(key, out var raw) &&
-                float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed))
+            if (!values.TryGetValue(key, out var raw))
+                return fallback;
+
+            if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float parsed) ||
+                float.IsNaN(parsed) || float.IsInfinity(parsed))
             {
-                return parsed;
+                MelonLogger.Warning($"[CustomKeySettings] {key}={raw} 은(는) 숫자가 아니라 기본값 {Num(fallback)}을 씁니다.");
+                return fallback;
             }
 
-            return fallback;
+            if (parsed < min || parsed > max)
+            {
+                float clamped = Math.Max(min, Math.Min(max, parsed));
+                MelonLogger.Warning($"[CustomKeySettings] {key}={raw} 은(는) 허용 범위 {Num(min)}~{Num(max)}를 벗어나 {Num(clamped)}로 맞춥니다.");
+                return clamped;
+            }
+
+            return parsed;
         }
     }
 }
