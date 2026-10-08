@@ -35,6 +35,9 @@ namespace GRC2.Core
         private static readonly HashSet<string> ImageExtensions = new HashSet<string> { ".jpg", ".png", ".jpeg" };
         private static readonly HashSet<string> AudioExtensions = new HashSet<string> { ".mp3", ".wav", ".ogg" };
 
+        /// <summary>hwa 루트 앨범의 키입니다. AlbumName은 폴더 이름("hwa")이므로 이름이 아니라 이 키로 찾습니다.</summary>
+        private const string RootAlbumKey = "root";
+
         private static Dictionary<string, AlbumInfo> _albums = new Dictionary<string, AlbumInfo>();
         private static AlbumInfo _currentAlbum = null;
         private static Dictionary<MusicID, AlbumInfo> _musicIdToAlbumMap = new Dictionary<MusicID, AlbumInfo>();
@@ -185,7 +188,7 @@ namespace GRC2.Core
             return null;
         }
 
-        public static Dictionary<string, AlbumInfo> GetAllAlbums()
+        public static IReadOnlyDictionary<string, AlbumInfo> GetAllAlbums()
         {
             return _albums;
         }
@@ -267,6 +270,9 @@ namespace GRC2.Core
             {
                 _albums.Clear();
                 _currentAlbum = null;
+                _musicIdToAlbumMap.Clear();
+                _musicIdToOriginalTitleMap.Clear();
+                _artistIdToFirstSong.Clear();
 
                 MelonLogger.Msg("[AlbumManager] 앨범 폴더 스캔 시작");
 
@@ -312,6 +318,9 @@ namespace GRC2.Core
             MelonLogger.Msg($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
         }
 
+        /// <summary>
+        /// 루트 앨범이 있으면 그것을, 없으면 키 순서상 첫 앨범을 고릅니다. 열거 순서에 기대지 않으려고 정렬합니다.
+        /// </summary>
         private static void SelectDefaultAlbum()
         {
             if (_albums.Count == 0)
@@ -319,8 +328,9 @@ namespace GRC2.Core
                 return;
             }
 
-            var defaultAlbum = _albums.Values.FirstOrDefault(a => a.AlbumName == "root")
-                ?? _albums.Values.First();
+            AlbumInfo defaultAlbum = _albums.TryGetValue(RootAlbumKey, out var rootAlbum)
+                ? rootAlbum
+                : _albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase).First().Value;
             SelectAlbum(defaultAlbum.AlbumFolderPath);
         }
 
@@ -411,7 +421,7 @@ namespace GRC2.Core
         private static string GetAlbumKey(string albumFolderPath)
         {
             string albumKey = Path.GetFileName(albumFolderPath);
-            return string.IsNullOrEmpty(albumKey) || albumKey == "hwa" ? "root" : albumKey;
+            return string.IsNullOrEmpty(albumKey) || albumKey == "hwa" ? RootAlbumKey : albumKey;
         }
 
         #endregion
@@ -458,82 +468,6 @@ namespace GRC2.Core
             }
 
             return album;
-        }
-
-        /// <summary>
-        /// 곡 정보(txt 파일)로 앨범 찾기 및 선택
-        /// </summary>
-        public static bool SelectAlbumBySongInfo(SongInfo songInfo)
-        {
-            if (songInfo == null) return false;
-
-            try
-            {
-                var matchedAlbum = FindAlbumBySongInfo(songInfo);
-                if (matchedAlbum != null)
-                {
-                    _currentAlbum = matchedAlbum;
-                    return true;
-                }
-
-                return SelectFirstAlbumWhenAvailable();
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Error($"[AlbumManager] 곡 정보로 앨범 선택 오류: {ex.Message}");
-                return false;
-            }
-        }
-
-        private static AlbumInfo FindAlbumBySongInfo(SongInfo songInfo)
-        {
-            foreach (var album in _albums.Values)
-            {
-                if (album.SongInfo == null)
-                {
-                    continue;
-                }
-
-                if (HasSameTitle(songInfo, album.SongInfo))
-                {
-                    MelonLogger.Msg($"[AlbumManager] 곡 제목으로 앨범 선택: {album.AlbumName} (제목: {songInfo.Title})");
-                    return album;
-                }
-
-                if (HasSameArtist(songInfo, album.SongInfo))
-                {
-                    MelonLogger.Msg($"[AlbumManager] 아티스트로 앨범 선택: {album.AlbumName} (아티스트: {songInfo.Artist})");
-                    return album;
-                }
-            }
-
-            return null;
-        }
-
-        private static bool HasSameTitle(SongInfo target, SongInfo candidate)
-        {
-            return !string.IsNullOrEmpty(target.Title) &&
-                !string.IsNullOrEmpty(candidate.Title) &&
-                candidate.Title.Equals(target.Title, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool HasSameArtist(SongInfo target, SongInfo candidate)
-        {
-            return !string.IsNullOrEmpty(target.Artist) &&
-                !string.IsNullOrEmpty(candidate.Artist) &&
-                candidate.Artist.Equals(target.Artist, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private static bool SelectFirstAlbumWhenAvailable()
-        {
-            if (_albums.Count == 0)
-            {
-                return false;
-            }
-
-            _currentAlbum = _albums.Values.First();
-            MelonLogger.Msg($"[AlbumManager] 매칭되는 앨범이 없어 기본 앨범 선택: {_currentAlbum.AlbumName}");
-            return true;
         }
 
         #endregion

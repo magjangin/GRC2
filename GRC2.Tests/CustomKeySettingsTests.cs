@@ -1,35 +1,10 @@
-using System;
-using System.IO;
 using GRC2.Core;
 using Xunit;
 
 namespace GRC2.Tests
 {
-    public class CustomKeySettingsTests : IDisposable
+    public class CustomKeySettingsTests
     {
-        private readonly string _tempDirectory;
-
-        public CustomKeySettingsTests()
-        {
-            _tempDirectory = Path.Combine(Path.GetTempPath(), "GRC2Tests_" + Guid.NewGuid().ToString("N"));
-            Directory.CreateDirectory(_tempDirectory);
-        }
-
-        public void Dispose()
-        {
-            if (Directory.Exists(_tempDirectory))
-            {
-                try
-                {
-                    Directory.Delete(_tempDirectory, recursive: true);
-                }
-                catch
-                {
-                    // Ignore cleanup errors in tests
-                }
-            }
-        }
-
         [Theory]
         [InlineData("true", true)]
         [InlineData("트루", true)]

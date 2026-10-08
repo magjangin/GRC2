@@ -73,27 +73,11 @@ namespace GRC2.Injectors
                     _bgmBeatManagerInstance = beatManager;
                     MelonLogger.Msg("[BgmInjector] cBGMBeatManager 인스턴스 발견");
                     BgmSearcher.LogOriginalAudioInfo(_bgmBeatManagerInstance, "BgmInjector");
-                    return;
                 }
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogWarning(ex, "[BgmInjector] FindBeatManager", "FindObjectOfType(cBGMBeatManager) 실패");
-            }
-
-            // 활성 컴포넌트에서 찾지 못한 경우 AudioSource 쪽에서 역으로 찾기
-            try
-            {
-                if (BgmSearcher.TryFindBeatManagerFromAudioSource(out var beatManagerFromAudio))
-                {
-                    _bgmBeatManagerInstance = beatManagerFromAudio;
-                    MelonLogger.Msg("[BgmInjector] AudioSource에서 cBGMBeatManager 발견");
-                    BgmSearcher.LogOriginalAudioInfo(_bgmBeatManagerInstance, "BgmInjector");
-                }
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogWarning(ex, "[BgmInjector] FindBeatManager", "AudioSource 경로 검색 실패");
             }
         }
     }

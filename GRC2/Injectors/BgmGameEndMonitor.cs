@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.IO;
 using GRC2.Core;
 using GRC2.Helpers;
 using HarmonyLib;
@@ -109,12 +110,22 @@ namespace GRC2.Injectors
         {
             if (__instance == null ||
                 __result == null ||
-                !CustomAssetManager.ShouldInjectCustomContent())
+                !CustomAssetManager.ShouldInjectCustomContent() ||
+                !HasCurrentBgmFile())
             {
                 return;
             }
 
             __result = WaitForTimingAndRunOriginal(__instance, __result);
+        }
+
+        /// <summary>
+        /// BGM 파일이 없는 곡은 종료 시각이 정해지지 않습니다. 그 상태에서 감싸면 기다릴 이유가 없는 15초를 헛되이 기다리므로 감싸지 않습니다.
+        /// </summary>
+        private static bool HasCurrentBgmFile()
+        {
+            string bgmFile = AlbumManager.GetCurrentBgmFile();
+            return !string.IsNullOrEmpty(bgmFile) && File.Exists(bgmFile);
         }
 
         private static IEnumerator WaitForTimingAndRunOriginal(cRythmGameManager manager, IEnumerator original)

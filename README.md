@@ -30,4 +30,4 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --logger "console;verbosity=normal"
 ```
 
-`GRC2.sln`에는 테스트 프로젝트가 들어 있지 않아서, `test_debug.bat`(`dotnet test GRC2.sln`)은 현재 테스트를 하나도 실행하지 않고 성공으로 끝납니다. 위 명령처럼 테스트 프로젝트를 직접 지정하세요(2026-10-04 기준 71개 통과).
+`GRC2.sln`에는 테스트 프로젝트가 들어 있지 않아서, `test_debug.bat`(`dotnet test GRC2.sln`)은 현재 테스트를 하나도 실행하지 않고 성공으로 끝납니다. 위 명령처럼 테스트 프로젝트를 직접 지정하세요(2026-10-08 기준 72개 통과).

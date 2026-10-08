@@ -53,13 +53,20 @@ namespace GRC2.Harmony
             }
         }
 
+        private static bool IsCustomMusicId(MusicID musicId)
+        {
+            int idValue = (int)musicId;
+            return idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd;
+        }
+
         private static void RegisterArtistFirstSongs(List<MusicSelectScrollItemData> cellList)
         {
             var seenArtists = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (MusicSelectScrollItemData item in cellList)
             {
-                if (item == null)
+                // 재진입 때는 이전에 주입한 커스텀 항목이 목록 끝에 남아 있습니다. 그것을 원본 첫 곡으로 등록하면 안 됩니다.
+                if (item == null || IsCustomMusicId(item.mMusicSelectData.musicID))
                     continue;
 
                 MusicSelectData musicData = item.mMusicSelectData;
@@ -93,13 +100,7 @@ namespace GRC2.Harmony
             // 항목이 남아있다면 먼저 제거하고 다시 주입합니다. 중복 항목이 하나라도 있으면
             // 뒤쪽 곡의 스크롤 위치 계산(getNeedsScrollCountUntilID)이 어긋나 엉뚱한 곡이
             // 선택된 채로 화면에 표시됩니다.
-            cellList.RemoveAll(item =>
-            {
-                if (item == null)
-                    return false;
-                int idValue = (int)item.mMusicSelectData.musicID;
-                return idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd;
-            });
+            cellList.RemoveAll(item => item != null && IsCustomMusicId(item.mMusicSelectData.musicID));
 
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 

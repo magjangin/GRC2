@@ -25,8 +25,9 @@ namespace GRC2.Tests
             };
             float baseBpm = 120f;
             float baseFreq = 60f / baseBpm;
+            // 0~1마디 @120 = 2초, 1~2마디 @60 = 4초
             float t = BmsParser.CalculateTime(2f, baseBpm, baseFreq, changes);
-            Assert.True(t > 0f);
+            Assert.Equal(6f, t, precision: 5);
         }
     }
 }

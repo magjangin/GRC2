@@ -47,8 +47,11 @@ namespace GRC2.Harmony
                 requestedPath,
                 sprite =>
                 {
+                    // 요청하는 사이에 씬이 바뀌어 instance가 파괴됐다면 적용하지 않습니다.
+                    // 그대로 두면 아래 FindArtworkInstance가 다른 씬의 아트워크를 찾아 엉뚱한 곳에 그립니다.
                     string currentPath = AlbumManager.GetCurrentImageFile();
-                    if (!CustomAssetManager.IsCustomChartSelected() ||
+                    if (instance == null ||
+                        !CustomAssetManager.IsCustomChartSelected() ||
                         string.IsNullOrEmpty(currentPath) ||
                         !string.Equals(
                             Path.GetFullPath(currentPath),

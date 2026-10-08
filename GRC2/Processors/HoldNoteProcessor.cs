@@ -60,7 +60,7 @@ namespace GRC2.Processors
         private static HoldAttachResult AttachHoldEnd(
             BmsNote holdEnd,
             Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote, int EndSample)>> holdStartByLane,
+            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
             Dictionary<string, NoteCreateData> processedHoldStartsByEndKey,
             float timeTolerance)
         {
@@ -152,7 +152,7 @@ namespace GRC2.Processors
             BmsNote holdEnd,
             string fallbackSearchKey,
             Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote, int EndSample)>> holdStartByLane,
+            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
             Dictionary<string, NoteCreateData> processedHoldStartsByEndKey,
             float timeTolerance)
         {
@@ -164,7 +164,7 @@ namespace GRC2.Processors
             (NoteCreateData Note, BmsNote BmsNote)? bestMatch = null;
             float bestTimeDiff = float.MaxValue;
 
-            foreach (var (key, noteObj, bmsNote, endSample) in laneNotes)
+            foreach (var (key, noteObj, bmsNote) in laneNotes)
             {
                 if (!holdStartMap.TryGetValue(key, out var keyList) || keyList.Count == 0) continue;
                 var expectedEndTime = bmsNote.Time + bmsNote.Duration;
@@ -413,18 +413,18 @@ namespace GRC2.Processors
                 noteObj.subLaneID == EnumValueHelper.GetSubLaneType(holdStartBms.Lane);
         }
 
-        private static Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote, int EndSample)>> BuildHoldStartByLane(
+        private static Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> BuildHoldStartByLane(
             Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
-            var holdStartByLane = new Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote, int EndSample)>>();
+            var holdStartByLane = new Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>>();
             foreach (var kvp in holdStartMap)
             {
                 foreach (var (noteObj, bmsNote) in kvp.Value)
                 {
                     var laneKey = (bmsNote.Lane, bmsNote.IsLeft);
                     if (!holdStartByLane.ContainsKey(laneKey))
-                        holdStartByLane[laneKey] = new List<(string, NoteCreateData, BmsNote, int)>();
-                    holdStartByLane[laneKey].Add((kvp.Key, noteObj, bmsNote, ToSampleIndex(bmsNote.Time + bmsNote.Duration)));
+                        holdStartByLane[laneKey] = new List<(string, NoteCreateData, BmsNote)>();
+                    holdStartByLane[laneKey].Add((kvp.Key, noteObj, bmsNote));
                 }
             }
 

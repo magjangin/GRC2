@@ -30,6 +30,15 @@ namespace GRC2.Tests
         }
 
         [Fact]
+        public void ParseHexData_KeepsSlotForUnreadableChunk_SoLaterSlotsDoNotShift()
+        {
+            // "0Z"는 16진수가 아니므로 빈 슬롯(0)이 되고, 뒤의 "0A"는 제자리(인덱스 2)에 남아야 합니다.
+            var values = BmsNoteDataParser.ParseHexData("010Z0A", valueWidth: 2);
+
+            Assert.Equal(new[] { 1, 0, 10 }, values);
+        }
+
+        [Fact]
         public void ParseNoteData_WithThreeCharacterWidth_UsesThreeCharacterSlotCount()
         {
             var notes = BmsNoteDataParser.ParseNoteData(1, 11, "00100000A", valueWidth: 3);

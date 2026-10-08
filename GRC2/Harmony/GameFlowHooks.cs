@@ -76,11 +76,12 @@ namespace GRC2.Harmony
                     return;
 
                 AlbumInfo album = AlbumManager.GetCurrentAlbum();
-                string artistId = album?.SongInfo?.Character;
-                if (string.IsNullOrWhiteSpace(artistId))
-                    artistId = album?.SongInfo?.Artist;
                 if (album == null)
                     return;
+
+                string artistId = album.SongInfo?.Character;
+                if (string.IsNullOrWhiteSpace(artistId))
+                    artistId = album.SongInfo?.Artist;
 
                 soRythmGameMusicDataMap.MusicID previousMusicId = __instance.mCurentMusicId;
                 var firstSong = string.IsNullOrWhiteSpace(artistId)

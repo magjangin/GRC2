@@ -152,7 +152,7 @@ namespace GRC2.Injectors
 
         public static AudioType GetAudioType(string filePath)
         {
-            var extension = Path.GetExtension(filePath).ToLower();
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
             switch (extension)
             {
                 case ".mp3":

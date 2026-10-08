@@ -15,33 +15,6 @@ namespace GRC2.Injectors
             return instance != null;
         }
 
-        /// <summary>
-        /// FindObjectOfType이 놓치는 비활성 컴포넌트를 위해 AudioSource 쪽에서 역으로 찾습니다.
-        /// cBGMBeatManager는 [RequireComponent(typeof(AudioSource))]이므로 항상 같은 GameObject에 있습니다.
-        /// </summary>
-        public static bool TryFindBeatManagerFromAudioSource(out cBGMBeatManager instance)
-        {
-            instance = null;
-
-            var audioSources = UnityEngine.Object.FindObjectsOfType<AudioSource>();
-            if (audioSources == null || audioSources.Length == 0)
-            {
-                return false;
-            }
-
-            foreach (var audioSource in audioSources)
-            {
-                var beatManager = audioSource.GetComponent<cBGMBeatManager>();
-                if (beatManager != null)
-                {
-                    instance = beatManager;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         public static void LogOriginalAudioInfo(cBGMBeatManager instance, string logPrefix)
         {
             if (instance == null)

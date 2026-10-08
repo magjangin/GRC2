@@ -140,8 +140,11 @@ namespace GRC2.Injectors
                     }
                 }
 
-                // 둘 다 주입 완료되면 종료
-                if (BgaInjector.IsInjected && (BgmInjector.IsInjected || !_isPlayScene))
+                // 할 일이 남지 않으면 종료. 파일이 없는 쪽은 할 일이 없으므로 끝난 것으로 봅니다.
+                // (예전에는 BGA 파일이 없는 곡에서 이 조건이 영원히 거짓이라 코루틴이 끝나지 않았습니다.)
+                bool bgaDone = BgaInjector.IsInjected || string.IsNullOrEmpty(_bgaFilePath);
+                bool bgmDone = BgmInjector.IsInjected || string.IsNullOrEmpty(_bgmFilePath) || !_isPlayScene;
+                if (bgaDone && bgmDone)
                 {
                     break;
                 }

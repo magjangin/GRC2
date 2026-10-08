@@ -8,11 +8,11 @@ namespace GRC2.Parsers
         public int Channel { get; set; }
         public float Tick { get; set; }  // measure 단위 (예: 1.5 = measure 1의 중간)
         public float Time { get; set; }  // 초 단위
-        public int Lane { get; set; }    // 게임 레인 (1-6)
+        public int Lane { get; set; }    // 레인 인덱스 0~2 (IsLeft와 함께 게임 레인을 정함)
         public bool IsLeft { get; set; }  // 왼쪽 레인인지
         public NoteType Type { get; set; }
         public NoteDirection? Direction { get; set; }
-        public float Duration { get; set; }  // 홀드 길이 (초 단위)
+        public float Duration { get; set; }  // 홀드/페어리 길이. 파싱 직후에는 tick, CalculateNoteTimes 이후에는 초
         
         // 홀드/페어리 노트 연결 참조
         public BmsNote StartNote { get; set; } // 끝 노트인 경우 시작 노트 참조

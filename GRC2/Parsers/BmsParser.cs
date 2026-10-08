@@ -15,10 +15,11 @@ namespace GRC2.Parsers
     public static class BmsParser
     {
         // 정규식 캐싱 (성능 최적화)
-        private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled);
-        private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)", RegexOptions.Compiled);
+        // 헤더 명령(#BPM, #WAV)은 대소문자를 구분하지 않습니다(#wav001도 같은 키로 봅니다).
+        private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex MeasureRegex = new Regex(@"^#(\d{3})(\d{2}):", RegexOptions.Compiled);
-        private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled);
+        private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>
         /// BMS 파일 파싱 메인 메서드
@@ -129,7 +130,7 @@ namespace GRC2.Parsers
                     continue;
 
                 // 기본 BPM 설정 (#BPM)
-                if (line.StartsWith("#BPM"))
+                if (line.StartsWith("#BPM", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = BpmRegex.Match(line);
                     if (match.Success)

@@ -73,14 +73,12 @@ namespace GRC2.Parsers
             if (valueWidth <= 0)
                 return values;
             
-            // WAV 키 폭에 맞춰 2자리 또는 3자리 단위로 16진수 파싱
+            // WAV 키 폭에 맞춰 2자리 또는 3자리 단위로 16진수 파싱.
+            // 읽지 못한 조각은 버리지 않고 0(빈 슬롯)으로 둡니다. 버리면 뒤의 슬롯이 앞으로 밀려 노트 시각이 틀어집니다.
             for (int i = 0; i + valueWidth <= trimmed.Length; i += valueWidth)
             {
                 var hex = trimmed.Substring(i, valueWidth);
-                if (int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int value))
-                {
-                    values.Add(value);
-                }
+                values.Add(int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int value) ? value : 0);
             }
 
             return values;

@@ -68,7 +68,7 @@ namespace GRC2.Core
                 AlbumManager.ScanAlbums(_hwaFolderPath);
                 MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 완료");
 
-                // 곡 정보 파일 파싱 (앨범별로 이미 파싱됨, 현재 앨범의 곡 정보 사용)
+                // 곡 정보는 현재(기본) 앨범의 txt에서 이미 파싱되어 있습니다. 없으면 기본값을 씁니다.
                 MelonLogger.Msg("[SceneDetector] 곡 정보 확인 시작...");
                 var currentSongInfo = AlbumManager.GetCurrentSongInfo();
                 if (currentSongInfo != null)
@@ -78,13 +78,7 @@ namespace GRC2.Core
                 }
                 else
                 {
-                    // 앨범별 곡 정보가 없으면 기존 방식으로 파싱
-                    ParseSongInfo();
-                    // 파싱된 곡 정보로 앨범 선택 시도
-                    if (SongInfo != null)
-                    {
-                        AlbumManager.SelectAlbumBySongInfo(SongInfo);
-                    }
+                    MelonLogger.Msg("[SceneDetector] 현재 앨범에 곡 정보 파일이 없어 기본값을 사용합니다.");
                 }
                 
                 // 커스텀 아트워크 로드 (앨범별)
@@ -223,37 +217,6 @@ namespace GRC2.Core
         #endregion
 
         #region 곡 정보 / 아트워크 / BMS 스캔
-
-        private void ParseSongInfo()
-        {
-            try
-            {
-                MelonLogger.Msg("[SceneDetector] 곡 정보 파일 파싱 시작");
-
-                if (!Directory.Exists(_hwaFolderPath))
-                {
-                    MelonLogger.Warning($"[SceneDetector] hwa 폴더가 없습니다: {_hwaFolderPath}");
-                    return;
-                }
-
-                var txtFiles = Directory.GetFiles(_hwaFolderPath, "*.txt", SearchOption.TopDirectoryOnly).ToList();
-                if (txtFiles.Count == 0)
-                {
-                    MelonLogger.Msg("[SceneDetector] 곡 정보 txt 파일을 찾을 수 없습니다. 기본값 사용.");
-                    return;
-                }
-
-                var firstTxtFile = txtFiles[0];
-                MelonLogger.Msg($"[SceneDetector] 곡 정보 파일 파싱: {Path.GetFileName(firstTxtFile)}");
-
-                SongInfo = SongInfoParser.ParseTxtFile(firstTxtFile);
-                MelonLogger.Msg($"[SceneDetector] 곡 정보 파싱 완료 - 제목: {SongInfo.Title}, 아티스트: {SongInfo.Artist}");
-            }
-            catch (Exception ex)
-            {
-                ErrorLogger.LogException(ex, "[SceneDetector]", "곡 정보 파싱 오류");
-            }
-        }
 
         private void ScanAndParseBmsFiles()
         {

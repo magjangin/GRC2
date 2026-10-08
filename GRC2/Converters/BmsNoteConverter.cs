@@ -43,8 +43,6 @@ namespace GRC2.Converters
 
                 // 성능 최적화: 한 번만 정렬 (Time 기준)
                 var sortedBmsNotes = bmsNotes.OrderBy(n => n.Time).ToList();
-                int convertedCount = 0;
-                int skippedCount = 0;
 
                 foreach (var bmsNote in sortedBmsNotes)
                 {
@@ -54,13 +52,11 @@ namespace GRC2.Converters
                         if (bmsNote.Type == NoteType.HoldEnd)
                         {
                             holdEndNotes.Add(bmsNote);
-                            skippedCount++;
                             continue;
                         }
                         if (bmsNote.Type == NoteType.FairyEnd)
                         {
                             fairyEndNotes.Add(bmsNote);
-                            skippedCount++;
                             continue;
                         }
 
@@ -68,7 +64,6 @@ namespace GRC2.Converters
                         if (noteCreateData != null)
                         {
                             noteList.Add(noteCreateData);
-                            convertedCount++;
                         }
                         else
                         {
