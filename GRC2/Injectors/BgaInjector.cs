@@ -102,24 +102,23 @@ namespace GRC2.Injectors
             }
 
             // Prepare 완료 대기 (파일 크기에 따라 타임아웃 동적 조정)
-            // 기본 5초 + 파일 크기당 추가 시간 (100MB당 1초, 최대 60초)
-            int maxWaitFrames = 300; // 기본 5초 (60fps 기준)
+            // 기본 5초 + 파일 크기당 추가 시간 (100MB당 1초, 최대 60초).
+            // 프레임이 아니라 실제 시간으로 셉니다. 프레임으로 세면 144Hz 화면에서 2.4배 짧아집니다(F3).
+            float maxWaitSeconds = 5f;
             if (fileSizeBytes > 0)
             {
                 var fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
-                var additionalFrames = (int)(fileSizeMB / 100.0 * 60.0); // 100MB당 1초
-                maxWaitFrames = Math.Min(300 + additionalFrames, 3600); // 최대 60초
+                maxWaitSeconds = Math.Min(5f + (float)(fileSizeMB / 100.0), 60f);
             }
-            
-            int waitCount = 0;
-            int lastLogFrame = 0;
+
+            float waitStart = Time.realtimeSinceStartup;
+            float nextLogAt = waitStart + 1f;
             bool allPrepared = false;
-            
-            while (!allPrepared && waitCount < maxWaitFrames)
+
+            while (!allPrepared && Time.realtimeSinceStartup - waitStart < maxWaitSeconds)
             {
-                waitCount++;
                 allPrepared = true;
-                
+
                 foreach (var vp in activeVideoPlayers)
                 {
                     if (!vp.isPrepared)
@@ -128,26 +127,26 @@ namespace GRC2.Injectors
                         break;
                     }
                 }
-                
+
                 // 1초마다 진행 상황 로깅 (대용량 파일용)
-                if (waitCount - lastLogFrame >= 60)
+                if (!allPrepared && Time.realtimeSinceStartup >= nextLogAt)
                 {
-                    var elapsedSeconds = waitCount / 60.0f;
+                    var elapsed = Time.realtimeSinceStartup - waitStart;
                     int preparedCount = 0;
                     foreach (var vp in activeVideoPlayers)
                     {
                         if (vp.isPrepared) preparedCount++;
                     }
-                    MelonLogger.Msg($"[BgaInjector] BGA Prepare 대기 중... ({elapsedSeconds:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
-                    lastLogFrame = waitCount;
+                    MelonLogger.Msg($"[BgaInjector] BGA Prepare 대기 중... ({elapsed:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
+                    nextLogAt += 1f;
                 }
                 yield return null;
             }
 
             if (!allPrepared)
             {
-                var elapsedSeconds = waitCount / 60.0f;
-                MelonLogger.Warning($"[BgaInjector] 일부 BGA 준비 시간 초과 ({elapsedSeconds:F1}초 경과, 최대 {maxWaitFrames / 60.0f:F1}초)");
+                var elapsedSeconds = Time.realtimeSinceStartup - waitStart;
+                MelonLogger.Warning($"[BgaInjector] 일부 BGA 준비 시간 초과 ({elapsedSeconds:F1}초 경과, 최대 {maxWaitSeconds:F1}초)");
                 // 일부만 준비되어도 계속 진행
             }
 
