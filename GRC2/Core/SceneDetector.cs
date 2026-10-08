@@ -405,6 +405,7 @@ namespace GRC2.Core
         public override void OnSceneWasLoaded(int buildIndex, string sceneName)
         {
             MelonLogger.Msg($"[SceneDetector] 씬 로드: {sceneName} (BuildIndex: {buildIndex})");
+            TextPatch.OnSceneLoaded(sceneName);
 
             if (!_isInitialized)
             {
@@ -465,6 +466,7 @@ namespace GRC2.Core
                     MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
+                    AudioClipPatch.ResetHandledSelection();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
                 {
