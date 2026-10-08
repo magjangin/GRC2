@@ -34,9 +34,9 @@ namespace GRC2.Parsers
                 string text = "";
                 string encodingUsed = "Default/BOM Detect";
 
-                // 가장 표준적이고 안정적인 방식: StreamReader의 자동 감지 기능 사용
-                // BOM이 있으면 UTF-8/UTF-16으로, 없으면 Encoding.Default(한국어 윈도우는 CP949)로 읽음
-                using (var reader = new StreamReader(filePath, System.Text.Encoding.Default, true))
+                // BOM이 있으면 그 인코딩을 따르고, 없으면 UTF-8로 읽습니다.
+                // 예전 주석은 CP949라고 했지만 Unity Mono에서 Encoding.Default는 UTF-8입니다(알려진 문제 G). 그래서 명시합니다.
+                using (var reader = new StreamReader(filePath, System.Text.Encoding.UTF8, true))
                 {
                     text = reader.ReadToEnd();
                     encodingUsed = reader.CurrentEncoding.EncodingName;
