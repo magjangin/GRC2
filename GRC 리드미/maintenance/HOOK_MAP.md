@@ -358,8 +358,8 @@ Purpose:
 - `AutoPlayPatch`/`JudgePerfectPatch` are off when the `AutoPlay`/`AllPerfect`
   keys are missing (code fallback is `false`), but the config file generated on
   first launch (`CustomKeySettings.DefaultLines`) writes `AutoPlay=0` and
-  **`AllPerfect=1`** — so a fresh install starts with the all-perfect judge
-  override **on** (saves stay protected by the default `BlockSave=1`). The keys
+  `AllPerfect=0` (changed from `1` on 2026-10-08 so the generated file matches the
+  code fallback; a config file that already exists is not rewritten). The keys
   in `savecustomkey/config.txt` (created next to the `hwa` folder on first
   launch) are the only way to change them — there is no in-game toggle key.
   See [알려진_문제.md](알려진_문제.md) H3. Both patches read `CustomKeySettings` on every call

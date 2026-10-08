@@ -40,5 +40,14 @@ namespace GRC2.Tests
             // Assert
             Assert.Equal(expected, result);
         }
+
+        [Theory]
+        [InlineData("모름", true)]
+        [InlineData("maybe", false)]
+        [InlineData("2", true)]
+        public void ParseBool_UnknownValueReturnsFallback(string valueRaw, bool fallback)
+        {
+            Assert.Equal(fallback, CustomKeySettings.ParseBool(valueRaw, fallback));
+        }
     }
 }
