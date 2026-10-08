@@ -97,7 +97,7 @@ cFairyModeNotesManager.createAllNote [prefix: NoteArrayHooks]
 
 ## 테스트
 
-`GRC2.Tests`에 파서 순수 함수 테스트가 있습니다(3자리 WAV 폭, 16진수 파싱, BPM 없는 시간 계산, 불리언 설정 파싱).
+`GRC2.Tests`에 파서 순수 함수 테스트가 있습니다(3자리 WAV 폭, 16진수 파싱, BPM 없는 시간 계산, 불리언 설정 파싱, `info.txt` 크레딧 줄).
 
 ```powershell
 dotnet test GRC2.Tests\GRC2.Tests.csproj

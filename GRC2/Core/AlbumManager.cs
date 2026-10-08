@@ -259,6 +259,16 @@ namespace GRC2.Core
             return _musicIdToAlbumMap.ContainsKey(musicID);
         }
 
+        /// <summary>
+        /// 커스텀 MusicID에 등록된 앨범입니다. 원본 곡 ID처럼 등록되지 않은 ID면 null입니다.
+        /// 현재 앨범을 바꾸지 않으므로 커서와 무관하게 특정 곡의 정보를 읽을 때 씁니다.
+        /// </summary>
+        public static AlbumInfo GetAlbumByMusicID(MusicID musicID)
+        {
+            _musicIdToAlbumMap.TryGetValue(musicID, out AlbumInfo album);
+            return album;
+        }
+
         public static void RegisterOriginalTitle(MusicID musicID, string originalTitle)
         {
             if (!string.IsNullOrWhiteSpace(originalTitle))

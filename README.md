@@ -18,16 +18,20 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 
 - 메인 모드 소스: `GRC2/`
 - 테스트: `GRC2.Tests/`
-- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 50개, `GRC2.Tests` 5개
-- `GRC2.csproj`는 `EnableDefaultCompileItems=false`라 소스를 추가하면 `<Compile Include>` 항목도 같이 넣어야 합니다(빠뜨려도 빌드는 통과하고 그 파일만 조용히 빠집니다)
+- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 51개, `GRC2.Tests` 6개
+- SDK 스타일 프로젝트 규칙에 따라 `GRC2/` 및 `GRC2.Tests/` 하위의 `.cs` 소스는 자동으로 컴파일에 포함됩니다.
 - 현재 훅 소유 구조는 [GRC 리드미/maintenance/HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md)에 정리되어 있습니다.
 
 ## 검증
 
-아래 명령으로 테스트를 실행할 수 있습니다.
+솔루션 전체 또는 테스트 프로젝트를 지정하여 테스트를 실행할 수 있습니다.
+
+```powershell
+dotnet test GRC2.sln --logger "console;verbosity=normal"
+```
+
+또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-10-08 기준 106개 통과).
 
 ```powershell
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --logger "console;verbosity=normal"
 ```
-
-`GRC2.sln`에는 테스트 프로젝트가 들어 있지 않아서, `test_debug.bat`(`dotnet test GRC2.sln`)은 현재 테스트를 하나도 실행하지 않고 성공으로 끝납니다. 위 명령처럼 테스트 프로젝트를 직접 지정하세요(2026-10-08 기준 72개 통과).

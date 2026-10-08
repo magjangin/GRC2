@@ -14,8 +14,17 @@ namespace GRC2.Parsers
         public static readonly string[] DifficultyKeys = { "easy", "normal", "hard", "expert" };
 
         public string Title { get; set; } = "custom chart";
-        public string Artist { get; set; } = "";
+        public string Artist { get; set; } = ""; // 아티스트 (상세 패널의 아티스트 칸, 캐릭터가 없을 때 아티스트 ID로도 사용)
         public string Character { get; set; } = ""; // 캐릭터 (아티스트 ID로 사용)
+
+        // 크레딧. 곡 선택 상세 패널과 곡 시작 화면에 표시하고(CreditTextPatch), 비어 있으면 "-"로 보입니다.
+        public string Lyricist { get; set; } = "";  // 작사
+        public string Composer { get; set; } = "";  // 작곡
+        public string Arranger { get; set; } = "";  // 편곡
+        public string Charter { get; set; } = "";   // 채보 (게임의 譜面制作者 칸)
+        public string CdTitle { get; set; } = "";   // 수록 CD
+        public string GameTitle { get; set; } = ""; // 원작 게임
+
         public List<string> Difficulties { get; set; } = new List<string>();
         public Dictionary<string, int> DifficultyNumbers { get; set; } = new Dictionary<string, int>();
     }

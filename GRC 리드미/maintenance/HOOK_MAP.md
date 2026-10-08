@@ -274,6 +274,53 @@ Removal risk:
 
 - gameplay may still function, but UI may show original song data.
 
+### Credit text (artist, lyricist, composer, arranger, charter, CD, game)
+
+Owner file:
+
+- `GRC2/Harmony/CreditTextPatch.cs`
+
+Patched game targets:
+
+- `IntiCreates.soRythmGameMusicDataMap.MusicData.getArtistText`,
+  `getLylicistText`, `getComposerText`, `getArrangerText`,
+  `getNoteCreaterText`, `getCDTitleText`, `getGameTitleText` (one prefix through
+  `TargetMethods`; `MusicData` is a struct and the prefix does not use
+  `__instance`)
+- `IntiCreates.cMusicSelectArtWorkManager.requestSetMusicData` (prefix +
+  `[HarmonyFinalizer]`, scope only)
+
+Purpose:
+
+- the game draws credits in exactly two places, both through these getters:
+  the Music Select detail panel (`requestSetMusicData` → all 7 on
+  `getMusicDataFromId(musicID)`) and the play scene's pre-start screen
+  (`cPreRythmnGameStartScreen.coInitialize` → lyricist/composer/arranger);
+- Music Select: `getMusicDataFromId` returns `new MusicData { id = Invalid }`
+  for a custom id, so every credit enum is 0 and the panel showed the first
+  entry of each credit table (real people's names) for every custom song. That
+  struct cannot tell which custom song it is, so the prefix on
+  `requestSetMusicData` looks up the album for its `musicID` argument
+  (`AlbumManager.GetAlbumByMusicID`) and the finalizer closes the scope even if
+  the original throws. Inside the scope the decision is by that id only — an
+  original song keeps its own credits whatever the custom-selection flags say;
+- pre-start screen: its `musicData` is the template song borrowed by
+  `GameFlowHooks` (`coOpenPreMusicStartWindow`), so the template song's credits
+  were shown. Outside the panel scope the getters return the current album's
+  values when `BgmBgaInjector.IsPlayScene()` and
+  `CustomAssetManager.ShouldInjectCustomContent()` (no other caller exists in
+  play scenes);
+- values come from `info.txt` (`SongInfo.Artist`/`Lyricist`/`Composer`/
+  `Arranger`/`Charter`/`CdTitle`/`GameTitle`); missing values and albums
+  without `info.txt` show the game's own placeholder
+  `soRythmGameMusicDataMap.INVALID_MUSIC_INFO_DISP` (`"-"`). Because only the
+  getters change, labels, layout and the per-locale separator are the game's.
+
+Removal risk:
+
+- custom songs show unrelated real credits in the Music Select detail panel and
+  the template song's credits on the pre-start screen.
+
 ### BGM and game-end timing
 
 Owner files:
@@ -639,6 +686,19 @@ of the current source baseline:
   replaces it, so the manifest is currently writable)
 
 ## Cleanup Log
+
+### 2026-10-08 (credit text)
+
+Added `CreditTextPatch` (see "Credit text" above) and six `info.txt` credit keys
+(lyricist, composer, arranger, charter, CD, game); `작곡가`/`composer` now fill
+`Composer` instead of `Artist`. Build: 0 warnings; tests: 103 passing (31 new in
+`SongInfoParserTests`). Checked outside Unity against the installed
+`Assembly-CSharp` with the game's HarmonyX 2.10.2: the 7 getters and
+`requestSetMusicData(bool isInstant, MusicID musicID)` resolve, HarmonyX patches
+the 7 struct methods, the getters return album values inside the panel scope
+and in the play context and fall through to the original otherwise, and the
+scope is open inside the real `requestSetMusicData` and closed after both a
+normal return and an exception (which still propagates). Not yet seen in game.
 
 ### 2026-10-04 (verified fixes)
 
