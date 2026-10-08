@@ -209,9 +209,6 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
-        /// BPM 변화 처리: 채널 03-08 데이터는 measure 내 슬롯별 BPM 인덱스(hex). 인덱스→실제 BPM은 bpmIndexTable 사용.
-        /// </summary>
-        /// <summary>
         /// BPM 변화 처리. 채널 03은 값(16진수)이 BPM 자체이고, 채널 08은 값이 #BPMxx 표의 인덱스입니다(E1).
         /// 04·05·06·07은 BGA 채널이라 BPM 변화가 아닙니다. 예전에는 이 채널들도 BPM 인덱스로 읽었습니다.
         /// </summary>
