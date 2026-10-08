@@ -168,10 +168,6 @@ namespace GRC2.Core
         private static readonly AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
             AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
 
-        // setPauseButtonPusable은 private이므로 열린 인스턴스 델리게이트로 한 번만 바인딩합니다.
-        private static readonly Action<IntiCreates.cRythmGameManager, bool> SetPauseButtonPusable =
-            AccessTools.MethodDelegate<Action<IntiCreates.cRythmGameManager, bool>>(
-                AccessTools.Method(typeof(IntiCreates.cRythmGameManager), "setPauseButtonPusable"));
 
         private static void HandlePauseKeyInput()
         {
@@ -202,10 +198,10 @@ namespace GRC2.Core
 
                 if (!isPausing)
                 {
-                    // 일시정지 버튼 활성화 상태 강제 후 메뉴 열기
-                    SetPauseButtonPusable?.Invoke(manager, true);
+                    // 원본은 로딩·시작·클리어 연출 중에 일시정지 버튼을 잠급니다. 예전에는 여기서 잠금을 강제로 풀었기 때문에
+                    // 그 구간에서도 Space/Esc로 메뉴가 열렸습니다(H13). 이제 잠금은 그대로 두고, 원본 requestPause가 스스로 판단합니다.
                     manager.requestPause();
-                    MelonLogger.Msg("[SceneDetector] ⏸️ 키 입력 (Space/ESC) -> 일시정지 메뉴 오픈 (requestPause)");
+                    MelonLogger.Msg("[SceneDetector] ⏸️ 키 입력 (Space/ESC) -> 일시정지 요청 (원본이 잠금 상태면 무시됨)");
                 }
             }
             catch (Exception ex)
