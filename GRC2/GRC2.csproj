@@ -11,7 +11,6 @@
     <TargetFrameworks>net472</TargetFrameworks>
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
   <PropertyGroup>
@@ -24,7 +23,9 @@
     <Deterministic>true</Deterministic>
   </PropertyGroup>
   <PropertyGroup>
-    <GameManaged>H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\GUNVOLT_RECORDS_Cychronicle_Data\Managed</GameManaged>
+    <!-- 게임 설치 폴더. build_*.bat가 /p:GamePath로 넘깁니다. 넘기지 않으면 기본 경로를 씁니다(F, H11). -->
+    <GamePath Condition=" '$(GamePath)' == '' ">H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle</GamePath>
+    <GameManaged>$(GamePath)\GUNVOLT_RECORDS_Cychronicle_Data\Managed</GameManaged>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System" />
@@ -36,10 +37,10 @@
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
     <Reference Include="MelonLoader">
-      <HintPath>H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\MelonLoader\net35\MelonLoader.dll</HintPath>
+      <HintPath>$(GamePath)\MelonLoader\net35\MelonLoader.dll</HintPath>
     </Reference>
     <Reference Include="0Harmony">
-      <HintPath>H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\MelonLoader\net35\0Harmony.dll</HintPath>
+      <HintPath>$(GamePath)\MelonLoader\net35\0Harmony.dll</HintPath>
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
@@ -52,57 +53,5 @@
     <!-- Unity: UnityEngine.*.dll, Unity.*.dll 와일드카드 참조 -->
     <Reference Include="$(GameManaged)\UnityEngine.*.dll" />
     <Reference Include="$(GameManaged)\Unity.*.dll" />
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="Builders\NoteCreateDataBuilder.cs" />
-    <Compile Include="Builders\NoteFieldInitializer.cs" />
-    <Compile Include="Converters\BmsNoteConverter.cs" />
-    <Compile Include="Core\AlbumManager.cs" />
-    <Compile Include="Core\ArtworkImageFinder.cs" />
-    <Compile Include="Core\CustomAssetManager.cs" />
-    <Compile Include="Core\CustomKeySettings.cs" />
-    <Compile Include="Core\GameHud.cs" />
-    <Compile Include="Core\PlaySceneArtworkInjector.cs" />
-    <Compile Include="Core\SceneDetector.cs" />
-    <Compile Include="Harmony\ArtWorkPatch.cs" />
-    <Compile Include="Harmony\ArtworkUpdater.cs" />
-    <Compile Include="Harmony\AudioClipPatch.cs" />
-    <Compile Include="Harmony\AutoPlayPatch.cs" />
-    <Compile Include="Harmony\BgaCrossfadePatch.cs" />
-    <Compile Include="Harmony\CustomBgmPlayer.cs" />
-    <Compile Include="Harmony\GameFlowHooks.cs" />
-    <Compile Include="Harmony\JudgePerfectPatch.cs" />
-    <Compile Include="Harmony\JudgmentBarPatch.cs" />
-    <Compile Include="Harmony\MusicScrollViewHooks.cs" />
-    <Compile Include="Harmony\NoteArrayHooks.cs" />
-    <Compile Include="Harmony\NoteSpeedChaosPatch.cs" />
-    <Compile Include="Harmony\NoteSwayPatch.cs" />
-    <Compile Include="Harmony\PreviewAudioManager.cs" />
-    <Compile Include="Harmony\RecordBlockPatch.cs" />
-    <Compile Include="Harmony\ResultSceneUpdaterPatch.cs" />
-    <Compile Include="Harmony\SteamApiHijacker.cs" />
-    <Compile Include="Harmony\TextPatch.cs" />
-    <Compile Include="Helpers\CharacterNames.cs" />
-    <Compile Include="Helpers\EnumValueHelper.cs" />
-    <Compile Include="Helpers\ErrorLogger.cs" />
-    <Compile Include="Helpers\NoteSampleTime.cs" />
-    <Compile Include="Helpers\PathHelper.cs" />
-    <Compile Include="Injectors\BgaBgmSyncManager.cs" />
-    <Compile Include="Injectors\BgaInjector.cs" />
-    <Compile Include="Injectors\BgmBgaInjector.cs" />
-    <Compile Include="Injectors\BgmGameEndMonitor.cs" />
-    <Compile Include="Injectors\BgmInjector.cs" />
-    <Compile Include="Injectors\BgmLoader.cs" />
-    <Compile Include="Injectors\BgmSearcher.cs" />
-    <Compile Include="Parsers\BmsDataModels.cs" />
-    <Compile Include="Parsers\BmsNoteDataParser.cs" />
-    <Compile Include="Parsers\BmsParser.cs" />
-    <Compile Include="Parsers\BmsSummaryPrinter.cs" />
-    <Compile Include="Parsers\SongInfo.cs" />
-    <Compile Include="Parsers\SongInfoParser.cs" />
-    <Compile Include="Processors\FairyNoteProcessor.cs" />
-    <Compile Include="Processors\HoldNoteProcessor.cs" />
-    <Compile Include="Processors\NoteProcessorHelper.cs" />
-    <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 </Project>
