@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using GRC2.Helpers;
 using GRC2.Harmony;
 using GRC2.Injectors;
@@ -155,10 +156,63 @@ namespace GRC2.Core
             }
             catch (Exception ex)
             {
-                _harmonyInstance = null;
-                MelonLogger.Msg($"[SceneDetector] Harmony 패치 적용 실패: {ex.Message}");
+                // PatchAll은 첫 실패에서 멈춰 뒤의 패치 클래스가 빠집니다(H4). 적용된 것을 되돌리고 클래스마다 다시 적용합니다.
+                MelonLogger.Error($"[SceneDetector] Harmony PatchAll 실패 ({ex.Message}). 패치 클래스를 하나씩 다시 적용합니다.");
                 MelonLogger.Msg($"[SceneDetector] 스택 트레이스: {ex.StackTrace}");
+                PatchTypesOneByOne();
             }
+        }
+
+        /// <summary>패치 클래스를 하나씩 적용합니다. 한 클래스가 실패해도 나머지는 적용되고, 실패한 클래스 이름을 남깁니다(H4).</summary>
+        private static void PatchTypesOneByOne()
+        {
+            if (_harmonyInstance == null)
+                _harmonyInstance = new HarmonyLib.Harmony("GRC2.MusicInjector");
+
+            _harmonyInstance.UnpatchSelf();
+
+            int applied = 0;
+            int failed = 0;
+            foreach (var type in typeof(SceneDetector).Assembly.GetTypes())
+            {
+                if (!HasPatchAttributes(type))
+                    continue;
+
+                try
+                {
+                    _harmonyInstance.CreateClassProcessor(type).Patch();
+                    applied++;
+                }
+                catch (Exception ex)
+                {
+                    failed++;
+                    MelonLogger.Error($"[SceneDetector] 패치 클래스 적용 실패: {type.FullName} - {ex.Message}");
+                }
+            }
+
+            MelonLogger.Msg($"[SceneDetector] 패치 클래스 적용 {applied}개, 실패 {failed}개");
+        }
+
+        private static bool HasPatchAttributes(Type type)
+        {
+            if (type.GetCustomAttributes(typeof(HarmonyPatch), inherit: false).Length > 0)
+                return true;
+
+            const BindingFlags flags = BindingFlags.Static | BindingFlags.Instance |
+                BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly;
+            foreach (var method in type.GetMethods(flags))
+            {
+                if (method.GetCustomAttributes(inherit: false).Any(IsHarmonyAnnotation))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsHarmonyAnnotation(object attribute)
+        {
+            return attribute is HarmonyPrefix || attribute is HarmonyPostfix ||
+                attribute is HarmonyFinalizer || attribute is HarmonyTranspiler;
         }
 
         #endregion

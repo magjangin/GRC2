@@ -14,7 +14,8 @@ set "PROJECT_NAME=GRC2"
 set "PROJECT_DIR=GRC2"
 set "SOLUTION_FILE=GRC2.sln"
 set "GAME_PATH=H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle"
-set "SOURCE_ROOT=H:\source\repos\GRC2"
+rem 소스 루트는 이 스크립트가 있는 폴더입니다. 다른 위치에 복사해도 원래 경로의 예전 DLL을 복사하지 않습니다(F).
+for %%I in ("%~dp0.") do set "SOURCE_ROOT=%%~fI"
 
 :: Build paths
 set "DLL_NAME=%PROJECT_NAME%.dll"
