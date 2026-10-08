@@ -15,6 +15,8 @@ namespace GRC2.Harmony
     /// </summary>
     public static class RecordBlockPatch
     {
+        private const string ResultSceneName = "RythmGameResultScene";
+
         public static bool ShouldBlock => CustomKeySettings.BlockSave;
 
         private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, int> OldHighScoreRef =
@@ -146,12 +148,19 @@ namespace GRC2.Harmony
             [HarmonyPrefix]
             private static bool Prefix()
             {
-                if (!ShouldBlock)
+                // 결과 씬에서만 막습니다. 예전에는 어디서든 막아서 세이브 파일이 없는 첫 부팅이 끝나지 않았고(A1),
+                // 옵션 같은 다른 설정도 디스크에 남지 않았습니다(A2). 결과 씬의 기록은 initializePreFade 후킹이 원복합니다.
+                if (!ShouldBlock || !IsResultScene())
                     return true;
 
-                MelonLogger.Msg("[RecordBlockPatch] AutoPlay/판정조작 결과 저장 차단: 세이브 파일 저장 요청 스킵");
+                MelonLogger.Msg("[RecordBlockPatch] AutoPlay/판정조작 결과 저장 차단: 결과 씬의 세이브 파일 저장 요청 스킵");
                 return false;
             }
+        }
+
+        private static bool IsResultScene()
+        {
+            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == ResultSceneName;
         }
     }
 }
