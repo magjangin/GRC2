@@ -115,14 +115,14 @@ dotnet build GRC2.sln --no-restore --configuration Debug
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --configuration Debug
 ```
 
-`GRC2.sln`에는 테스트 프로젝트가 없으므로 테스트는 반드시 `GRC2.Tests.csproj`를 지정해 실행합니다.
-새 `.cs` 파일은 `GRC2.csproj`에 `<Compile Include>`도 추가해야 합니다(`EnableDefaultCompileItems=false`).
+`GRC2.sln`에는 `GRC2.Tests` 프로젝트도 들어 있어 `dotnet test GRC2.sln`으로도 테스트가 실행됩니다(2026-10-08 추가).
+새 `.cs` 파일은 `GRC2.csproj`에 따로 등록하지 않아도 됩니다. csproj는 `EnableDefaultCompileItems`를 설정하지 않고 `<Compile Include>` 목록도 없으므로 SDK 기본 규칙으로 `GRC2/` 아래 모든 `.cs`를 포함합니다(2026-10-08, [알려진_문제.md](../maintenance/알려진_문제.md) H11).
 
 게임 업데이트로 타입이나 메서드가 바뀌면 컴파일 오류 또는 시작 시
 `PatchAll()` 오류로 드러납니다. `SceneDetector.InitializeHarmony()`는 예외
 메시지와 스택 트레이스를 MelonLoader 로그에 남깁니다.
 
-주의: `PatchAll()`은 패치 클래스를 순서대로 처리하다 실패하면 거기서 멈추고, 이 모드는 실패해도 `Msg` 수준 로그만
-남기고 초기화를 계속합니다. 게임 업데이트로 대상 하나가 사라지면 그 뒤 클래스의 패치가 빠진 채 모드가 반쯤만 동작할 수
-있습니다. 게임 업데이트 뒤에는 로그에서 `Harmony 패치 적용 실패`가 있는지 가장 먼저 확인하세요
-([알려진_문제.md](../maintenance/알려진_문제.md) H4).
+주의: `PatchAll()`은 패치 클래스를 순서대로 처리하다 실패하면 거기서 멈춥니다. 2026-10-08부터는 실패하면 적용된 패치를
+되돌리고 패치 클래스를 하나씩 다시 적용하며, 실패한 클래스 이름을 `Error` 로그로 남깁니다(H4). 게임 업데이트 뒤에는 로그에서
+`PatchAll 실패`와 `패치 클래스 적용 실패`를 가장 먼저 확인하세요. 이 수정은 실패 경로만 바꿨고, 게임에서 실제로 실패시켜
+확인하지는 않았습니다([알려진_문제.md](../maintenance/알려진_문제.md) H4).
