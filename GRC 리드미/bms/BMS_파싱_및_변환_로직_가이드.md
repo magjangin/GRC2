@@ -103,4 +103,4 @@ cFairyModeNotesManager.createAllNote [prefix: NoteArrayHooks]
 dotnet test GRC2.Tests\GRC2.Tests.csproj
 ```
 
-`test_debug.bat`은 현재 테스트를 실행하지 못합니다([알려진_문제.md](../maintenance/알려진_문제.md) F).
+`test_debug.bat`은 `GRC2.sln`으로 테스트를 실행합니다. `GRC2.sln`에 테스트 프로젝트를 넣은 것은 2026-10-08입니다([알려진_문제.md](../maintenance/알려진_문제.md) F).

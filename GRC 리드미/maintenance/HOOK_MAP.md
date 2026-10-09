@@ -687,6 +687,13 @@ of the current source baseline:
 
 ## Cleanup Log
 
+### 2026-10-09 (documentation refresh)
+
+Documentation-only pass; no source changes. Corrected statements that no longer matched the code:
+the test project is in `GRC2.sln` (2026-10-08), `GRC2.csproj` has no `<Compile Include>` list so new `.cs`
+files need no csproj entry, `test_debug.bat` runs tests, `PatchAll` failures fall back to per-class patching
+(H4), and the known-issues header no longer says nothing was changed.
+
 ### 2026-10-08 (credit text)
 
 Added `CreditTextPatch` (see "Credit text" above) and six `info.txt` credit keys
