@@ -15,7 +15,8 @@ namespace GRC2.Builders
     /// </summary>
     public static class NoteCreateDataBuilder
     {
-        private static Dictionary<string, BmsNote> _timeToBmsNoteCache = null;
+        /// <summary>BMS 노트 조회 키: (perfectSample, 레인, 좌우, 노트 종류). 종류를 모르면 -1입니다. 문자열 키를 만들지 않습니다(P1).</summary>
+        private static Dictionary<(int Sample, int Lane, bool IsLeft, int TypeKey), BmsNote> _noteLookupCache = null;
         private static List<BmsNote> _cachedBmsNotes = null;
 
         public static NoteCreateData CreateNoteCreateData(BmsNote bmsNote)
@@ -74,17 +75,17 @@ namespace GRC2.Builders
                 bool isLeft = noteCreateData.laneLeftRightID == IntiCreates.RythmGame.FairyMode.NoteLaneLeftRight.Left;
                 int lane = EnumValueHelper.ToLaneIndex(noteCreateData.subLaneID);
                 NoteType? targetType = EnumValueHelper.ToBmsNoteType(noteCreateData.noteTypeID);
-                float time = NoteSampleTime.ToSeconds(noteCreateData.perfectSample);
-
                 EnsureBmsNoteLookupCache(bmsNotes);
-                string searchKey = BuildBmsNoteLookupKey(time, lane, isLeft, targetType);
 
-                if (_timeToBmsNoteCache.TryGetValue(searchKey, out var cachedNote) &&
-                    Math.Abs(cachedNote.Time - time) < 0.001f)
+                // perfectSample은 BMS 시각을 NoteSampleTime.ToSamples로 바꾼 값이라, 같은 식으로 만든 키와 정확히 맞습니다.
+                // 예전에는 초를 소수 셋째 자리로 반올림한 문자열 키를 노트마다 새로 만들었습니다(P1).
+                if (_noteLookupCache.TryGetValue((noteCreateData.perfectSample, lane, isLeft, TypeKeyOf(targetType)), out var cachedNote))
                 {
                     return cachedNote;
                 }
 
+                // 캐시에 없을 때만(종류가 맞지 않는 경우 등) 선형 탐색합니다. 예전과 같습니다.
+                float time = NoteSampleTime.ToSeconds(noteCreateData.perfectSample);
                 return bmsNotes.Find(n =>
                     Math.Abs(n.Time - time) < 0.001f &&
                     n.Lane == lane &&
@@ -102,13 +103,13 @@ namespace GRC2.Builders
         /// </summary>
         public static void ClearCache()
         {
-            _timeToBmsNoteCache = null;
+            _noteLookupCache = null;
             _cachedBmsNotes = null;
         }
 
         private static void EnsureBmsNoteLookupCache(List<BmsNote> bmsNotes)
         {
-            bool needRebuild = _timeToBmsNoteCache == null ||
+            bool needRebuild = _noteLookupCache == null ||
                 _cachedBmsNotes == null ||
                 !ReferenceEquals(_cachedBmsNotes, bmsNotes);
 
@@ -117,23 +118,23 @@ namespace GRC2.Builders
                 return;
             }
 
-            _timeToBmsNoteCache = new Dictionary<string, BmsNote>();
+            _noteLookupCache = new Dictionary<(int Sample, int Lane, bool IsLeft, int TypeKey), BmsNote>();
             _cachedBmsNotes = bmsNotes;
 
             foreach (var note in bmsNotes)
             {
-                string key = BuildBmsNoteLookupKey(note.Time, note.Lane, note.IsLeft, note.Type);
-                if (!_timeToBmsNoteCache.TryGetValue(key, out _))
+                var key = (NoteSampleTime.ToSamples(note.Time), note.Lane, note.IsLeft, TypeKeyOf(note.Type));
+                if (!_noteLookupCache.ContainsKey(key))
                 {
-                    _timeToBmsNoteCache[key] = note;
+                    _noteLookupCache[key] = note;
                 }
             }
         }
 
-        private static string BuildBmsNoteLookupKey(float time, int lane, bool isLeft, NoteType? noteType)
+        /// <summary>노트 종류를 키용 정수로 바꿉니다. 종류가 없으면 -1입니다.</summary>
+        private static int TypeKeyOf(NoteType? noteType)
         {
-            var timeKey = (float)Math.Round(time, 3);
-            return $"{timeKey}_{lane}_{isLeft}_{noteType}";
+            return noteType.HasValue ? (int)noteType.Value : -1;
         }
     }
 }
