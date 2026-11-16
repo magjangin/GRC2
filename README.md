@@ -8,6 +8,7 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 
 - [문서 인덱스](GRC%20리드미/README.md)
 - [현재 훅 맵](GRC%20리드미/maintenance/HOOK_MAP.md)
+- [게임 업데이트 대응 가이드](GRC%20리드미/maintenance/업데이트_대응_가이드.md): 스팀 업데이트 뒤 무엇이 깨졌는지 찾는 절차
 - [알려진 문제](GRC%20리드미/maintenance/알려진_문제.md): 아직 고치지 않은 문제. 게임을 새로 설치하거나 PC를 옮기기 전에 A절을 먼저 확인하세요.
 - [차트 작성 규칙](GRC%20리드미/bms/BMS_파싱_및_변환_로직_가이드.md): BMS 채널·노트 값, BGM은 48kHz, `info.txt`는 UTF-8
 - [Harmony 레이어 README](GRC2/Harmony/README.md)
@@ -18,7 +19,7 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 
 - 메인 모드 소스: `GRC2/`
 - 테스트: `GRC2.Tests/`
-- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 51개, `GRC2.Tests` 6개
+- `bin/obj`를 제외한 현재 관리 C# 소스: `GRC2` 53개, `GRC2.Tests` 7개
 - SDK 스타일 프로젝트 규칙에 따라 `GRC2/` 및 `GRC2.Tests/` 하위의 `.cs` 소스는 자동으로 컴파일에 포함됩니다.
 - 현재 훅 소유 구조는 [GRC 리드미/maintenance/HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md)에 정리되어 있습니다.
 
@@ -30,7 +31,7 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 dotnet test GRC2.sln --logger "console;verbosity=normal"
 ```
 
-또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-10-08 기준 106개 통과).
+또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-11-16 기준 114개 통과).
 
 ```powershell
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --logger "console;verbosity=normal"

@@ -14,6 +14,16 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+  <PropertyGroup>
+    <!-- GRC2.csproj와 같은 규칙: build_*.bat가 /p:GamePath를 넘기지 않으면 기본 설치 경로를 씁니다. -->
+    <GamePath Condition=" '$(GamePath)' == '' ">H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle</GamePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- GameCompatibilityTests가 Harmony 패치 적용 가능 여부를 직접 확인하는 데 씁니다. -->
+    <Reference Include="0Harmony">
+      <HintPath>$(GamePath)\MelonLoader\net35\0Harmony.dll</HintPath>
+    </Reference>
+  </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\GRC2\GRC2.csproj" />
   </ItemGroup>

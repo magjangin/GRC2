@@ -51,6 +51,9 @@ namespace GRC2.Core
                 var gameFolder = Path.GetDirectoryName(Application.dataPath);
                 _hwaFolderPath = Path.Combine(gameFolder, "hwa");
                 MelonLogger.Msg($"[SceneDetector] 게임 폴더: {gameFolder}");
+
+                // 게임 업데이트 내성: 빌드 ID, 어셈블리 MVID, 이름으로 접근하는 필드를 점검해 로그 한 곳에 모읍니다(진단 전용).
+                GameCompatibility.LogStartupReport(gameFolder);
                 MelonLogger.Msg($"[SceneDetector] hwa 폴더 경로: {_hwaFolderPath}");
 
                 // hwa 폴더 생성 (없으면)
@@ -153,6 +156,7 @@ namespace GRC2.Core
                 _harmonyInstance = new HarmonyLib.Harmony("GRC2.MusicInjector");
                 _harmonyInstance.PatchAll(typeof(SceneDetector).Assembly);
                 MelonLogger.Msg("[SceneDetector] Harmony 자동 패치 적용 완료");
+                LogPatchedMethodCount();
             }
             catch (Exception ex)
             {
@@ -191,6 +195,20 @@ namespace GRC2.Core
             }
 
             MelonLogger.Msg($"[SceneDetector] 패치 클래스 적용 {applied}개, 실패 {failed}개");
+            LogPatchedMethodCount();
+        }
+
+        /// <summary>실제로 패치된 게임 메서드 수를 남깁니다. 업데이트 뒤 이 수가 줄었다면 대상이 사라진 훅이 있다는 뜻입니다.</summary>
+        private static void LogPatchedMethodCount()
+        {
+            try
+            {
+                MelonLogger.Msg($"[SceneDetector] 패치된 게임 메서드 {_harmonyInstance.GetPatchedMethods().Count()}개");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[SceneDetector] 패치된 메서드 수 확인 실패: {ex.Message}");
+            }
         }
 
         private static bool HasPatchAttributes(Type type)
@@ -219,8 +237,28 @@ namespace GRC2.Core
 
         #region 플레이 씬에서 Space/ESC 키 입력 시 일시정지 메뉴를 여닫는 처리
 
-        private static readonly AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
-            AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
+        // 진입점 클래스의 정적 초기화에서 필드 이름 조회가 던지면(게임 업데이트로 필드가 바뀐 경우) 모드 전체가 로드되지 않습니다.
+        // 그래서 처음 쓸 때 한 번만 조회하고, 실패하면 일시정지 단축키만 꺼집니다.
+        private static AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> _pauseMenuWorkRef;
+        private static bool _pauseMenuWorkRefFailed;
+
+        private static IntiCreates.cRythmGamePauseMenuHud GetPauseMenuWork(IntiCreates.cRythmGameManager manager)
+        {
+            if (_pauseMenuWorkRef == null && !_pauseMenuWorkRefFailed)
+            {
+                try
+                {
+                    _pauseMenuWorkRef = AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
+                }
+                catch (Exception ex)
+                {
+                    _pauseMenuWorkRefFailed = true;
+                    MelonLogger.Error($"[SceneDetector] mPauseMenuWork 필드를 찾지 못해 일시정지 단축키 일부가 꺼집니다: {ex.Message}");
+                }
+            }
+
+            return _pauseMenuWorkRef == null ? null : _pauseMenuWorkRef(manager);
+        }
 
 
         private static void HandlePauseKeyInput()
@@ -237,7 +275,7 @@ namespace GRC2.Core
                     return;
 
                 bool isPausing = manager.mIsPausing;
-                var pauseMenuWork = PauseMenuWorkRef(manager);
+                var pauseMenuWork = GetPauseMenuWork(manager);
 
                 if (isPausing && pauseMenuWork != null)
                 {

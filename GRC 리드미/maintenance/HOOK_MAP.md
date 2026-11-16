@@ -687,6 +687,14 @@ of the current source baseline:
 
 ## Cleanup Log
 
+### 2026-11-16 (update resilience)
+
+Added `GameCompatibility` / `SteamBuildInfo` (`GRC2/Core`): a read-only startup report (`[호환성]` log lines) that compares the
+installed Steam build ID and `Assembly-CSharp` MVID with the verified ones and checks every field the mod reads by name
+(`FieldContracts`). No hook was added, removed or changed. `SceneDetector` now also logs how many game methods were patched, and
+resolves `mPauseMenuWork` lazily so a renamed field can no longer abort the entry-point class. `GameCompatibilityTests` re-runs
+the field and patch-target checks offline against the referenced game DLL. See `업데이트_대응_가이드.md`.
+
 ### 2026-10-09 (documentation refresh)
 
 Documentation-only pass; no source changes. Corrected statements that no longer matched the code:

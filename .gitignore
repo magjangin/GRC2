@@ -11,3 +11,6 @@ __pycache__/
 
 # Assembly-CSharp.dll 디컴파일 산출물 (게임 원본 코드, 저작권상 커밋 대상 아님)
 /Decompiled/
+
+# 디컴파일 요약본(게임 원본 구조 포함, 저작권상 커밋 대상 아님)
+/Decompiled-outline/
