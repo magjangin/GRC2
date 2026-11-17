@@ -13,8 +13,14 @@ Main startup path. It:
 
 - applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
 - locates the game `hwa` folder;
-- scans albums, song metadata, custom artwork, and BMS files;
+- reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then points
+  `CustomMusicIdRegistry` at `savecustomkey/musicid_map.txt`;
+- scans albums and song metadata, records the `hwa` folder signature, loads the
+  current album's artwork, and parses **only the current album's BMS** (others are
+  parsed on first play by `GetOrParseBms`, re-parsed when the file's write time
+  changes; 2026-11-18);
 - supplies parsed BMS data to the already-registered note-array hook;
+- logs one line with per-phase timings (`모드 초기화 완료 146ms (Harmony 71ms, …)`);
 - (the BGM/BGA injection loop needs no initialisation: it reads the current
   album's paths every tick; `BgmBgaInjector.Initialize` was removed 2026-10-04).
 
@@ -24,6 +30,45 @@ File: `GRC2/Core/SceneDetector.cs` (scene-routing section)
 
 Scene routing path. It starts or stops custom BGM/BGA/artwork injection depending on
 the loaded scene.
+
+It also calls `FontFallback.EnsureInstalled` on every scene load (before the
+initialisation check) and `FontFallback.LogCoverageDiagnostics` on the first Music
+Select load. See `FontFallback` below.
+
+On every Music Select load it calls `RescanAlbumsIfChanged()`: if
+`AlbumManager.ComputeFolderSignature(hwa)` (FNV hash of folder/file names, sizes
+and write times; `hwa/fonts` excluded) differs from the last scan, it re-runs
+`AlbumManager.ScanAlbums`. This runs before the list-injection postfix (about
+200 ms later in the log), so new or edited songs appear without restarting.
+Safe only because MusicIDs are now pinned per folder (C4).
+
+### `FontFallback` (not a Harmony hook)
+
+File: `GRC2/Core/FontFallback.cs`, candidate list in `GRC2/Helpers/FallbackFontCandidates.cs`
+
+Purpose: custom song text with glyphs missing from the game's Static TMP atlases
+(e.g. simplified Chinese `麦`, `盖` in the Korean locale) rendered as `□`. The game
+swaps per-locale Static font assets (`cLocalizedTMPFontEvent`, `PCDMainFontAssetTable`)
+that only contain the game's own characters.
+
+How: on the first scene load it builds Dynamic `TMP_FontAsset`s from font files
+(`hwa/fonts/*.ttf|otf|ttc` first, then `msyh`, `msjh`, `YuGothM`, `meiryo`, `malgun`,
+`seguisym` from the Windows font folder) with `new Font(path)` +
+`TMP_FontAsset.CreateFontAsset(..., AtlasPopulationMode.Dynamic)`, and appends them to
+`TMP_Settings.fallbackFontAssets`. TMP searches current font → its fallbacks → this
+global list, so game glyphs are untouched and only missing ones come from these fonts.
+Locale font swaps need no hook because the global list survives them. If
+`TMP_Settings.instance` is missing it falls back to appending to every loaded
+`TMP_FontAsset.fallbackFontAssetTable`.
+
+- `new Font(path)` (path with a directory → `Internal_CreateFontFromPath`) is used
+  instead of `Font.CreateDynamicFontFromOSFont`, because TMP's `FontEngine.LoadFontFace(Font)`
+  needs the font data. Confirmed in game 2026-11-17: 5/5 fonts loaded, `.ttc` included.
+- The global fallback list was empty in this build (`전체 5개` after adding 5).
+- A glyph the game font *does* have is never replaced. `吉` looked like a Hangul
+  syllable in a screenshot but is the game's own rounded `PCDMainfont` glyph (log:
+  `PCDMainfont: 吉…`), not a mis-mapping.
+- Removal: safe to delete; text simply falls back to `□` again.
 
 The Music Select scene's actual Unity scene file name is `MusicSelectScene_Hasegawa`,
 not `MusicSelectScene` (confirmed from `Latest.log`). The scene-name check here uses
@@ -87,9 +132,21 @@ Purpose:
 - register original artist first-song mappings used by custom artist handling;
 - provide a stable original-song template for the pre-play window.
 
+MusicID assignment (2026-11-18): `CustomMusicIdRegistry.Allocate` gives each album
+folder key a persistent ID from `savecustomkey/musicid_map.txt` (range 54..7999,
+skipping every named `MusicID` enum value such as `SAVEABLE_ID_END = 512`), then
+`CustomMusicIdRegistry.EnsureSaveSlots` grows `SavableGameData.playerMusicData`
+past its default 512 entries so the result scene can index any custom ID. The save
+is JsonUtility JSON, so the longer array round-trips; game loops either stop at
+512 or filter with `getIsUsableMusicID`. Do not use 8000+ (`UNIQUE_TOP`, tutorial
+and preview IDs). Logged once per change via `ModLog.InfoOnChange` because this
+postfix runs about four times per Music Select entry.
+
 Removal risk:
 
-- custom songs may disappear from the music select UI.
+- custom songs may disappear from the music select UI;
+- removing `EnsureSaveSlots` while IDs ≥ 512 are assigned makes the result scene
+  throw `IndexOutOfRangeException` on `playerMusicData[id]`.
 
 ### Selection and pre-play state tracking
 

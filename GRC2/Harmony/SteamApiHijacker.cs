@@ -3,6 +3,7 @@ using System.IO;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
+using GRC2.Helpers;
 using Steamworks;
 
 namespace GRC2.Harmony
@@ -112,13 +113,13 @@ namespace GRC2.Harmony
                         string dirName = Path.GetFileName(dir);
                         if (!int.TryParse(dirName, out int index))
                         {
-                            MelonLogger.Msg($"[SteamApiHijacker]   -> 숫자가 아닌 폴더는 건너뜁니다: {dirName}");
+                            ModLog.Verbose($"[SteamApiHijacker]   -> 숫자가 아닌 폴더는 건너뜁니다: {dirName}");
                             continue;
                         }
 
                         string fullPath = Path.GetFullPath(dir);
                         dlcList[index] = new cDlcDirector.cDlcInfo { mMountPath = fullPath };
-                        MelonLogger.Msg($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
+                        ModLog.Verbose($"[SteamApiHijacker]   -> Detected & Populated DLC {index}: {fullPath}");
                     }
                     catch (Exception ex)
                     {

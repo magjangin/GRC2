@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using MelonLoader;
@@ -37,3 +37,6 @@ using MelonLoader;
 [assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.5.1", "화영왕")]
 [assembly: MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")]
 [assembly: MelonColor(0, 255, 255, 255)] // Cyan (R, G, B, A)
+
+// 테스트 프로젝트가 internal 판정 함수(ModLog.ShouldLogOnChange 등)를 확인합니다.
+[assembly: System.Runtime.CompilerServices.InternalsVisibleTo("GRC2.Tests")]

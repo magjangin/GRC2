@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using MelonLoader;
+using GRC2.Helpers;
 using UnityEngine;
 
 namespace GRC2.Core
@@ -44,7 +45,7 @@ namespace GRC2.Core
         {
             _cachedArtWorkImage = null;
             _lastSceneHash = 0;
-            MelonLogger.Msg("[PlaySceneArtworkInjector] 아트워크 캐시 리셋 완료");
+            ModLog.Verbose("[PlaySceneArtworkInjector] 아트워크 캐시 리셋 완료");
         }
 
         /// <summary>

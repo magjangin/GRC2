@@ -79,7 +79,7 @@ namespace GRC2.Processors
             if (processedHoldStartsByEndKey.TryGetValue(fallbackSearchKey, out _))
                 return HoldAttachResult.Matched;
 
-            MelonLogger.Msg($"[HoldNoteProcessor] 홀드 끝 노트 매칭 시도: Lane={holdEnd.Lane}, IsLeft={holdEnd.IsLeft}, Time={holdEnd.Time:F3}, SearchKey={fallbackSearchKey}");
+            ModLog.Verbose($"[HoldNoteProcessor] 홀드 끝 노트 매칭 시도: Lane={holdEnd.Lane}, IsLeft={holdEnd.IsLeft}, Time={holdEnd.Time:F3}, SearchKey={fallbackSearchKey}");
 
             HoldAttachResult attachResult = TryAttachExactFallback(holdEnd, fallbackSearchKey, holdStartMap, processedHoldStartsByEndKey, timeTolerance);
             if (attachResult == HoldAttachResult.NotMatched)
@@ -125,7 +125,7 @@ namespace GRC2.Processors
         {
             if (!holdStartMap.TryGetValue(fallbackSearchKey, out var fallbackList) || fallbackList.Count == 0)
             {
-                MelonLogger.Msg($"[HoldNoteProcessor] 홀드 끝 노트 키 매칭 실패: SearchKey={fallbackSearchKey} (holdStartMap에 없음)");
+                ModLog.Verbose($"[HoldNoteProcessor] 홀드 끝 노트 키 매칭 실패: SearchKey={fallbackSearchKey} (holdStartMap에 없음)");
                 return HoldAttachResult.NotMatched;
             }
 
@@ -149,7 +149,7 @@ namespace GRC2.Processors
 
             AttachEndNote(holdStart.Note, holdEnd);
             processedHoldStartsByEndKey[fallbackSearchKey] = holdStart.Note;
-            MelonLogger.Msg($"[HoldNoteProcessor] ✓ 홀드 끝 노트 매칭 성공: Time={holdEnd.Time:F3}, StartTime={holdStart.BmsNote.Time:F3}, Duration={holdStart.BmsNote.Duration:F3}");
+            ModLog.Verbose($"[HoldNoteProcessor] ✓ 홀드 끝 노트 매칭 성공: Time={holdEnd.Time:F3}, StartTime={holdStart.BmsNote.Time:F3}, Duration={holdStart.BmsNote.Duration:F3}");
             return HoldAttachResult.Matched;
         }
 
@@ -203,7 +203,7 @@ namespace GRC2.Processors
             AttachEndNote(finalNote, holdEnd);
             processedHoldStartsByEndKey[bestMatchKey] = finalNote;
             processedHoldStartsByEndKey[fallbackSearchKey] = finalNote;
-            MelonLogger.Msg($"[HoldNoteProcessor] ✓ 홀드 끝 노트 매칭 성공 (범위 검색): Time={holdEnd.Time:F3}, StartTime={matchedBmsNote.Time:F3}, Duration={matchedBmsNote.Duration:F3}, Diff={bestTimeDiff:F3}");
+            ModLog.Verbose($"[HoldNoteProcessor] ✓ 홀드 끝 노트 매칭 성공 (범위 검색): Time={holdEnd.Time:F3}, StartTime={matchedBmsNote.Time:F3}, Duration={matchedBmsNote.Duration:F3}, Diff={bestTimeDiff:F3}");
             return HoldAttachResult.Matched;
         }
 
@@ -229,8 +229,8 @@ namespace GRC2.Processors
             List<BmsNote> holdEndNotes,
             List<BmsNote> allBmsNotes)
         {
-            MelonLogger.Msg($"[HoldNoteProcessor] 홀드 끝 노트 처리 시작: {holdEndNotes.Count}개");
-            MelonLogger.Msg($"[HoldNoteProcessor] noteList 개수: {noteList.Count}개");
+            ModLog.Verbose($"[HoldNoteProcessor] 홀드 끝 노트 처리 시작: {holdEndNotes.Count}개");
+            ModLog.Verbose($"[HoldNoteProcessor] noteList 개수: {noteList.Count}개");
 
             // 역매핑 캐시를 미리 구성해 둡니다.
             if (noteList.Count > 0)
@@ -244,11 +244,11 @@ namespace GRC2.Processors
                 out int unmatchedCount);
 
             int totalStartCount = holdStartMap.Values.Sum(list => list.Count);
-            MelonLogger.Msg($"[HoldNoteProcessor] 홀드 시작 노트 맵 생성 완료: {totalStartCount}개 (키 {holdStartMap.Count}개, noteList 매칭: {matchedCount}개, 매칭 실패: {unmatchedCount}개)");
+            ModLog.Verbose($"[HoldNoteProcessor] 홀드 시작 노트 맵 생성 완료: {totalStartCount}개 (키 {holdStartMap.Count}개, noteList 매칭: {matchedCount}개, 매칭 실패: {unmatchedCount}개)");
 
             float baseBpm = holdEndNotes.FirstOrDefault()?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
             float timeTolerance = NoteProcessorHelper.CalculateTimeTolerance(baseBpm);
-            MelonLogger.Msg($"[HoldNoteProcessor] BPM: {baseBpm}, 시간 오차 허용 범위: {timeTolerance:F4}초");
+            ModLog.Verbose($"[HoldNoteProcessor] BPM: {baseBpm}, 시간 오차 허용 범위: {timeTolerance:F4}초");
 
             var holdStartByLane = BuildHoldStartByLane(holdStartMap);
             var processedHoldStartsByEndKey = new Dictionary<string, NoteCreateData>();
@@ -351,7 +351,7 @@ namespace GRC2.Processors
                 noteListBySample[sampleValue].Add(noteObj);
             }
 
-            MelonLogger.Msg($"[HoldNoteProcessor] noteList 인덱싱 완료: {noteListBySample.Count}개 샘플 값");
+            ModLog.Verbose($"[HoldNoteProcessor] noteList 인덱싱 완료: {noteListBySample.Count}개 샘플 값");
             return noteListBySample;
         }
 

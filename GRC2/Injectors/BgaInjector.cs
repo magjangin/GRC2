@@ -5,6 +5,7 @@ using System.Linq;
 using GRC2.Harmony;
 using IntiCreates;
 using MelonLoader;
+using GRC2.Helpers;
 using UnityEngine;
 using UnityEngine.Video;
 
@@ -96,7 +97,7 @@ namespace GRC2.Injectors
             {
                 try
                 {
-                    MelonLogger.Msg($"[BgaInjector] {vp.gameObject.name}에 BGA 설정 중...");
+                    ModLog.Verbose($"[BgaInjector] {vp.gameObject.name}에 BGA 설정 중...");
                     vp.source = VideoSource.Url;
                     vp.url = fileUrl;
                     vp.isLooping = true; // 반복 재생
@@ -144,7 +145,7 @@ namespace GRC2.Injectors
                     {
                         if (vp.isPrepared) preparedCount++;
                     }
-                    MelonLogger.Msg($"[BgaInjector] BGA Prepare 대기 중... ({elapsed:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
+                    ModLog.Verbose($"[BgaInjector] BGA Prepare 대기 중... ({elapsed:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
                     nextLogAt += 1f;
                 }
                 yield return null;
@@ -167,7 +168,7 @@ namespace GRC2.Injectors
                 {
                     if (vp.isPrepared)
                     {
-                        MelonLogger.Msg($"[BgaInjector] {vp.gameObject.name} 재생 시작");
+                        ModLog.Verbose($"[BgaInjector] {vp.gameObject.name} 재생 시작");
                         vp.Play();
                         playingCount++;
                     }
@@ -191,7 +192,7 @@ namespace GRC2.Injectors
                 if (vp != null && vp.isPlaying)
                 {
                     actuallyPlayingCount++;
-                    MelonLogger.Msg($"[BgaInjector] {vp.gameObject.name} 재생 중 ✓");
+                    ModLog.Verbose($"[BgaInjector] {vp.gameObject.name} 재생 중 ✓");
                 }
             }
             
@@ -218,10 +219,10 @@ namespace GRC2.Injectors
 
                 // BGA와 BGM 동기화 시작
                 var playingVideoPlayers = activeVideoPlayers.Where(vp => vp != null && vp.isPlaying).ToArray();
-                MelonLogger.Msg($"[BgaInjector] 동기화 시작 시도: {playingVideoPlayers.Length}개 VideoPlayer 재생 중");
+                ModLog.Verbose($"[BgaInjector] 동기화 시작 시도: {playingVideoPlayers.Length}개 VideoPlayer 재생 중");
                 if (playingVideoPlayers.Length > 0)
                 {
-                    MelonLogger.Msg("[BgaInjector] BgaBgmSyncManager.StartSync 호출");
+                    ModLog.Verbose("[BgaInjector] BgaBgmSyncManager.StartSync 호출");
                     BgaBgmSyncManager.StartSync(playingVideoPlayers);
                 }
                 else

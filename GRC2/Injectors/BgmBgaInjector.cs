@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using System.Linq;
 using MelonLoader;
+using GRC2.Helpers;
 using UnityEngine;
 using GRC2.Core;
 
@@ -21,23 +22,23 @@ namespace GRC2.Injectors
             if (isPlayScene)
             {
                 _isPlayScene = true;
-                MelonLogger.Msg($"[BgmBgaInjector] StartInjection 호출: 플레이 씬 감지, _isPlayScene=true로 설정");
+                ModLog.Verbose($"[BgmBgaInjector] StartInjection 호출: 플레이 씬 감지, _isPlayScene=true로 설정");
             }
             else if (!_isPlayScene)
             {
                 // 이미 플레이 씬 상태가 아니므로 _isPlayScene은 그대로 false입니다.
-                MelonLogger.Msg($"[BgmBgaInjector] StartInjection 호출: 일반 씬, _isPlayScene=false");
+                ModLog.Verbose($"[BgmBgaInjector] StartInjection 호출: 일반 씬, _isPlayScene=false");
             }
             else
             {
                 // 이미 플레이 씬이면 false로 덮어쓰지 않음
-                MelonLogger.Msg($"[BgmBgaInjector] StartInjection 호출: 플레이 씬 상태 유지 (_isPlayScene=true)");
+                ModLog.Verbose($"[BgmBgaInjector] StartInjection 호출: 플레이 씬 상태 유지 (_isPlayScene=true)");
             }
             
             // 재시작 시 주입 상태 리셋
             if (_injectionCoroutine != null)
             {
-                MelonLogger.Msg($"[BgmBgaInjector] 기존 코루틴 중지 및 상태 리셋 (재시작)");
+                ModLog.Verbose($"[BgmBgaInjector] 기존 코루틴 중지 및 상태 리셋 (재시작)");
                 StopInjection();
                 
                 // 재시작 시 아트워크 캐시도 리셋 (플레이 씬 재로드 시 새로운 GameObject를 찾기 위해)
@@ -52,7 +53,7 @@ namespace GRC2.Injectors
         {
             BgaInjector.Reset();
             BgmInjector.Reset();
-            MelonLogger.Msg("[BgmBgaInjector] 주입 상태 리셋 완료");
+            ModLog.Verbose("[BgmBgaInjector] 주입 상태 리셋 완료");
         }
 
         public static void StopInjection()
@@ -69,7 +70,7 @@ namespace GRC2.Injectors
         public static void ResetPlaySceneState()
         {
             _isPlayScene = false;
-            MelonLogger.Msg("[BgmBgaInjector] 플레이 씬 상태 리셋: _isPlayScene=false");
+            ModLog.Verbose("[BgmBgaInjector] 플레이 씬 상태 리셋: _isPlayScene=false");
         }
 
         public static bool IsPlayScene()

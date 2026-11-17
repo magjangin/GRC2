@@ -1,6 +1,7 @@
 using System;
 using IntiCreates;
 using MelonLoader;
+using GRC2.Helpers;
 using UnityEngine;
 using UnityEngine.Video;
 using System.Collections;
@@ -321,7 +322,7 @@ namespace GRC2.Injectors
                 float bgmTime = ResolveBgmTimeForSync();
                 if (bgmTime <= 0f)
                 {
-                    MelonLogger.Msg($"[BGAPlayerHook] SyncBgaToBgm: BGM 시간이 0이어서 동기화 건너뜀 (AudioSource.isPlaying={_bgmAudioSource?.isPlaying}, clip={_bgmAudioSource?.clip?.name})");
+                    ModLog.Verbose($"[BGAPlayerHook] SyncBgaToBgm: BGM 시간이 0이어서 동기화 건너뜀 (AudioSource.isPlaying={_bgmAudioSource?.isPlaying}, clip={_bgmAudioSource?.clip?.name})");
                     return;
                 }
 
@@ -375,7 +376,7 @@ namespace GRC2.Injectors
                 float syncTime = (float)(bgmTime % videoPlayer.length);
                 float oldTime = (float)videoPlayer.time;
                 videoPlayer.time = syncTime;
-                MelonLogger.Msg($"[BGAPlayerHook] 동기화: {videoPlayer.gameObject.name} - BGM={bgmTime:F3}초, BGA={oldTime:F3}초 → {syncTime:F3}초");
+                ModLog.Verbose($"[BGAPlayerHook] 동기화: {videoPlayer.gameObject.name} - BGM={bgmTime:F3}초, BGA={oldTime:F3}초 → {syncTime:F3}초");
                 return true;
             }
             catch (Exception ex)

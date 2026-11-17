@@ -24,9 +24,8 @@ namespace GRC2.Harmony
         private static readonly AccessTools.FieldRef<cMusicSelectScrollView, List<MusicSelectScrollItemData>> CellListRef =
             AccessTools.FieldRefAccess<cMusicSelectScrollView, List<MusicSelectScrollItemData>>("mCellHaviableMusicDataList");
 
-        // MusicID 0~53은 실제 곡, 54~511은 SAVEABLE_ID_END(512) 전의 빈 영역입니다.
-        private const int CustomMusicIdStart = 54;
-        private const int CustomMusicIdEnd = 511;
+        // 커스텀 MusicID 범위·배정은 CustomMusicIdRegistry가 정합니다(54~7999, 예약 값 제외, 폴더별 고정 ID).
+
 
         private static readonly Dictionary<MusicID, TemplateSong> TemplateSongs =
             new Dictionary<MusicID, TemplateSong>();
@@ -54,32 +53,9 @@ namespace GRC2.Harmony
             }
         }
 
-        private static bool _warnedRangeOverlap;
-
-        /// <summary>
-        /// 커스텀 ID 범위(54~511)에 원본 MusicID 값이 들어 있으면 경고합니다. 게임에 곡이 추가되면 겹칠 수 있습니다(C4).
-        /// </summary>
-        private static void WarnIfCustomRangeOverlapsOriginal()
-        {
-            if (_warnedRangeOverlap)
-                return;
-            _warnedRangeOverlap = true;
-
-            foreach (MusicID id in Enum.GetValues(typeof(MusicID)))
-            {
-                int idValue = (int)id;
-                if (idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd)
-                {
-                    MelonLogger.Warning($"[MusicScrollViewHooks] 커스텀 ID 범위({CustomMusicIdStart}~{CustomMusicIdEnd})와 원본 MusicID {id}({idValue})가 겹칩니다.");
-                }
-            }
-        }
-
-        private static bool IsCustomMusicId(MusicID musicId)
-        {
-            int idValue = (int)musicId;
-            return idValue >= CustomMusicIdStart && idValue <= CustomMusicIdEnd;
-        }
+        // 예전의 "원본 MusicID가 커스텀 범위와 겹치면 경고"는 필요 없어졌습니다. 시작 번호를 원본 곡 다음 값으로 계산하고
+        // 이름 붙은 enum 값은 배정하지 않기 때문입니다(CustomMusicIdRegistry).
+        private static bool IsCustomMusicId(MusicID musicId) => CustomMusicIdRegistry.IsCustomRange(musicId);
 
         private static void RegisterArtistFirstSongs(List<MusicSelectScrollItemData> cellList)
         {
@@ -126,35 +102,26 @@ namespace GRC2.Harmony
 
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
-            // 앨범 순서를 키 이름순으로 고정합니다. 딕셔너리 열거 순서에 기대면 폴더를 추가·삭제할 때 ID가 밀립니다(C4).
-            // 같은 폴더 구성이면 항상 같은 ID가 붙습니다. (ID를 폴더 이름에 영구 매핑하는 것은 아직 하지 않았습니다.)
-            var orderedAlbums = albums
-                .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(kvp => kvp.Value)
-                .ToList();
-
-            WarnIfCustomRangeOverlapsOriginal();
+            // 폴더 키마다 고정 ID를 받습니다(savecustomkey/musicid_map.txt). 폴더를 추가·삭제해도 기존 곡의 ID와 기록이 그대로입니다(C4).
+            var ids = CustomMusicIdRegistry.Allocate(albums.Keys);
+            if (ids.Assigned.Count > 0)
+                CustomMusicIdRegistry.EnsureSaveSlots(ids.Assigned.Values.Max());
 
             int injectedCount = 0;
-            foreach (AlbumInfo album in orderedAlbums)
+            foreach (var pair in albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
             {
-                int customIdValue = CustomMusicIdStart + injectedCount;
-                if (customIdValue > CustomMusicIdEnd)
-                {
-                    MelonLogger.Warning(
-                        $"[MusicScrollViewHooks] 커스텀 MusicID 공간이 부족해 나머지 곡을 건너뜁니다. " +
-                        $"최대 {CustomMusicIdEnd - CustomMusicIdStart + 1}곡");
-                    break;
-                }
+                if (!ids.Assigned.TryGetValue(pair.Key, out int customIdValue))
+                    continue;
 
-                if (TryCreateCustomItem(templateData, album, customIdValue, cellList.Count, out var newItem))
+                if (TryCreateCustomItem(templateData, pair.Value, customIdValue, cellList.Count, out var newItem))
                 {
                     cellList.Add(newItem);
                     injectedCount++;
                 }
             }
 
-            MelonLogger.Msg(
+            // 곡 선택 씬 한 번에 이 postfix가 4번쯤 불리므로 결과가 달라질 때만 남깁니다.
+            ModLog.InfoOnChange("MusicScrollViewHooks.inject",
                 $"[MusicScrollViewHooks] 커스텀 곡 주입 완료: {injectedCount}개 (총 {cellList.Count}개)");
         }
 

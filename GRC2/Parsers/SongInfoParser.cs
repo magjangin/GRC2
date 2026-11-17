@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using MelonLoader;
+using GRC2.Helpers;
 
 namespace GRC2.Parsers
 {
@@ -51,7 +52,7 @@ namespace GRC2.Parsers
 
             try
             {
-                MelonLogger.Msg($"[SongInfoParser] 곡 정보 파일 파싱 시작: {Path.GetFileName(filePath)}");
+                ModLog.Verbose($"[SongInfoParser] 곡 정보 파일 파싱 시작: {Path.GetFileName(filePath)}");
 
                 string text = "";
                 string encodingUsed = "Default/BOM Detect";
@@ -64,7 +65,7 @@ namespace GRC2.Parsers
                     encodingUsed = reader.CurrentEncoding.EncodingName;
                 }
                 
-                MelonLogger.Msg($"[SongInfoParser] 인코딩 결정: {encodingUsed}");
+                ModLog.Verbose($"[SongInfoParser] 인코딩 결정: {encodingUsed}");
                 string[] lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
                 
                 foreach (var line in lines)
@@ -90,14 +91,14 @@ namespace GRC2.Parsers
                         songInfo.Title = titleMatch.Groups[2].Value.Trim().Normalize(System.Text.NormalizationForm.FormC);
                         
                         // 디버깅 로그
-                        MelonLogger.Msg($"[SongInfoParser] 곡 제목 파싱: '{songInfo.Title}'");
+                        ModLog.Verbose($"[SongInfoParser] 곡 제목 파싱: '{songInfo.Title}'");
                         continue;
                     }
 
                     // 크레딧 필드 (아티스트, 작사, 작곡, 편곡, 채보, 수록 CD, 원작 게임)
                     if (TryApplyCreditLine(trimmedLine, songInfo, out string creditLabel, out string creditValue))
                     {
-                        MelonLogger.Msg($"[SongInfoParser] {creditLabel}: {creditValue}");
+                        ModLog.Verbose($"[SongInfoParser] {creditLabel}: {creditValue}");
                         continue;
                     }
 
@@ -110,7 +111,7 @@ namespace GRC2.Parsers
                             .Select(d => d.Trim())
                             .Where(d => !string.IsNullOrEmpty(d))
                             .ToList();
-                        MelonLogger.Msg($"[SongInfoParser] 난이도 목록: {string.Join(", ", songInfo.Difficulties)}");
+                        ModLog.Verbose($"[SongInfoParser] 난이도 목록: {string.Join(", ", songInfo.Difficulties)}");
                         continue;
                     }
                     
@@ -119,7 +120,7 @@ namespace GRC2.Parsers
                     if (characterMatch.Success)
                     {
                         songInfo.Character = characterMatch.Groups[2].Value.Trim();
-                        MelonLogger.Msg($"[SongInfoParser] 캐릭터(ArtistID): {songInfo.Character}");
+                        ModLog.Verbose($"[SongInfoParser] 캐릭터(ArtistID): {songInfo.Character}");
                         continue;
                     }
                     
@@ -131,7 +132,7 @@ namespace GRC2.Parsers
                         if (int.TryParse(difficultyNumberMatch.Groups[2].Value.Trim(), out int difficultyNumber))
                         {
                             songInfo.DifficultyNumbers[difficultyName] = difficultyNumber;
-                            MelonLogger.Msg($"[SongInfoParser] 난이도 숫자 매핑: {difficultyName} = {difficultyNumber}");
+                            ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyName} = {difficultyNumber}");
                         }
                         continue;
                     }
@@ -139,10 +140,10 @@ namespace GRC2.Parsers
 
                 // 난이도 숫자 매핑 로그
                 var difficultyNumbersStr = string.Join(", ", songInfo.DifficultyNumbers.Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                MelonLogger.Msg($"[SongInfoParser] 곡 정보 파싱 완료 - 제목: {songInfo.Title}, 아티스트: {songInfo.Artist}, 난이도: {string.Join(", ", songInfo.Difficulties)}");
+                ModLog.Verbose($"[SongInfoParser] 곡 정보 파싱 완료 - 제목: {songInfo.Title}, 아티스트: {songInfo.Artist}, 난이도: {string.Join(", ", songInfo.Difficulties)}");
                 if (!string.IsNullOrEmpty(difficultyNumbersStr))
                 {
-                    MelonLogger.Msg($"[SongInfoParser] 난이도 숫자 매핑: {difficultyNumbersStr}");
+                    ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyNumbersStr}");
                 }
             }
             catch (Exception ex)

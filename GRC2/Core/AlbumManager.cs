@@ -67,7 +67,7 @@ namespace GRC2.Core
             string normalizedKey = CharacterNames.Normalize(artistId);
             _artistIdToFirstSong[normalizedKey] = (musicId, title);
             _artistIdToFirstSong[artistId] = (musicId, title);
-            MelonLogger.Msg($"[AlbumManager] 아티스트 첫 곡 등록: {artistId} (정규화: {normalizedKey}) -> MusicID: {musicId}, 제목: '{title}'");
+            ModLog.Verbose($"[AlbumManager] 아티스트 첫 곡 등록: {artistId} (정규화: {normalizedKey}) -> MusicID: {musicId}, 제목: '{title}'");
         }
 
         public static (MusicID musicId, string title)? GetArtistFirstSong(string artistId)
@@ -221,7 +221,7 @@ namespace GRC2.Core
                 if (_musicIdToAlbumMap.TryGetValue(musicID, out AlbumInfo album))
                 {
                     _currentAlbum = album;
-                    MelonLogger.Msg($"[AlbumManager] MusicID로 앨범 선택: {album.AlbumName} (MusicID: {musicID})");
+                    ModLog.Verbose($"[AlbumManager] MusicID로 앨범 선택: {album.AlbumName} (MusicID: {musicID})");
                     return true;
                 }
 
@@ -250,7 +250,7 @@ namespace GRC2.Core
 
                 _musicIdToAlbumMap[musicID] = album;
                 _albumToMusicId[album] = musicID;
-                MelonLogger.Msg($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
+                ModLog.Verbose($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
             }
         }
 
@@ -280,7 +280,7 @@ namespace GRC2.Core
                     RebuildOriginalTitleSet();
                 }
 
-                MelonLogger.Msg($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
+                ModLog.Verbose($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
             }
         }
 
@@ -353,9 +353,66 @@ namespace GRC2.Core
             }
         }
 
+        /// <summary>
+        /// hwa 폴더 구성의 지문(파일 이름·크기·수정 시각)입니다. 곡 선택 씬에 들어올 때 이 값이 바뀌었으면
+        /// 다시 스캔해, 곡을 추가하거나 info.txt·BMS를 고친 뒤 게임을 재시작하지 않아도 되게 합니다(H12).
+        /// DirectoryInfo 열거는 파일 정보를 목록 조회 결과에서 바로 채우므로 파일마다 따로 stat하지 않습니다.
+        /// </summary>
+        public static ulong ComputeFolderSignature(string hwaFolderPath)
+        {
+            const ulong FnvOffset = 14695981039346656037UL;
+            const ulong FnvPrime = 1099511628211UL;
+            ulong hash = FnvOffset;
+
+            void Mix(string text)
+            {
+                foreach (char ch in text)
+                {
+                    hash ^= ch;
+                    hash *= FnvPrime;
+                }
+                hash ^= '|';
+                hash *= FnvPrime;
+            }
+
+            void MixFolder(DirectoryInfo dir)
+            {
+                Mix(dir.Name);
+                foreach (var file in dir.EnumerateFiles().OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    Mix(file.Name);
+                    Mix(file.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    Mix(file.LastWriteTimeUtc.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                }
+            }
+
+            try
+            {
+                var root = new DirectoryInfo(hwaFolderPath);
+                if (!root.Exists)
+                    return 0;
+
+                MixFolder(root);
+                foreach (var dir in root.EnumerateDirectories()
+                    .Where(d => !string.Equals(d.Name, FallbackFontCandidates.UserFontFolderName, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+                {
+                    MixFolder(dir);
+                }
+                return hash;
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[AlbumManager] hwa 폴더 지문 계산 실패: {ex.Message}");
+                return 0;
+            }
+        }
+
         private static List<string> EnumerateAlbumFolders(string hwaFolderPath)
         {
+            // hwa/fonts는 FontFallback이 읽는 사용자 폰트 폴더입니다. 라이선스 txt 등이 있으면 가짜 곡으로 잡히므로 뺍니다.
             var albumFolders = Directory.GetDirectories(hwaFolderPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(dir => !string.Equals(Path.GetFileName(dir), FallbackFontCandidates.UserFontFolderName, StringComparison.OrdinalIgnoreCase))
                 .ToList();
             albumFolders.Add(hwaFolderPath);
             MelonLogger.Msg($"[AlbumManager] {albumFolders.Count}개 앨범 폴더 발견");
@@ -372,7 +429,7 @@ namespace GRC2.Core
 
             string albumKey = GetAlbumKey(albumFolder);
             _albums[albumKey] = albumInfo;
-            MelonLogger.Msg($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
+            ModLog.Verbose($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
         }
 
         /// <summary>
