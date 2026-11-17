@@ -14,7 +14,7 @@ Main startup path. It:
 - applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
 - locates the game `hwa` folder;
 - reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then points
-  `CustomMusicIdRegistry` at `savecustomkey/musicid_map.txt`;
+  `CustomMusicIdRegistry` at `UserData/GRC2/musicid_map.txt`;
 - scans albums and song metadata, records the `hwa` folder signature, loads the
   current album's artwork, and parses **only the current album's BMS** (others are
   parsed on first play by `GetOrParseBms`, re-parsed when the file's write time
@@ -133,7 +133,7 @@ Purpose:
 - provide a stable original-song template for the pre-play window.
 
 MusicID assignment (2026-11-18): `CustomMusicIdRegistry.Allocate` gives each album
-folder key a persistent ID from `savecustomkey/musicid_map.txt` (range 54..7999,
+folder key a persistent ID from `UserData/GRC2/musicid_map.txt` (range 54..7999,
 skipping every named `MusicID` enum value such as `SAVEABLE_ID_END = 512`), then
 `CustomMusicIdRegistry.EnsureSaveSlots` grows `SavableGameData.playerMusicData`
 past its default 512 entries so the result scene can index any custom ID. The save

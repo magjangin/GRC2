@@ -58,12 +58,53 @@ namespace GRC2.Core
             return value >= Start && value <= End && !IsReserved(value);
         }
 
-        /// <summary>SceneDetector가 시작할 때 맵 파일 위치(savecustomkey/musicid_map.txt)를 알려 줍니다.</summary>
+        /// <summary>
+        /// 맵 파일 위치를 정합니다: MelonLoader의 모드 데이터 폴더 <c>UserData/GRC2/musicid_map.txt</c>.
+        /// savecustomkey는 사용자가 고치는 설정 파일만 두는 폴더이고, hwa는 루트도 앨범으로 스캔돼 txt가 곡 정보로 읽히므로 둘 다 쓰지 않습니다.
+        /// 0.6.0 개발 중 잠깐 쓰던 savecustomkey/musicid_map.txt가 있으면 새 위치로 옮깁니다(ID 유지).
+        /// </summary>
         public static void Initialize(string gameFolder)
         {
-            if (string.IsNullOrEmpty(gameFolder))
+            string userData = null;
+            try { userData = MelonLoader.Utils.MelonEnvironment.UserDataDirectory; }
+            catch { /* 아래 대체 경로 사용 */ }
+            if (string.IsNullOrEmpty(userData) && !string.IsNullOrEmpty(gameFolder))
+                userData = Path.Combine(gameFolder, "UserData");
+            if (string.IsNullOrEmpty(userData))
                 return;
-            _mapFilePath = Path.Combine(Path.Combine(gameFolder, CustomKeySettings.FolderName), CustomMusicIdAllocator.MapFileName);
+
+            _mapFilePath = Path.Combine(Path.Combine(userData, DataFolderName), CustomMusicIdAllocator.MapFileName);
+
+            if (!string.IsNullOrEmpty(gameFolder))
+                MigrateLegacyMapFile(Path.Combine(Path.Combine(gameFolder, "savecustomkey"), CustomMusicIdAllocator.MapFileName));
+        }
+
+        /// <summary>UserData 아래 이 모드의 폴더 이름.</summary>
+        public const string DataFolderName = "GRC2";
+
+        private static void MigrateLegacyMapFile(string legacyPath)
+        {
+            try
+            {
+                if (!File.Exists(legacyPath))
+                    return;
+
+                if (File.Exists(_mapFilePath))
+                {
+                    // 새 위치가 이미 정본이므로 옛 파일만 지웁니다.
+                    File.Delete(legacyPath);
+                }
+                else
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_mapFilePath));
+                    File.Move(legacyPath, _mapFilePath);
+                }
+                MelonLogger.Msg($"[MusicID] 맵 파일을 savecustomkey에서 {_mapFilePath}로 옮겼습니다.");
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[MusicID] 옛 맵 파일 이동 실패({legacyPath}): {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -82,6 +123,7 @@ namespace GRC2.Core
             {
                 try
                 {
+                    Directory.CreateDirectory(Path.GetDirectoryName(_mapFilePath));
                     CustomMusicIdAllocator.Save(_mapFilePath, result.FullMap);
                     MelonLogger.Msg($"[MusicID] 맵 저장: {result.FullMap.Count}개 ({_mapFilePath})");
                 }

@@ -8,7 +8,7 @@ using System.Text;
 namespace GRC2.Helpers
 {
     /// <summary>
-    /// 커스텀 곡(앨범 폴더)마다 MusicID를 정하고 hwa/musicid_map.txt에 기억합니다(Unity 없이 테스트 가능).
+    /// 커스텀 곡(앨범 폴더)마다 MusicID를 정하고 UserData/GRC2/musicid_map.txt에 기억합니다(Unity 없이 테스트 가능).
     ///
     /// 예전에는 앨범을 이름순으로 세워 54, 55, …를 붙였기 때문에 폴더를 하나 추가·삭제하면 뒤 곡들의 ID가 밀려
     /// 저장된 기록과 마지막 선택 곡이 다른 곡으로 옮겨 갔습니다(알려진 문제 C4). 이제는 한 번 받은 ID를 파일에
