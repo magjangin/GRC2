@@ -295,8 +295,8 @@ namespace GRC2.Processors
         {
             if (noteList == null || fairyEndNotes == null || allBmsNotes == null) return;
 
-            MelonLogger.Msg($"[FairyNoteProcessor] 페어리 끝 노트 처리 시작: {fairyEndNotes.Count}개");
-            MelonLogger.Msg($"[FairyNoteProcessor] noteList 개수: {noteList.Count}개");
+            ModLog.Verbose($"[FairyNoteProcessor] 페어리 끝 노트 처리 시작: {fairyEndNotes.Count}개");
+            ModLog.Verbose($"[FairyNoteProcessor] noteList 개수: {noteList.Count}개");
 
             float bpm = fairyEndNotes.FirstOrDefault(n => n?.BaseBpm > 0f)?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
             float timeTolerance = NoteProcessorHelper.CalculateTimeTolerance(bpm);

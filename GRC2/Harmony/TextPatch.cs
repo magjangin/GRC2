@@ -23,8 +23,12 @@ namespace GRC2.Harmony
         /// </summary>
         public static void EnableTextReplacement(bool enable)
         {
+            // 곡 선택 커서가 움직일 때마다 불리므로, 상태가 바뀔 때만 남깁니다(같은 OFF가 수십 번 찍히던 스팸).
+            if (_isTextReplacementEnabled == enable)
+                return;
+
             _isTextReplacementEnabled = enable;
-            MelonLogger.Msg($"[TextPatch] 텍스트 교체 스위치: {(enable ? "ON" : "OFF")}");
+            Helpers.ModLog.Verbose($"[TextPatch] 텍스트 교체 스위치: {(enable ? "ON" : "OFF")}");
         }
 
         /// <summary>
@@ -84,7 +88,7 @@ namespace GRC2.Harmony
                     return;
                 }
 
-                MelonLogger.Msg($"[TextPatch] ✅ 텍스트 교체: '{oldValue}' -> '{value}'");
+                Helpers.ModLog.Verbose($"[TextPatch] ✅ 텍스트 교체: '{oldValue}' -> '{value}'");
             }
             catch (Exception ex)
             {

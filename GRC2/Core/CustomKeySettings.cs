@@ -15,7 +15,8 @@ namespace GRC2.Core
     /// </summary>
     public static class CustomKeySettings
     {
-        private const string FolderName = "savecustomkey";
+        /// <summary>모드 설정 폴더 이름(게임 폴더 아래). MusicID 맵도 여기에 둡니다.</summary>
+        public const string FolderName = "savecustomkey";
         private const string FileName = "config.txt";
 
         // 기본값은 이 한 곳에만 둡니다. 프로퍼티 초기값, 키가 없을 때의 대체값, 새로 만드는 설정 파일이 모두 이 값을 씁니다(H3).
@@ -35,6 +36,7 @@ namespace GRC2.Core
         private const float DefaultNoteSpeedChaosMin = 0.6f;
         private const float DefaultNoteSpeedChaosMax = 1.8f;
         private const bool DefaultNoteSpeedChaosPerLane = true;
+        private const bool DefaultVerboseLog = false;
 
         // 허용 범위. 범위를 벗어난 값은 가장 가까운 한계로 맞추고 경고를 남깁니다. 0이면 노트가 멈추고 음수면 거꾸로 가므로 하한을 둡니다(H3).
         private const float MinNoteSwayAmplitude = 0f;
@@ -52,7 +54,8 @@ namespace GRC2.Core
             "AutoPlay", "AllPerfect", "BlockSave",
             "EnableJudgmentBar", "JudgmentBarVertical", "JudgmentBarCapsule", "JudgmentBarLeft",
             "NoteSway", "NoteSwayAmplitude", "NoteSwaySpeed", "NoteSwayDamping", "NoteSwayDampingTime",
-            "NoteSpeedChaos", "NoteSpeedChaosMin", "NoteSpeedChaosMax", "NoteSpeedChaosPerLane"
+            "NoteSpeedChaos", "NoteSpeedChaosMin", "NoteSpeedChaosMax", "NoteSpeedChaosPerLane",
+            "VerboseLog"
         };
 
         /// <summary>Initialize에서 확정한 설정 파일 경로. Reload/PollFileChange는 이 경로만 사용합니다.</summary>
@@ -83,6 +86,9 @@ namespace GRC2.Core
         public static float NoteSpeedChaosMin { get; private set; } = DefaultNoteSpeedChaosMin;
         public static float NoteSpeedChaosMax { get; private set; } = DefaultNoteSpeedChaosMax;
         public static bool NoteSpeedChaosPerLane { get; private set; } = DefaultNoteSpeedChaosPerLane;
+
+        /// <summary>곡·노트마다 찍히는 상세 로그를 남길지(ModLog.Verbose). 문제를 조사할 때만 켭니다.</summary>
+        public static bool VerboseLog { get; private set; } = DefaultVerboseLog;
 
         public static void Initialize(string gameFolder)
         {
@@ -206,7 +212,7 @@ namespace GRC2.Core
                 $"NoteSway={NoteSway}(Amplitude={NoteSwayAmplitude}, Speed={NoteSwaySpeed}, " +
                 $"Damping={NoteSwayDamping}, DampingTime={NoteSwayDampingTime}), " +
                 $"NoteSpeedChaos={NoteSpeedChaos}(Min={NoteSpeedChaosMin}, Max={NoteSpeedChaosMax}, " +
-                $"PerLane={NoteSpeedChaosPerLane})";
+                $"PerLane={NoteSpeedChaosPerLane}), VerboseLog={VerboseLog}";
         }
 
         private static string Bit(bool value) => value ? "1" : "0";
@@ -268,7 +274,10 @@ namespace GRC2.Core
             "",
             "# 1 = 레인마다 속도가 다름(같은 레인 안에서는 순서 유지, 읽을 수는 있음)",
             "# 0 = 노트마다 속도가 다름(완전 카오스)",
-            $"NoteSpeedChaosPerLane={Bit(DefaultNoteSpeedChaosPerLane)}"
+            $"NoteSpeedChaosPerLane={Bit(DefaultNoteSpeedChaosPerLane)}",
+            "",
+            "# 상세 로그 (1 = 켜짐, 0 = 꺼짐). 곡·노트마다 찍히는 진단 로그입니다. 문제를 조사할 때만 켜세요.",
+            $"VerboseLog={Bit(DefaultVerboseLog)}"
         };
 
         /// <summary>
@@ -312,6 +321,7 @@ namespace GRC2.Core
             NoteSpeedChaosMin = ParseRangedFloat(values, "NoteSpeedChaosMin", DefaultNoteSpeedChaosMin, MinNoteSpeedChaos, MaxNoteSpeedChaos);
             NoteSpeedChaosMax = ParseRangedFloat(values, "NoteSpeedChaosMax", DefaultNoteSpeedChaosMax, MinNoteSpeedChaos, MaxNoteSpeedChaos);
             NoteSpeedChaosPerLane = ParseBool(values, "NoteSpeedChaosPerLane", DefaultNoteSpeedChaosPerLane);
+            VerboseLog = ParseBool(values, "VerboseLog", DefaultVerboseLog);
             return true;
         }
 

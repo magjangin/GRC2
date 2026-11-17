@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using GRC2.Processors;
 using MelonLoader;
+using GRC2.Helpers;
 
 namespace GRC2.Parsers
 {
@@ -37,7 +38,7 @@ namespace GRC2.Parsers
 
             try
             {
-                MelonLogger.Msg($"[BmsParser] BMS 파일 파싱 시작: {filePath}");
+                ModLog.Verbose($"[BmsParser] BMS 파일 파싱 시작: {filePath}");
                 
                 var lines = File.ReadAllLines(filePath);
                 var bpmChanges = new List<BpmChange>();

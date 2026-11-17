@@ -40,15 +40,22 @@ namespace GRC2.Core
         public override void OnInitializeMelon()
         {
             MelonLogger.Msg("[SceneDetector] 모드 초기화 시작");
-            
+            var total = System.Diagnostics.Stopwatch.StartNew();
+            var phase = System.Diagnostics.Stopwatch.StartNew();
+            var timings = new List<string>();
+            void Mark(string name)
+            {
+                timings.Add($"{name} {phase.ElapsedMilliseconds}ms");
+                phase.Restart();
+            }
+
             // 모드 어셈블리의 HarmonyPatch 특성을 한 번에 등록합니다.
             InitializeHarmony();
-            
+            Mark("Harmony");
+
             try
             {
-                // hwa 폴더 경로 설정 (게임 설치 폴더)
-                // Application.dataPath는 보통 "게임폴더/게임명_Data"를 가리키므로
-                // 한 단계 위로 올라가면 게임 설치 폴더가 됩니다
+                // Application.dataPath는 "게임폴더/게임명_Data"이므로 한 단계 위가 게임 설치 폴더입니다.
                 var gameFolder = Path.GetDirectoryName(Application.dataPath);
                 _gameFolder = gameFolder;
                 _hwaFolderPath = Path.Combine(gameFolder, "hwa");
@@ -56,60 +63,45 @@ namespace GRC2.Core
 
                 // 게임 업데이트 내성: 빌드 ID, 어셈블리 MVID, 이름으로 접근하는 필드를 점검해 로그 한 곳에 모읍니다(진단 전용).
                 GameCompatibility.LogStartupReport(gameFolder);
-                MelonLogger.Msg($"[SceneDetector] hwa 폴더 경로: {_hwaFolderPath}");
+                Mark("호환성");
 
-                // hwa 폴더 생성 (없으면)
                 if (!Directory.Exists(_hwaFolderPath))
                 {
                     Directory.CreateDirectory(_hwaFolderPath);
-                    MelonLogger.Msg("[SceneDetector] hwa 폴더 생성 완료");
+                    MelonLogger.Msg($"[SceneDetector] hwa 폴더 생성: {_hwaFolderPath}");
                 }
 
-                // AutoPlay/판정조작 on-off 설정 (savecustomkey 폴더) 로드.
-                // 이후에는 씬이 바뀔 때마다 CustomKeySettings.Reload()로 다시 읽습니다.
+                // AutoPlay/판정조작/VerboseLog 등 설정(savecustomkey 폴더). 이후에는 씬이 바뀔 때마다 Reload로 다시 읽습니다.
+                // 상세 로그 여부가 여기서 정해지므로 앨범 스캔보다 먼저 읽습니다.
                 CustomKeySettings.Initialize(gameFolder);
+                CustomMusicIdRegistry.Initialize(gameFolder);
 
-                // 앨범 폴더 스캔 (먼저 앨범들을 스캔)
-                MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 시작...");
                 AlbumManager.ScanAlbums(_hwaFolderPath);
-                MelonLogger.Msg("[SceneDetector] 앨범 폴더 스캔 완료");
+                Mark($"앨범 {AlbumManager.GetAllAlbums().Count}개");
 
                 // 곡 정보는 현재(기본) 앨범의 txt에서 이미 파싱되어 있습니다. 없으면 기본값을 씁니다.
-                MelonLogger.Msg("[SceneDetector] 곡 정보 확인 시작...");
                 var currentSongInfo = AlbumManager.GetCurrentSongInfo();
                 if (currentSongInfo != null)
-                {
                     SongInfo = currentSongInfo;
-                    MelonLogger.Msg($"[SceneDetector] 곡 정보 확인 완료 - 제목: {SongInfo.Title}, 아티스트: {SongInfo.Artist}");
-                }
-                else
-                {
-                    MelonLogger.Msg("[SceneDetector] 현재 앨범에 곡 정보 파일이 없어 기본값을 사용합니다.");
-                }
-                
-                // 커스텀 아트워크 로드 (앨범별)
-                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 스캔 시작...");
+
                 LoadCustomArtwork();
-                
-                // BMS 파일 스캔 및 파싱 (앨범별)
-                MelonLogger.Msg("[SceneDetector] BMS 파일 스캔 시작...");
+                Mark("아트워크");
+
                 ScanAndParseBmsFiles();
-                MelonLogger.Msg($"[SceneDetector] BMS 파일 스캔 완료: {ParsedBmsNotesByFile.Count}개 파일, 현재 선택 파일 노트 {ParsedBmsNotes.Count}개");
+                Mark("BMS");
 
                 // 자동 패치는 이미 적용되어 있으므로 주입할 BMS 데이터만 갱신합니다.
+                // BGA/BGM 주입 경로는 주입 루프가 매번 현재 앨범에서 읽으므로 따로 초기화할 것이 없습니다.
                 NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
 
-                // BGA/BGM 주입 경로는 주입 루프가 매번 현재 앨범에서 읽으므로 따로 초기화할 것이 없습니다.
-
                 _isInitialized = true;
-                MelonLogger.Msg("[SceneDetector] 모드 초기화 완료");
+                MelonLogger.Msg($"[SceneDetector] 모드 초기화 완료 {total.ElapsedMilliseconds}ms ({string.Join(", ", timings)})");
             }
             catch (Exception ex)
             {
                 Helpers.ErrorLogger.LogException(ex, "[SceneDetector]", "초기화 실패");
             }
         }
-
         public override void OnUpdate()
         {
             if (!_isInitialized) return;
@@ -151,13 +143,13 @@ namespace GRC2.Core
         {
             if (_harmonyInstance != null) return;
 
-            MelonLogger.Msg("[SceneDetector] Harmony 초기화 중...");
+            ModLog.Verbose("[SceneDetector] Harmony 초기화 중...");
 
             try
             {
                 _harmonyInstance = new HarmonyLib.Harmony("GRC2.MusicInjector");
                 _harmonyInstance.PatchAll(typeof(SceneDetector).Assembly);
-                MelonLogger.Msg("[SceneDetector] Harmony 자동 패치 적용 완료");
+                ModLog.Verbose("[SceneDetector] Harmony 자동 패치 적용 완료");
                 LogPatchedMethodCount();
             }
             catch (Exception ex)
@@ -308,12 +300,16 @@ namespace GRC2.Core
 
         #region 곡 정보 / 아트워크 / BMS 스캔
 
+        /// <summary>
+        /// 시작할 때는 현재 선택 앨범의 BMS만 파싱합니다. 다른 곡은 플레이 씬에 들어갈 때
+        /// <see cref="ReloadCurrentAlbumAssets"/>가 처음 한 번 파싱해 캐시합니다.
+        /// 예전에는 모든 앨범의 BMS를 시작할 때 파싱하고 곡마다 요약을 찍어, 곡 수에 비례해 시작이 느려지고
+        /// 쓰지 않는 노트까지 메모리에 들고 있었습니다(곡 상한을 늘리면서 병목이 됨).
+        /// </summary>
         private void ScanAndParseBmsFiles()
         {
             try
             {
-                MelonLogger.Msg("[SceneDetector] BMS 파일 스캔 및 파싱 시작...");
-
                 var albums = AlbumManager.GetAllAlbums();
                 if (albums == null || albums.Count == 0)
                 {
@@ -321,80 +317,11 @@ namespace GRC2.Core
                     return;
                 }
 
-                int totalBmsFiles = 0;
-                foreach (var kvp in albums)
-                {
-                    var albumKey = kvp.Key;
-                    var album = kvp.Value;
-                    var files = album?.BmsFiles ?? new List<string>();
-                    if (files.Count == 0)
-                    {
-                        continue;
-                    }
-
-                    MelonLogger.Msg($"[SceneDetector] 앨범 폴더 '{albumKey}'에서 {files.Count}개의 BMS 파일 발견");
-                    foreach (var file in files)
-                    {
-                        MelonLogger.Msg($"[SceneDetector]   - {Path.GetFileName(file)}");
-                    }
-
-                    totalBmsFiles += files.Count;
-                }
-
-                MelonLogger.Msg($"[SceneDetector] 총 {totalBmsFiles}개의 BMS 파일 발견, 파싱 시작...");
+                int albumsWithBms = albums.Values.Count(a => a?.BmsFiles != null && a.BmsFiles.Count > 0);
+                int totalBmsFiles = albums.Values.Sum(a => a?.BmsFiles?.Count ?? 0);
+                MelonLogger.Msg($"[SceneDetector] BMS 파일 {totalBmsFiles}개(앨범 {albumsWithBms}개) 발견 - 현재 곡만 지금 파싱하고 나머지는 플레이할 때 파싱합니다.");
 
                 ParsedBmsNotesByFile.Clear();
-                var albumOrder = albums.Keys.OrderBy(k => k, StringComparer.OrdinalIgnoreCase).ToList();
-
-                foreach (var albumKey in albumOrder)
-                {
-                    var album = albums[albumKey];
-                    var files = (album?.BmsFiles ?? new List<string>())
-                        .Where(f => !string.IsNullOrWhiteSpace(f))
-                        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-
-                    foreach (var file in files)
-                    {
-                        if (ParsedBmsNotesByFile.ContainsKey(file))
-                        {
-                            continue;
-                        }
-
-                        var notes = BmsParser.ParseBmsFile(file, printSummary: false);
-                        ParsedBmsNotesByFile[file] = notes ?? new List<BmsNote>();
-                    }
-                }
-
-                MelonLogger.Msg("");
-                MelonLogger.Msg("=== BMS 파일 파싱 결과 ===");
-
-                foreach (var albumKey in albumOrder)
-                {
-                    var album = albums[albumKey];
-                    var files = (album?.BmsFiles ?? new List<string>())
-                        .Where(f => !string.IsNullOrWhiteSpace(f))
-                        .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-
-                    foreach (var file in files)
-                    {
-                        if (!ParsedBmsNotesByFile.TryGetValue(file, out var notes))
-                        {
-                            continue;
-                        }
-
-                        BmsSummaryPrinter.PrintParseSummary(
-                            notes,
-                            file,
-                            label: albumKey,
-                            printHeader: false,
-                            printLeadingBlankLine: false,
-                            printTrailingBlankLine: false);
-                    }
-                }
-
-                MelonLogger.Msg("");
 
                 var currentBmsFile = AlbumManager.GetCurrentBmsFile();
                 if (string.IsNullOrEmpty(currentBmsFile))
@@ -405,22 +332,17 @@ namespace GRC2.Core
                     return;
                 }
 
-                if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var currentNotes))
-                {
-                    currentNotes = BmsParser.ParseBmsFile(currentBmsFile);
-                    ParsedBmsNotesByFile[currentBmsFile] = currentNotes ?? new List<BmsNote>();
-                }
-
-                ParsedBmsNotes = currentNotes ?? new List<BmsNote>();
+                var currentNotes = BmsParser.ParseBmsFile(currentBmsFile, printSummary: false) ?? new List<BmsNote>();
+                ParsedBmsNotesByFile[currentBmsFile] = currentNotes;
+                ParsedBmsNotes = currentNotes;
                 _lastParsedBmsFile = currentBmsFile;
-                MelonLogger.Msg($"[SceneDetector] 현재 선택 BMS 노트 로드 완료: {Path.GetFileName(currentBmsFile)} / {ParsedBmsNotes.Count}개");
+                ModLog.Verbose($"[SceneDetector] 현재 선택 BMS 노트 로드 완료: {Path.GetFileName(currentBmsFile)} / {ParsedBmsNotes.Count}개");
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogException(ex, "[SceneDetector]", "BMS 파일 스캔/파싱 오류");
             }
         }
-
         private void ReloadCurrentAlbumAssets()
         {
             try
@@ -443,7 +365,7 @@ namespace GRC2.Core
                 }
                 else if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
                 {
-                    MelonLogger.Msg($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
+                    ModLog.Verbose($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
                     if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
                     {
                         notes = BmsParser.ParseBmsFile(currentBmsFile);
@@ -455,7 +377,7 @@ namespace GRC2.Core
 
                     // 노트가 0개여도 넘깁니다. 예전에는 0개면 넘기지 않아 이전 앨범의 차트가 남았습니다(C2).
                     NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
-                    MelonLogger.Msg($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
+                    ModLog.Verbose($"[SceneDetector] BMS 노트 업데이트 완료: {ParsedBmsNotes.Count}개 노트");
                 }
             }
             catch (Exception ex)
@@ -468,17 +390,17 @@ namespace GRC2.Core
         {
             try
             {
-                MelonLogger.Msg("[SceneDetector] 커스텀 아트워크 파일 스캔 시작");
+                ModLog.Verbose("[SceneDetector] 커스텀 아트워크 파일 스캔 시작");
 
                 var imageFile = AlbumManager.GetCurrentImageFile();
                 if (!string.IsNullOrEmpty(imageFile))
                 {
-                    MelonLogger.Msg($"[SceneDetector] 커스텀 아트워크 파일 발견: {Path.GetFileName(imageFile)}");
+                    ModLog.Verbose($"[SceneDetector] 커스텀 아트워크 파일 발견: {Path.GetFileName(imageFile)}");
                     CustomAssetManager.LoadCustomArtwork(imageFile);
                 }
                 else
                 {
-                    MelonLogger.Msg("[SceneDetector] 현재 선택된 앨범에 커스텀 아트워크 이미지 파일이 없습니다.");
+                    ModLog.Verbose("[SceneDetector] 현재 선택된 앨범에 커스텀 아트워크 이미지 파일이 없습니다.");
                 }
 
             }
@@ -532,9 +454,9 @@ namespace GRC2.Core
                 }
                 else if (sceneName == "RenderCutinScene")
                 {
-                    MelonLogger.Msg("[SceneDetector] RenderCutinScene 로드 처리 시작 (플레이 씬 로딩)");
+                    ModLog.Verbose("[SceneDetector] RenderCutinScene 로드 처리 시작 (플레이 씬 로딩)");
                     CustomBgmPlayer.Cleanup();
-                    MelonLogger.Msg("[SceneDetector] ✅ 로딩 씬 진입 - 커스텀 프리뷰 BGM 중지");
+                    ModLog.Verbose("[SceneDetector] ✅ 로딩 씬 진입 - 커스텀 프리뷰 BGM 중지");
 
                     BgmBgaInjector.StartInjection(isPlayScene: true);
 
@@ -576,7 +498,7 @@ namespace GRC2.Core
 
                     if (BgmBgaInjector.IsPlayScene())
                     {
-                        MelonLogger.Msg($"[SceneDetector] 플레이 씬 상태 감지: {sceneName}");
+                        ModLog.Verbose($"[SceneDetector] 플레이 씬 상태 감지: {sceneName}");
                         if (CustomAssetManager.ShouldInjectCustomContent())
                         {
                             ReloadCurrentAlbumAssets();
@@ -607,12 +529,12 @@ namespace GRC2.Core
 
         private void HandlePlayScene(string sceneName)
         {
-            MelonLogger.Msg($"[SceneDetector] {sceneName} 로드 처리 시작");
+            ModLog.Verbose($"[SceneDetector] {sceneName} 로드 처리 시작");
 
             try
             {
                 CustomBgmPlayer.Cleanup();
-                MelonLogger.Msg("[SceneDetector] ✅ 플레이 씬 진입 - 커스텀 프리뷰 BGM 중지");
+                ModLog.Verbose("[SceneDetector] ✅ 플레이 씬 진입 - 커스텀 프리뷰 BGM 중지");
 
                 if (CustomAssetManager.IsCustomChartSelected())
                 {

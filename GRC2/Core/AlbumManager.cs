@@ -67,7 +67,7 @@ namespace GRC2.Core
             string normalizedKey = CharacterNames.Normalize(artistId);
             _artistIdToFirstSong[normalizedKey] = (musicId, title);
             _artistIdToFirstSong[artistId] = (musicId, title);
-            MelonLogger.Msg($"[AlbumManager] 아티스트 첫 곡 등록: {artistId} (정규화: {normalizedKey}) -> MusicID: {musicId}, 제목: '{title}'");
+            ModLog.Verbose($"[AlbumManager] 아티스트 첫 곡 등록: {artistId} (정규화: {normalizedKey}) -> MusicID: {musicId}, 제목: '{title}'");
         }
 
         public static (MusicID musicId, string title)? GetArtistFirstSong(string artistId)
@@ -250,7 +250,7 @@ namespace GRC2.Core
 
                 _musicIdToAlbumMap[musicID] = album;
                 _albumToMusicId[album] = musicID;
-                MelonLogger.Msg($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
+                ModLog.Verbose($"[AlbumManager] MusicID-앨범 매핑 등록: {musicID} -> {album.AlbumName}");
             }
         }
 
@@ -280,7 +280,7 @@ namespace GRC2.Core
                     RebuildOriginalTitleSet();
                 }
 
-                MelonLogger.Msg($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
+                ModLog.Verbose($"[AlbumManager] MusicID-원본 제목 매핑 등록: {musicID} -> {originalTitle}");
             }
         }
 
@@ -355,7 +355,9 @@ namespace GRC2.Core
 
         private static List<string> EnumerateAlbumFolders(string hwaFolderPath)
         {
+            // hwa/fonts는 FontFallback이 읽는 사용자 폰트 폴더입니다. 라이선스 txt 등이 있으면 가짜 곡으로 잡히므로 뺍니다.
             var albumFolders = Directory.GetDirectories(hwaFolderPath, "*", SearchOption.TopDirectoryOnly)
+                .Where(dir => !string.Equals(Path.GetFileName(dir), FallbackFontCandidates.UserFontFolderName, StringComparison.OrdinalIgnoreCase))
                 .ToList();
             albumFolders.Add(hwaFolderPath);
             MelonLogger.Msg($"[AlbumManager] {albumFolders.Count}개 앨범 폴더 발견");
@@ -372,7 +374,7 @@ namespace GRC2.Core
 
             string albumKey = GetAlbumKey(albumFolder);
             _albums[albumKey] = albumInfo;
-            MelonLogger.Msg($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
+            ModLog.Verbose($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
         }
 
         /// <summary>
