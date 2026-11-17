@@ -466,9 +466,14 @@ namespace GRC2.Core
             {
                 albumInfo.BgmFiles.Add(filePath);
             }
-            else if (ext == ".txt" && string.IsNullOrEmpty(albumInfo.TxtFile))
+            else if (ext == ".txt")
             {
-                albumInfo.TxtFile = filePath;
+                // 열거 순서에 기대지 않고 이름순으로 가장 앞선 txt를 씁니다(I4).
+                if (string.IsNullOrEmpty(albumInfo.TxtFile) ||
+                    string.Compare(filePath, albumInfo.TxtFile, StringComparison.OrdinalIgnoreCase) < 0)
+                {
+                    albumInfo.TxtFile = filePath;
+                }
             }
         }
 

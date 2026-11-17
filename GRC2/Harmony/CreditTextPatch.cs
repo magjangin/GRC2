@@ -31,7 +31,7 @@ namespace GRC2.Harmony
     /// </summary>
     public static class CreditTextPatch
     {
-        private static readonly Dictionary<string, Func<SongInfo, string>> CreditByGetter =
+        public static readonly Dictionary<string, Func<SongInfo, string>> CreditByGetter =
             new Dictionary<string, Func<SongInfo, string>>
             {
                 { "getArtistText", info => info.Artist },
@@ -100,9 +100,21 @@ namespace GRC2.Harmony
         {
             private static IEnumerable<MethodBase> TargetMethods()
             {
-                return CreditByGetter.Keys
-                    .Select(name => AccessTools.Method(typeof(MusicData), name))
-                    .Where(method => method != null);
+                var methods = new List<MethodBase>();
+                foreach (var name in CreditByGetter.Keys)
+                {
+                    var method = AccessTools.Method(typeof(MusicData), name);
+                    if (method == null)
+                    {
+                        // 게임 업데이트로 이름이 바뀌면 크레딧이 원본 값으로 돌아갑니다. 조용히 빠지지 않게 알립니다(I3).
+                        MelonLogger.Error($"[CreditTextPatch] MusicData.{name}을(를) 찾지 못해 이 크레딧 칸은 바꾸지 못합니다.");
+                        continue;
+                    }
+
+                    methods.Add(method);
+                }
+
+                return methods;
             }
 
             [HarmonyPrefix]

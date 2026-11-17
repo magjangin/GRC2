@@ -156,6 +156,7 @@ namespace GRC2.Harmony
                 return;
             }
 
+            _customBgmAudioSource.volume = PreviewAudioManager.LastPreviewVolume;
             _customBgmAudioSource.clip = clip;
             _customBgmAudioSource.time = 0f;
             _customBgmAudioSource.Play();
