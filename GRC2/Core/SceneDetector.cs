@@ -29,6 +29,7 @@ namespace GRC2.Core
         private bool _isInitialized = false;
         private float _nextSettingsPollTime;
         private string _hwaFolderPath;
+        private string _gameFolder;
         private string _lastParsedBmsFile = null; // 마지막으로 파싱한 BMS 파일 경로
         public static List<Parsers.BmsNote> ParsedBmsNotes { get; private set; } = new List<Parsers.BmsNote>();
         // 파일 경로(전체 경로) 기준 캐시: 동일 파일명(hwa2.bms)이라도 폴더가 다르면 충돌하지 않음
@@ -49,6 +50,7 @@ namespace GRC2.Core
                 // Application.dataPath는 보통 "게임폴더/게임명_Data"를 가리키므로
                 // 한 단계 위로 올라가면 게임 설치 폴더가 됩니다
                 var gameFolder = Path.GetDirectoryName(Application.dataPath);
+                _gameFolder = gameFolder;
                 _hwaFolderPath = Path.Combine(gameFolder, "hwa");
                 MelonLogger.Msg($"[SceneDetector] 게임 폴더: {gameFolder}");
 
@@ -495,6 +497,10 @@ namespace GRC2.Core
             MelonLogger.Msg($"[SceneDetector] 씬 로드: {sceneName} (BuildIndex: {buildIndex})");
             TextPatch.OnSceneLoaded(sceneName);
 
+            // 게임 폰트에 없는 글자(간체 한자 등)를 시스템 폰트로 그리게 TMP 전역 fallback을 붙입니다.
+            // 처음 한 번만 폰트를 만들고, 이후에는 목록에 붙어 있는지만 확인합니다.
+            FontFallback.EnsureInstalled(_gameFolder);
+
             if (!_isInitialized)
             {
                 MelonLogger.Warning("[SceneDetector] 아직 초기화되지 않았습니다.");
@@ -555,6 +561,7 @@ namespace GRC2.Core
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
                     AudioClipPatch.ResetHandledSelection();
+                    FontFallback.LogCoverageDiagnostics();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
                 {

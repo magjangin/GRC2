@@ -55,6 +55,7 @@
 - **BGM은 48kHz만 가정한다.** 노트 시계를 BGM 샘플레이트에 맞추지 않고, 아니면 오류 로그만 남긴다(B1).
 - **패치는 `PatchAll` 한 번 + 실패 시 클래스별 재시도**(`SceneDetector.InitializeHarmony`). Harmony는 첫 실패에서 멈춰 뒤 클래스를 빠뜨리기 때문이다(H4).
 - **필드 이름 접근은 `GameCompatibility.FieldContracts`에 모은다.** 게임 업데이트 때 무엇이 깨졌는지 시작 로그(`[호환성]`)와 `GameCompatibilityTests`로 바로 알기 위해서다(2026-11-16). 새 `FieldRefAccess<..>("이름")`를 쓰면 이 표에도 한 줄 넣어야 테스트가 통과한다.
+- **게임 폰트에 없는 글자는 TMP 전역 fallback으로 그린다**(`Core/FontFallback.cs`, 2026-11-17). 게임은 언어별 Static TMP 아틀라스만 써서 커스텀 곡의 간체 한자 등이 □로 나왔다. 첫 씬 로드 때 `hwa/fonts/` → 윈도우 폰트(msyh·msjh·YuGothM·meiryo·malgun·seguisym) 순으로 Dynamic `TMP_FontAsset`을 만들어 `TMP_Settings.fallbackFontAssets`에 붙인다. 게임 폰트에 있는 글자는 바꾸지 않으므로 Harmony 훅이 필요 없고, 언어를 바꿔도 유지된다.
 - 훅 소유 파일·제거 위험의 정본은 [HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md), 문제별 상세는 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md).
 
 ## 4. 핵심 훅 시그니처와 주입 파이프라인
@@ -77,6 +78,8 @@
 - **프레임 수 기준 BGM/BGA 로딩 타임아웃** → 144Hz에서 2.4배 짧아짐. 실제 시간(초) 기준으로 바꿈(F).
 - **Harmony 패치를 xUnit 테스트 호스트에서 실제로 적용하기** → Unity ECall 때문에 `SecurityException: ECall 메서드는 시스템 모듈에 패키지되어 있어야 합니다`. 대상 해석만 테스트한다.
 - **`Steam 업데이트 차단`(`SteamManifestLocker`)** → 2026-06-06 커밋 `a1bff38`에서 삭제됨. 되살릴지는 사용자가 정할 일(A5).
+- **`Font.CreateDynamicFontFromOSFont`로 TMP 폰트 만들기** → 쓰지 않음. TMP의 `FontEngine.LoadFontFace(Font)`는 폰트 데이터가 필요하므로 `new Font(전체경로)`(내부적으로 `Internal_CreateFontFromPath`)를 쓴다. 이 방식은 `.ttc`도 게임에서 로드되는 것을 확인했다(2026-11-17).
+- **`吉`이 한글처럼 보여 폰트 매핑 오류를 의심** → 아니었다. 게임 `PCDMainfont`의 둥근 글씨체 `吉`이 작게 보인 것(곡 선택 진입 시 `[폰트]` 진단 로그로 확인). 게임 폰트가 가진 글자는 fallback으로 넘어가지 않는다.
 - **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `AccessTools.FieldRefAccess`.
 - **`GRC2.Tests`를 솔루션에 넣지 않기** → `test_debug.bat`이 테스트 0개로 "성공"했다(F). 지금은 솔루션에 포함.
 
@@ -99,6 +102,7 @@
 ## 7. 다음 작업자에게
 
 - 작업 전 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 비교한다. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 117개 모두 통과해야 한다(2026-11-16 기준). 게임 설치본이 기준 빌드와 다르면 `GameCompatibilityTests`가 먼저 실패한다.
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 120개 모두 통과해야 한다(2026-11-17 기준).
+- 폰트 fallback(2026-11-17)은 **곡 선택 화면에서만** 인게임 확인했다(`麦`·`盖` 정상 표시, 로그 `[폰트] fallback 폰트 5/5개 준비`). 로딩·플레이·결과 화면의 제목 표시는 같은 전역 목록을 쓰지만 아직 직접 보지 않았다. 게임 설치본이 기준 빌드와 다르면 `GameCompatibilityTests`가 먼저 실패한다.
 - **인게임 검증은 아직 안 됐다.** 2026-10-04~10-08의 수정들과 2026-11-16의 호환성 점검은 빌드·단위 테스트로만 확인했다. 게임에서 곡 선택 → 플레이 → 결과 → 복귀를 돌려 보고, 로그의 `[호환성]` 줄이 "점검 통과"인지 확인한 뒤 이 문서의 "미확인"을 지운다.
 - `fix/bms-parser-conversion`(BPM 채널·홀드 짝짓기·원본 로더 후처리 이식, H15)은 2026-11-16에 main에 병합했다. **인게임 확인 전**이므로 노트 타이밍·홀드 이상이 보이면 이 병합(`git log --merges`)부터 의심한다.
