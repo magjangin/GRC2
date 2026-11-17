@@ -61,7 +61,14 @@ namespace GRC2.Injectors
             }
 
             // 파일 경로를 file:// URL로 변환
+            // '#', '%', '?'가 든 경로는 문자열을 이어 붙인 URL이 잘못 해석됩니다(I1). 그런 경로만 인코딩된 URI를 쓰고,
+            // 나머지는 예전 방식을 그대로 둡니다(인게임에서 재생이 확인된 형태).
             var fileUrl = "file://" + bgaFilePath.Replace("\\", "/");
+            if (bgaFilePath.IndexOfAny(new[] { '#', '%', '?' }) >= 0)
+            {
+                try { fileUrl = new Uri(Path.GetFullPath(bgaFilePath)).AbsoluteUri; }
+                catch (Exception ex) { MelonLogger.Warning($"[BgaInjector] 경로 URI 변환 실패, 기본 방식 사용: {ex.Message}"); }
+            }
             
             // 파일 크기 확인 (대용량 지원)
             long fileSizeBytes = 0;

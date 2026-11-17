@@ -78,7 +78,7 @@ namespace GRC2.Parsers
             for (int i = 0; i + valueWidth <= trimmed.Length; i += valueWidth)
             {
                 var hex = trimmed.Substring(i, valueWidth);
-                values.Add(int.TryParse(hex, System.Globalization.NumberStyles.HexNumber, null, out int value) ? value : 0);
+                values.Add(int.TryParse(hex, System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture, out int value) ? value : 0);
             }
 
             return values;

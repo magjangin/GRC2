@@ -130,6 +130,17 @@ namespace GRC2.Tests
             Assert.True(unresolved.Count == 0, "게임에서 찾지 못한 패치 대상:" + Environment.NewLine + string.Join(Environment.NewLine, unresolved));
         }
 
+        [Fact]
+        public void CreditGetters_AllResolveOnMusicData()
+        {
+            var musicDataType = Assembly.Load("Assembly-CSharp").GetType("IntiCreates.soRythmGameMusicDataMap+MusicData");
+            Assert.NotNull(musicDataType);
+            var missing = GRC2.Harmony.CreditTextPatch.CreditByGetter.Keys
+                .Where(n => AccessTools.Method(musicDataType, n) == null)
+                .ToList();
+            Assert.True(missing.Count == 0, "MusicData에 없는 크레딧 게터: " + string.Join(", ", missing));
+        }
+
         [Theory]
         [InlineData("\"AppState\"\n{\n\t\"buildid\"\t\t\"13530823\"\n}", "13530823")]
         [InlineData("\"BuildID\" \"42\"", "42")]

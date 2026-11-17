@@ -35,12 +35,20 @@ namespace GRC2.Harmony
             AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mAmbientAudioSorce");
         private static bool _isMonitoring;
 
+        /// <summary>원본 미리듣기 소스를 음소거하기 직전의 양수 볼륨입니다. 커스텀 미리듣기가 옵션 음량과 크게 어긋나지 않게 맞추는 데 씁니다(I2).</summary>
+        public static float LastPreviewVolume { get; private set; } = 1f;
+
         public static void StopPreviewAndAmbient(
             cMusicSelectSceneUIUpdater updater)
         {
             try
             {
                 AudioSource[] sources = GetUpdaterSources(updater);
+                if (sources.Length > 0 && sources[0] != null && sources[0].volume > 0f)
+                {
+                    LastPreviewVolume = Mathf.Clamp01(sources[0].volume);
+                }
+
                 for (int i = 0; i < sources.Length; i++)
                 {
                     MuteSource(sources[i]);
