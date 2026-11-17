@@ -13,8 +13,14 @@ Main startup path. It:
 
 - applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
 - locates the game `hwa` folder;
-- scans albums, song metadata, custom artwork, and BMS files;
+- reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then points
+  `CustomMusicIdRegistry` at `savecustomkey/musicid_map.txt`;
+- scans albums and song metadata, records the `hwa` folder signature, loads the
+  current album's artwork, and parses **only the current album's BMS** (others are
+  parsed on first play by `GetOrParseBms`, re-parsed when the file's write time
+  changes; 2026-11-18);
 - supplies parsed BMS data to the already-registered note-array hook;
+- logs one line with per-phase timings (`모드 초기화 완료 146ms (Harmony 71ms, …)`);
 - (the BGM/BGA injection loop needs no initialisation: it reads the current
   album's paths every tick; `BgmBgaInjector.Initialize` was removed 2026-10-04).
 
@@ -28,6 +34,13 @@ the loaded scene.
 It also calls `FontFallback.EnsureInstalled` on every scene load (before the
 initialisation check) and `FontFallback.LogCoverageDiagnostics` on the first Music
 Select load. See `FontFallback` below.
+
+On every Music Select load it calls `RescanAlbumsIfChanged()`: if
+`AlbumManager.ComputeFolderSignature(hwa)` (FNV hash of folder/file names, sizes
+and write times; `hwa/fonts` excluded) differs from the last scan, it re-runs
+`AlbumManager.ScanAlbums`. This runs before the list-injection postfix (about
+200 ms later in the log), so new or edited songs appear without restarting.
+Safe only because MusicIDs are now pinned per folder (C4).
 
 ### `FontFallback` (not a Harmony hook)
 
@@ -119,9 +132,21 @@ Purpose:
 - register original artist first-song mappings used by custom artist handling;
 - provide a stable original-song template for the pre-play window.
 
+MusicID assignment (2026-11-18): `CustomMusicIdRegistry.Allocate` gives each album
+folder key a persistent ID from `savecustomkey/musicid_map.txt` (range 54..7999,
+skipping every named `MusicID` enum value such as `SAVEABLE_ID_END = 512`), then
+`CustomMusicIdRegistry.EnsureSaveSlots` grows `SavableGameData.playerMusicData`
+past its default 512 entries so the result scene can index any custom ID. The save
+is JsonUtility JSON, so the longer array round-trips; game loops either stop at
+512 or filter with `getIsUsableMusicID`. Do not use 8000+ (`UNIQUE_TOP`, tutorial
+and preview IDs). Logged once per change via `ModLog.InfoOnChange` because this
+postfix runs about four times per Music Select entry.
+
 Removal risk:
 
-- custom songs may disappear from the music select UI.
+- custom songs may disappear from the music select UI;
+- removing `EnsureSaveSlots` while IDs ≥ 512 are assigned makes the result scene
+  throw `IndexOutOfRangeException` on `playerMusicData[id]`.
 
 ### Selection and pre-play state tracking
 

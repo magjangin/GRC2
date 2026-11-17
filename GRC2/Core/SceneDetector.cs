@@ -77,6 +77,7 @@ namespace GRC2.Core
                 CustomMusicIdRegistry.Initialize(gameFolder);
 
                 AlbumManager.ScanAlbums(_hwaFolderPath);
+                _albumSignature = AlbumManager.ComputeFolderSignature(_hwaFolderPath);
                 Mark($"앨범 {AlbumManager.GetAllAlbums().Count}개");
 
                 // 곡 정보는 현재(기본) 앨범의 txt에서 이미 파싱되어 있습니다. 없으면 기본값을 씁니다.
@@ -334,6 +335,7 @@ namespace GRC2.Core
 
                 var currentNotes = BmsParser.ParseBmsFile(currentBmsFile, printSummary: false) ?? new List<BmsNote>();
                 ParsedBmsNotesByFile[currentBmsFile] = currentNotes;
+                _bmsParsedWriteTimeUtc[currentBmsFile] = GetWriteTimeUtcOrMin(currentBmsFile);
                 ParsedBmsNotes = currentNotes;
                 _lastParsedBmsFile = currentBmsFile;
                 ModLog.Verbose($"[SceneDetector] 현재 선택 BMS 노트 로드 완료: {Path.GetFileName(currentBmsFile)} / {ParsedBmsNotes.Count}개");
@@ -343,6 +345,7 @@ namespace GRC2.Core
                 ErrorLogger.LogException(ex, "[SceneDetector]", "BMS 파일 스캔/파싱 오류");
             }
         }
+
         private void ReloadCurrentAlbumAssets()
         {
             try
@@ -363,16 +366,13 @@ namespace GRC2.Core
                     NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
                     MelonLogger.Msg("[SceneDetector] 현재 앨범에 BMS가 없어 노트 주입 목록을 비웠습니다.");
                 }
-                else if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0)
+                else if (_lastParsedBmsFile != currentBmsFile || ParsedBmsNotes == null || ParsedBmsNotes.Count == 0 ||
+                         IsBmsCacheStale(currentBmsFile))
                 {
-                    ModLog.Verbose($"[SceneDetector] 앨범 변경 감지 - BMS 파일 다시 파싱: {Path.GetFileName(currentBmsFile)}");
-                    if (!ParsedBmsNotesByFile.TryGetValue(currentBmsFile, out var notes))
-                    {
-                        notes = BmsParser.ParseBmsFile(currentBmsFile);
-                        ParsedBmsNotesByFile[currentBmsFile] = notes ?? new List<BmsNote>();
-                    }
+                    ModLog.Verbose($"[SceneDetector] BMS 노트 준비: {Path.GetFileName(currentBmsFile)}");
+                    var notes = GetOrParseBms(currentBmsFile);
 
-                    ParsedBmsNotes = notes ?? new List<BmsNote>();
+                    ParsedBmsNotes = notes;
                     _lastParsedBmsFile = currentBmsFile;
 
                     // 노트가 0개여도 넘깁니다. 예전에는 0개면 넘기지 않아 이전 앨범의 차트가 남았습니다(C2).
@@ -386,6 +386,57 @@ namespace GRC2.Core
             }
         }
 
+        /// <summary>BMS 파일 → 파싱했을 때의 수정 시각. 차트를 고친 뒤 재시작 없이 다음 플레이에 반영하려고 둡니다(H12).</summary>
+        private static readonly Dictionary<string, DateTime> _bmsParsedWriteTimeUtc =
+            new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+
+        private static DateTime GetWriteTimeUtcOrMin(string path)
+        {
+            try { return File.GetLastWriteTimeUtc(path); }
+            catch { return DateTime.MinValue; }
+        }
+
+        private static bool IsBmsCacheStale(string file)
+        {
+            return !_bmsParsedWriteTimeUtc.TryGetValue(file, out var parsedAt) || parsedAt != GetWriteTimeUtcOrMin(file);
+        }
+
+        /// <summary>캐시가 있고 파일이 그대로면 캐시를, 아니면 새로 파싱합니다.</summary>
+        private static List<BmsNote> GetOrParseBms(string file)
+        {
+            if (ParsedBmsNotesByFile.TryGetValue(file, out var cached) && !IsBmsCacheStale(file))
+                return cached;
+
+            var writeTime = GetWriteTimeUtcOrMin(file);
+            var notes = BmsParser.ParseBmsFile(file) ?? new List<BmsNote>();
+            ParsedBmsNotesByFile[file] = notes;
+            _bmsParsedWriteTimeUtc[file] = writeTime;
+            return notes;
+        }
+
+        /// <summary>마지막 앨범 스캔 때의 hwa 지문. 곡 선택 씬에 들어올 때 비교합니다.</summary>
+        private ulong _albumSignature;
+
+        /// <summary>
+        /// hwa 폴더가 바뀌었으면 앨범을 다시 스캔합니다. 곡 목록 주입(initializeMusicDataByDefault)은 씬 로드 뒤에
+        /// 돌므로 여기서 다시 읽으면 바로 그 목록에 반영됩니다. MusicID는 폴더별로 고정돼 있어 기존 곡의 기록이 옮겨 가지 않습니다(C4).
+        /// </summary>
+        private void RescanAlbumsIfChanged()
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            ulong signature = AlbumManager.ComputeFolderSignature(_hwaFolderPath);
+            if (signature == 0 || signature == _albumSignature)
+            {
+                ModLog.Verbose($"[SceneDetector] hwa 변경 없음 (확인 {sw.ElapsedMilliseconds}ms)");
+                return;
+            }
+
+            AlbumManager.ScanAlbums(_hwaFolderPath);
+            _albumSignature = signature;
+            ParsedBmsNotes = new List<BmsNote>();
+            _lastParsedBmsFile = null;
+            MelonLogger.Msg($"[SceneDetector] hwa 폴더 변경 감지 - 앨범 다시 스캔: {AlbumManager.GetAllAlbums().Count}개 ({sw.ElapsedMilliseconds}ms)");
+        }
         private void LoadCustomArtwork()
         {
             try
@@ -483,6 +534,7 @@ namespace GRC2.Core
                     BgmBgaInjector.StopInjection();
                     BgmBgaInjector.ResetPlaySceneState();
                     AudioClipPatch.ResetHandledSelection();
+                    RescanAlbumsIfChanged();
                     FontFallback.LogCoverageDiagnostics();
                 }
                 else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
