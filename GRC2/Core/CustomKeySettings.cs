@@ -15,8 +15,8 @@ namespace GRC2.Core
     /// </summary>
     public static class CustomKeySettings
     {
-        /// <summary>모드 설정 폴더 이름(게임 폴더 아래). MusicID 맵도 여기에 둡니다.</summary>
-        public const string FolderName = "savecustomkey";
+        /// <summary>모드 설정 폴더 이름(게임 폴더 아래). 사용자가 고치는 config.txt만 둡니다.</summary>
+        private const string FolderName = "savecustomkey";
         private const string FileName = "config.txt";
 
         // 기본값은 이 한 곳에만 둡니다. 프로퍼티 초기값, 키가 없을 때의 대체값, 새로 만드는 설정 파일이 모두 이 값을 씁니다(H3).

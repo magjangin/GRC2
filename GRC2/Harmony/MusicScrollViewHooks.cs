@@ -102,7 +102,7 @@ namespace GRC2.Harmony
 
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
-            // 폴더 키마다 고정 ID를 받습니다(savecustomkey/musicid_map.txt). 폴더를 추가·삭제해도 기존 곡의 ID와 기록이 그대로입니다(C4).
+            // 폴더 키마다 고정 ID를 받습니다(UserData/GRC2/musicid_map.txt). 폴더를 추가·삭제해도 기존 곡의 ID와 기록이 그대로입니다(C4).
             var ids = CustomMusicIdRegistry.Allocate(albums.Keys);
             if (ids.Assigned.Count > 0)
                 CustomMusicIdRegistry.EnsureSaveSlots(ids.Assigned.Values.Max());

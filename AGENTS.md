@@ -5,7 +5,7 @@
 
 ## 0. 프로젝트 개요
 
-- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.5.1). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
+- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.6.0, GitHub 릴리즈 v0.6.0). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
 - **종류:** 게임 모드
 - **최근 수정일(파일 기준):** 2026-11-18
 - **git 원격:** `origin`(GitHub magjangin/GRC2), `local`(`H:\local-repos\GRC2.git`) — 둘 다 main을 밀어 둔다
@@ -51,13 +51,13 @@
 - **패치는 `PatchAll` 한 번 + 실패 시 클래스별 재시도**(`SceneDetector.InitializeHarmony`). Harmony는 첫 실패에서 멈춰 뒤 클래스를 빠뜨리기 때문이다(H4).
 - **필드 이름 접근은 `GameCompatibility.FieldContracts`에 모은다.** 게임 업데이트 때 무엇이 깨졌는지 시작 로그(`[호환성]`)와 `GameCompatibilityTests`로 바로 알기 위해서다(2026-11-16). 새 `FieldRefAccess<..>("이름")`를 쓰면 이 표에도 한 줄 넣어야 테스트가 통과한다.
 - **게임 폰트에 없는 글자는 TMP 전역 fallback으로 그린다**(`Core/FontFallback.cs`, 2026-11-17). 게임은 언어별 Static TMP 아틀라스만 써서 커스텀 곡의 간체 한자 등이 □로 나왔다. 첫 씬 로드 때 `hwa/fonts/` → 윈도우 폰트(msyh·msjh·YuGothM·meiryo·malgun·seguisym) 순으로 Dynamic `TMP_FontAsset`을 만들어 `TMP_Settings.fallbackFontAssets`에 붙인다. 게임 폰트에 있는 글자는 바꾸지 않으므로 Harmony 훅이 필요 없고, 언어를 바꿔도 유지된다.
-- **커스텀 MusicID는 54~7999(이름 붙은 enum 값 제외), 폴더별 고정**(`Core/CustomMusicIdRegistry.cs`, `Helpers/CustomMusicIdAllocator.cs`, 2026-11-18). 예전 상한 511(458곡)은 세이브 `playerMusicData`가 512칸이라서였다. 세이브가 JsonUtility JSON이라 배열을 늘려도 그대로 저장·로드되고 게임 루프는 512까지만 돌거나 `getIsUsableMusicID`로 걸러서, 곡 목록을 만들 때 `EnsureSaveSlots`로 늘린다. 8000 이상은 튜토리얼·미리보기(`UNIQUE_TOP`) 전용이라 쓰지 않는다. 폴더 → ID 맵은 `savecustomkey/musicid_map.txt`(첫 배정은 예전 이름순 54부터와 같아 기존 기록 유지).
+- **커스텀 MusicID는 54~7999(이름 붙은 enum 값 제외), 폴더별 고정**(`Core/CustomMusicIdRegistry.cs`, `Helpers/CustomMusicIdAllocator.cs`, 2026-11-18). 예전 상한 511(458곡)은 세이브 `playerMusicData`가 512칸이라서였다. 세이브가 JsonUtility JSON이라 배열을 늘려도 그대로 저장·로드되고 게임 루프는 512까지만 돌거나 `getIsUsableMusicID`로 걸러서, 곡 목록을 만들 때 `EnsureSaveSlots`로 늘린다. 8000 이상은 튜토리얼·미리보기(`UNIQUE_TOP`) 전용이라 쓰지 않는다. 폴더 → ID 맵은 `UserData/GRC2/musicid_map.txt`(첫 배정은 예전 이름순 54부터와 같아 기존 기록 유지).
 - **로그는 `ModLog`로 나눈다**(2026-11-18). 곡·노트·매핑마다 찍히는 것은 `ModLog.Verbose`(config `VerboseLog=1`일 때만), 같은 상태를 반복해 알리는 것은 `ModLog.InfoOnChange`. 곡 상한을 올리면 곡 수에 비례하는 로그가 수천 줄이 되기 때문이다. 경고·오류는 그대로 `MelonLogger`.
 - **시작할 때는 현재 곡 BMS만 파싱**하고, 곡 선택 씬 진입 때 `hwa` 지문이 바뀌었으면 다시 스캔한다(2026-11-18). 고정 MusicID가 있어서 재스캔해도 기록이 옮겨 가지 않는다.- 훅 소유 파일·제거 위험의 정본은 [HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md), 문제별 상세는 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md).
 
 ## 4. 핵심 훅 시그니처와 주입 파이프라인
 
-- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.5.1", "화영왕")]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
+- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.6.0", "화영왕")]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
 - **시작 순서(`SceneDetector.OnInitializeMelon`):** Harmony 패치 적용 → 게임 폴더 계산 → `GameCompatibility.LogStartupReport` → `CustomKeySettings.Initialize`(VerboseLog 결정) → `CustomMusicIdRegistry.Initialize` → 앨범 스캔(+hwa 지문) → 곡 정보 → 아트워크 → 현재 곡 BMS만 파싱 → `NoteArrayHooks.UpdateBmsNotes`. 끝에 단계별 ms를 한 줄로 남긴다.
 - **씬 로드마다:** `FontFallback.EnsureInstalled`(첫 회에 폰트 생성). 곡 선택 씬이면 `RescanAlbumsIfChanged` → (약 200ms 뒤) 곡 목록 postfix가 ID 배정·세이브 칸 확장·주입.
 - **노트 주입:** `cFairyModeNotesManager.createAllNote` 훅(`NoteArrayHooks`)이 `mFairyNoteCreateDataArray`를 `BmsNoteConverter` 결과로 교체한다. 곡 선택 씬에서는 주입하지 않는다(H1).
@@ -78,7 +78,8 @@
 - **`Steam 업데이트 차단`(`SteamManifestLocker`)** → 2026-06-06 커밋 `a1bff38`에서 삭제됨. 되살릴지는 사용자가 정할 일(A5).
 - **`Font.CreateDynamicFontFromOSFont`로 TMP 폰트 만들기** → 쓰지 않음. TMP의 `FontEngine.LoadFontFace(Font)`는 폰트 데이터가 필요하므로 `new Font(전체경로)`(내부적으로 `Internal_CreateFontFromPath`)를 쓴다. 이 방식은 `.ttc`도 게임에서 로드되는 것을 확인했다(2026-11-17).
 - **`吉`이 한글처럼 보여 폰트 매핑 오류를 의심** → 아니었다. 게임 `PCDMainfont`의 둥근 글씨체 `吉`이 작게 보인 것(곡 선택 진입 시 `[폰트]` 진단 로그로 확인). 게임 폰트가 가진 글자는 fallback으로 넘어가지 않는다.
-- **커스텀 MusicID 맵 파일을 `hwa/`에 두기** → 안 됨. `hwa` 루트도 앨범("root")으로 스캔되고 txt는 곡 정보로 읽혀 가짜 곡이 생긴다. `savecustomkey/`에 둔다. 같은 이유로 `hwa/fonts`는 앨범 스캔에서 뺀다.
+- **커스텀 MusicID 맵 파일을 `hwa/`에 두기** → 안 됨. `hwa` 루트도 앨범("root")으로 스캔되고 txt는 곡 정보로 읽혀 가짜 곡이 생긴다. 같은 이유로 `hwa/fonts`는 앨범 스캔에서 뺀다.
+- **맵 파일을 `savecustomkey/`에 두기** → 사용자가 원치 않음(2026-11-18). `savecustomkey`에는 사용자가 고치는 `config.txt`만 둔다. 모드가 만드는 데이터는 MelonLoader 관례대로 `UserData/GRC2/`에 둔다(`MelonEnvironment.UserDataDirectory`). 잠깐 쓰던 `savecustomkey/musicid_map.txt`는 시작할 때 자동으로 옮긴다.
 - **커스텀 ID에 512나 8000 이상 쓰기** → 512는 `SAVEABLE_ID_END`라는 이름 붙은 값(`ToString`·`Enum.TryParse` 경로가 이름으로 바뀜), 8000~8999는 튜토리얼 판정(`id >= UNIQUE_TOP`). 배정기는 이름 붙은 enum 값을 전부 건너뛴다.- **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `AccessTools.FieldRefAccess`.
 - **`GRC2.Tests`를 솔루션에 넣지 않기** → `test_debug.bat`이 테스트 0개로 "성공"했다(F). 지금은 솔루션에 포함.
 
