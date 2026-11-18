@@ -341,7 +341,7 @@ namespace GRC2.Core
 
                 foreach (var albumFolder in EnumerateAlbumFolders(hwaFolderPath))
                 {
-                    RegisterScannedAlbum(albumFolder);
+                    RegisterScannedAlbum(albumFolder, hwaFolderPath);
                 }
 
                 SelectDefaultAlbum();
@@ -419,7 +419,7 @@ namespace GRC2.Core
             return albumFolders;
         }
 
-        private static void RegisterScannedAlbum(string albumFolder)
+        private static void RegisterScannedAlbum(string albumFolder, string hwaFolderPath)
         {
             var albumInfo = ScanAlbumFolder(albumFolder);
             if (albumInfo == null)
@@ -427,7 +427,7 @@ namespace GRC2.Core
                 return;
             }
 
-            string albumKey = GetAlbumKey(albumFolder);
+            string albumKey = GetAlbumKey(albumFolder, hwaFolderPath);
             _albums[albumKey] = albumInfo;
             ModLog.Verbose($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
         }
@@ -543,10 +543,32 @@ namespace GRC2.Core
                 !string.IsNullOrEmpty(albumInfo.TxtFile);
         }
 
-        private static string GetAlbumKey(string albumFolderPath)
+        /// <summary>
+        /// 앨범 폴더 경로에서 앨범 키를 만듭니다. hwa 루트 자신일 때만 <c>"root"</c>를 돌려주고,
+        /// <c>hwa/hwa</c>처럼 이름이 <c>hwa</c>인 하위 폴더는 루트와 겹치지 않게 그대로 <c>"hwa"</c>로 둡니다(I4).
+        /// </summary>
+        internal static string GetAlbumKey(string albumFolderPath, string hwaRootPath = null)
         {
-            string albumKey = Path.GetFileName(albumFolderPath);
-            return string.IsNullOrEmpty(albumKey) || albumKey == "hwa" ? RootAlbumKey : albumKey;
+            if (string.IsNullOrEmpty(albumFolderPath))
+                return RootAlbumKey;
+
+            string trimmed = albumFolderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            if (!string.IsNullOrEmpty(hwaRootPath))
+            {
+                string trimmedRoot = hwaRootPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                if (string.Equals(trimmed, trimmedRoot, StringComparison.OrdinalIgnoreCase))
+                    return RootAlbumKey;
+            }
+
+            string albumKey = Path.GetFileName(trimmed);
+            if (string.IsNullOrEmpty(albumKey))
+                return RootAlbumKey;
+
+            // hwaRootPath 없이 호출된 경우에만 예전처럼 폴더 이름 "hwa"를 루트로 봅니다.
+            if (string.IsNullOrEmpty(hwaRootPath) && string.Equals(albumKey, "hwa", StringComparison.OrdinalIgnoreCase))
+                return RootAlbumKey;
+
+            return albumKey;
         }
 
         #endregion

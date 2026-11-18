@@ -76,6 +76,8 @@ private static class BackToPreScreenPatch
 |------|-----------|-----------|
 | 곡 목록 | `MusicScrollViewHooks.cs` | `cMusicSelectScrollView.initializeMusicDataByDefault` |
 | 곡 선택/시작 창 | `AudioClipPatch.cs`, `GameFlowHooks.cs` | `cMusicSelectSceneUIUpdater`, `cMusicSelectPreMusicStartWindowManager`, `soRythmGameMusicDataMap.getIsUsableMusicID` |
+| 곡 선택 긴 제목 스크롤 | `SongTitleMarqueePatch.cs` | `cMusicSelectSceneSelectingMusicUI.setDispMusicData` |
+| 크레딧 텍스트 | `CreditTextPatch.cs` | `soRythmGameMusicDataMap.MusicData.get*Text`, `cMusicSelectArtWorkManager.requestSetMusicData` |
 | 노트 배열 | `NoteArrayHooks.cs` | `cFairyModeNotesManager.createAllNote` |
 | 커버/텍스트 | `ArtWorkPatch.cs`, `TextPatch.cs` | `cMusicSelectArtWork`, Unity UI/TMP text setter |
 | 결과 화면 | `ResultSceneUpdaterPatch.cs` | `cRythmGameResultSceneUpdater.initializePreFade` |

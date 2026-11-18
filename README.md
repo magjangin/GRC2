@@ -25,10 +25,9 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 | `hwa\<곡 폴더>\` | 곡 하나: `*.bms`, `info.txt`(UTF-8), BGM(`.ogg/.mp3/.wav`, 48kHz), 아트워크(`.png/.jpg`), BGA(`.mp4`) |
 | `hwa\fonts\` | (선택) 게임 폰트에 없는 글자를 그릴 폰트(`.ttf/.otf/.ttc`). 없으면 윈도우 폰트(YaHei·JhengHei·Yu Gothic·맑은 고딕)를 씁니다. 곡 폴더로 스캔하지 않습니다. |
 | `savecustomkey\config.txt` | AutoPlay·판정바·BlockSave 등 설정. 고치면 다음 플레이부터 적용. `VerboseLog=1`이면 곡·노트별 상세 로그를 남깁니다(기본 0). |
-| `UserData\GRC2\musicid_map.txt` | 모드가 만드는 곡 폴더 → MusicID 표. 폴더를 추가·삭제해도 기존 곡의 ID와 기록이 그대로입니다. 지우지 마세요. |
 
-- **곡 수:** 약 7,900곡까지(MusicID 54~7999, 게임 예약 값 제외). 예전 상한은 458곡이었습니다.
-- **곡 추가·수정:** 게임을 켠 채 `hwa`에 곡을 넣거나 `info.txt`·BMS를 고치면, 곡 선택 화면에 다시 들어올 때 반영됩니다(아트워크 이미지를 같은 이름으로 덮어쓴 경우는 재시작 필요).
+- **곡 수:** 약 7,900곡까지(MusicID 54~7999, 게임 예약 값 제외, 외부 맵 파일 없이 메모리에서 자동 배정). 예전 상한은 458곡이었습니다.
+- **곡 추가·수정:** 게임을 켠 채 `hwa`에 곡을 넣거나 `info.txt`·BMS·아트워크를 고치면, 곡 선택 화면에 다시 들어올 때 반영됩니다.
 - **긴 곡 제목:** 곡 선택 화면에서 선택한 곡의 제목이 칸보다 길면 옆으로 흘러가며 끝까지 보여 줍니다.
 - **글자 깨짐(□):** 게임 폰트에 없는 글자(간체 한자 등)는 위 fallback 폰트로 그립니다.
 
@@ -48,7 +47,7 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 dotnet test GRC2.sln --logger "console;verbosity=normal"
 ```
 
-또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-11-18 기준 134개 통과).
+또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-11-18 기준 144개 통과).
 
 ```powershell
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --logger "console;verbosity=normal"

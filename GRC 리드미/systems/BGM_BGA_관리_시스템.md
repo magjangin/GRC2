@@ -40,15 +40,15 @@
 2. 현재 앨범의 BGA/BGM 경로를 그대로 따라갑니다. 앨범에 해당 파일이 없으면 경로가 비어 그 주입은 건너뛰고 원본 BGA/BGM이
    나옵니다(2026-10-04 이전에는 직전 앨범의 파일이 남아 다른 곡에 들어갔습니다, 알려진 문제 C1).
 3. 플레이 씬이면 BGA 주입 → BGM 주입을 시도합니다.
-4. 둘 다 끝나면 멈춥니다. BGA가 없는 앨범이면 루프가 씬이 끝날 때까지 계속 돕니다(가벼운 확인만 함).
+4. 둘 다 끝나면 멈춥니다(파일이 없는 쪽도 완료로 보므로 BGA가 없는 앨범에서도 BGM 주입이 끝나면 루프가 정상 종료됩니다, H7).
 
 실제 로그(2026-08-03)에서는 `FairyModeScene` 로드 후 약 3초 뒤 BGA·BGM이 주입되고, 그 2초 뒤 종료 시간이 적용됐습니다.
 
 ## BGM 주입: `BgmInjector` → `BgmLoader`
 
-1. `cBGMBeatManager`를 찾습니다(`FindObjectOfType`, 없으면 모든 `AudioSource`에서 역으로). 곡당 최대 10번 시도합니다.
+1. `cBGMBeatManager`를 찾습니다(`FindObjectOfType`). 곡당 최대 10번 시도합니다.
 2. `UnityWebRequestMultimedia.GetAudioClip("file://…", 확장자별 AudioType)`로 **전체를 메모리에** 읽습니다(스트리밍 아님).
-   타임아웃은 기본 600프레임 + 10MB당 60프레임, 최대 3600프레임입니다(60fps 기준 10~60초).
+   타임아웃은 실제 시간 기준 기본 10초 + 10MB당 1초, 최대 60초입니다(F).
    50MB 이상이면 경고, 200MB 이상이면 오류 로그를 남깁니다.
 3. `setClip(clip, false)` → `requestPlayAudio()`로 교체·재생합니다.
 4. `BgmFinishTimeManager.SetFinishTime(clip.length)`로 곡 종료 시간을 정합니다([게임_종료_시간_조정_가이드.md](../maintenance/게임_종료_시간_조정_가이드.md)).
@@ -57,7 +57,7 @@
 
 1. 활성화된 모든 `VideoPlayer`를 찾습니다(없으면 조용히 종료 → 다음 루프에서 재시도).
 2. 모두에 `source = Url`, `url = "file://…"`, `isLooping = true`를 넣고 `Prepare()`합니다.
-3. 준비될 때까지 기다립니다(기본 300프레임 + 100MB당 60프레임, 최대 3600프레임). 일부만 준비돼도 준비된 것부터 재생합니다.
+3. 준비될 때까지 기다립니다(실제 시간 기준 기본 5초 + 100MB당 1초, 최대 60초). 일부만 준비돼도 준비된 것부터 재생합니다.
 4. 0.5초 뒤 실제로 재생 중이면 주입 완료로 보고:
    - `BgaCrossfadePatch.TryStopSwapCoroutine()`: 원본의 BGA 자동 교체 코루틴(`coUpdateMovieInARow`)을 멈춥니다.
      멈추지 않으면 곡 끝 약 0.67초 전에 원본 영상으로 돌아갑니다.

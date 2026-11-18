@@ -76,24 +76,30 @@ namespace GRC2.Core
                 CustomKeySettings.Initialize(gameFolder);
                 CustomMusicIdRegistry.Initialize(gameFolder);
 
-                AlbumManager.ScanAlbums(_hwaFolderPath);
-                _albumSignature = AlbumManager.ComputeFolderSignature(_hwaFolderPath);
-                Mark($"앨범 {AlbumManager.GetAllAlbums().Count}개");
+                // 하위 단계 하나가 예외를 내도 _isInitialized가 켜지도록 감쌉니다(H12).
+                // Harmony 패치는 이미 적용된 상태라, 여기서 _isInitialized가 false로 남으면 패치만 돌고 씬 라우팅이 멈춥니다.
+                try
+                {
+                    AlbumManager.ScanAlbums(_hwaFolderPath);
+                    _albumSignature = AlbumManager.ComputeFolderSignature(_hwaFolderPath);
+                    Mark($"앨범 {AlbumManager.GetAllAlbums().Count}개");
 
-                // 곡 정보는 현재(기본) 앨범의 txt에서 이미 파싱되어 있습니다. 없으면 기본값을 씁니다.
-                var currentSongInfo = AlbumManager.GetCurrentSongInfo();
-                if (currentSongInfo != null)
-                    SongInfo = currentSongInfo;
+                    var currentSongInfo = AlbumManager.GetCurrentSongInfo();
+                    if (currentSongInfo != null)
+                        SongInfo = currentSongInfo;
 
-                LoadCustomArtwork();
-                Mark("아트워크");
+                    LoadCustomArtwork();
+                    Mark("아트워크");
 
-                ScanAndParseBmsFiles();
-                Mark("BMS");
+                    ScanAndParseBmsFiles();
+                    Mark("BMS");
 
-                // 자동 패치는 이미 적용되어 있으므로 주입할 BMS 데이터만 갱신합니다.
-                // BGA/BGM 주입 경로는 주입 루프가 매번 현재 앨범에서 읽으므로 따로 초기화할 것이 없습니다.
-                NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                    NoteArrayHooks.UpdateBmsNotes(ParsedBmsNotes);
+                }
+                catch (Exception stepEx)
+                {
+                    Helpers.ErrorLogger.LogException(stepEx, "[SceneDetector]", "초기 에셋 준비 오류 (모드는 계속 동작합니다)");
+                }
 
                 _isInitialized = true;
                 MelonLogger.Msg($"[SceneDetector] 모드 초기화 완료 {total.ElapsedMilliseconds}ms ({string.Join(", ", timings)})");

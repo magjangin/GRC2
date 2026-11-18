@@ -13,8 +13,10 @@ Main startup path. It:
 
 - applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
 - locates the game `hwa` folder;
-- reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then points
-  `CustomMusicIdRegistry` at `UserData/GRC2/musicid_map.txt`;
+- logs startup compatibility (`GameCompatibility.LogStartupReport`: Build ID, `Assembly-CSharp` MVID, `FieldContracts`, `ConstantContracts`);
+- reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then runs
+  `CustomMusicIdRegistry.Initialize` (resets the in-memory session map and deletes
+  any leftover `musicid_map.txt` or `[GRC2_MusicID]` section in `MelonPreferences.cfg`);
 - scans albums and song metadata, records the `hwa` folder signature, loads the
   current album's artwork, and parses **only the current album's BMS** (others are
   parsed on first play by `GetOrParseBms`, re-parsed when the file's write time
@@ -97,11 +99,10 @@ Runs every frame after initialization. It:
   config reload section below);
 - in play scenes (`BgmBgaInjector.IsPlayScene()`), handles **Space/Esc** as a pause
   toggle: if the pause menu is open and active it calls
-  `cRythmGamePauseMenuHud.requestPushContinueButton()`, otherwise it forces the
-  private `cRythmGameManager.setPauseButtonPusable(true)` and calls the public
-  `requestPause()`. `setPauseButtonPusable` is bound once through
-  `AccessTools.MethodDelegate`, which is the mod's only reflection-based method
-  lookup; `mPauseMenuWork` is read through `FieldRefAccess`.
+  `cRythmGamePauseMenuHud.requestPushContinueButton()`, otherwise it calls the public
+  `requestPause()` (which checks `isAblePause()` itself; the old forced
+  `setPauseButtonPusable(true)` was removed 2026-10-08, H13). `mPauseMenuWork` is
+  read lazily through `FieldRefAccess`.
 
 Removal risk: keyboard pause/resume in play scenes stops working.
 
@@ -133,14 +134,17 @@ Purpose:
 - provide a stable original-song template for the pre-play window.
 
 MusicID assignment (2026-11-18): `CustomMusicIdRegistry.Allocate` gives each album
-folder key a persistent ID from `UserData/GRC2/musicid_map.txt` (range 54..7999,
-skipping every named `MusicID` enum value such as `SAVEABLE_ID_END = 512`), then
-`CustomMusicIdRegistry.EnsureSaveSlots` grows `SavableGameData.playerMusicData`
-past its default 512 entries so the result scene can index any custom ID. The save
-is JsonUtility JSON, so the longer array round-trips; game loops either stop at
-512 or filter with `getIsUsableMusicID`. Do not use 8000+ (`UNIQUE_TOP`, tutorial
-and preview IDs). Logged once per change via `ModLog.InfoOnChange` because this
-postfix runs about four times per Music Select entry.
+folder key an ID purely in memory (range 54..7999, skipping every named `MusicID`
+enum value such as `SAVEABLE_ID_END = 512`; no external map file or config entry is
+written, and any leftover `musicid_map.txt` or `[GRC2_MusicID]` section is deleted
+at startup), then `CustomMusicIdRegistry.EnsureSaveSlots` grows
+`SavableGameData.playerMusicData` past its default 512 entries so the result scene
+can index any custom ID, and `ApplyPerSongProgress` links each item's
+`highScoreArray`/`clearBadgeArray` to `playerMusicData[customId]`. The save is
+JsonUtility JSON, so the longer array round-trips; game loops either stop at 512 or
+filter with `getIsUsableMusicID`. Do not use 8000+ (`UNIQUE_TOP`, tutorial and
+preview IDs). Logged once per change via `ModLog.InfoOnChange` because this postfix
+runs about four times per Music Select entry.
 
 Removal risk:
 
@@ -324,8 +328,8 @@ Purpose:
 
 - display custom title and artwork instead of the original song assets.
   `TextPatch` only rewrites text in play/loading/result scenes while its switch
-  is on, and replaces the *whole* string when it contains the borrowed template
-  title.
+  is on, replacing the whole string on an exact match or only the borrowed
+  template title substring on a partial match (D3).
 
 Removal risk:
 
@@ -773,8 +777,19 @@ of the current source baseline:
 
 ## Cleanup Log
 
-### 2026-11-18 (title scrolling)
+### 2026-11-18 (in-memory MusicID allocation, save progress link, title scrolling)
 
+- Removed external MusicID map persistence (`UserData/GRC2/musicid_map.txt`,
+  `savecustomkey/musicid_map.txt`, and `[GRC2_MusicID]` in `UserData/MelonPreferences.cfg`);
+  any leftover files or config section are deleted at startup, and IDs are assigned
+  purely in memory (`_sessionMap` keeps IDs stable across live `hwa` rescans within one run).
+- `MusicScrollViewHooks.ApplyPerSongProgress` now links each custom item's
+  `highScoreArray` and `clearBadgeArray` to `playerMusicData[customId]` instead of
+  overwriting with empty arrays.
+- `CustomAssetManager` invalidates cached artwork when the image file's write time changes;
+  `AlbumManager.GetAlbumKey` distinguishes the `hwa` root from a subfolder named `hwa` (I4);
+  `SceneDetector.OnInitializeMelon` wraps asset-scan phases so `_isInitialized` still flips true on non-fatal errors (H12);
+  `GameCompatibility.ConstantContracts` checks `SAVEABLE_ID_END`, `UNIQUE_TOP`, and `defaultFrequency`.
 - added long song title scrolling on the music select bar (`SongTitleMarqueePatch`).
 
 ### 2026-11-16 (update resilience)

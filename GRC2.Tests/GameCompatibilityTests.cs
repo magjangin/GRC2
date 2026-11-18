@@ -47,6 +47,24 @@ namespace GRC2.Tests
         }
 
         [Fact]
+        public void ConstantContracts_MatchExpectedGameValues()
+        {
+            var broken = GameCompatibility.FindBrokenConstantContracts();
+            Assert.True(broken.Count == 0, "깨진 게임 상수:\n" + string.Join("\n", broken));
+        }
+
+        [Fact]
+        public void CustomMusicIdRange_StartsAfterOriginalSongsAndSkipsNamedEnumValues()
+        {
+            Assert.Equal(54, CustomMusicIdRegistry.Start);
+            Assert.Equal(7999, CustomMusicIdRegistry.End);
+            Assert.True(CustomMusicIdRegistry.IsReserved(512));
+            Assert.True(CustomMusicIdRegistry.IsReserved(0));
+            Assert.True(CustomMusicIdRegistry.IsReserved(53));
+            Assert.False(CustomMusicIdRegistry.IsReserved(54));
+        }
+
+        [Fact]
         public void FieldContracts_CoverEveryNamedFieldRefInSource()
         {
             var root = FindRepoRoot();

@@ -60,5 +60,13 @@ namespace GRC2.Tests
         {
             Assert.Equal(0UL, AlbumManager.ComputeFolderSignature(Path.Combine(_hwa, "none")));
         }
+
+        [Fact]
+        public void GetAlbumKey_DistinguishesHwaRootFromSubfolderNamedHwa()
+        {
+            Assert.Equal("root", AlbumManager.GetAlbumKey(_hwa, _hwa));
+            Assert.Equal("hwa", AlbumManager.GetAlbumKey(Path.Combine(_hwa, "hwa"), _hwa));
+            Assert.Equal("song a", AlbumManager.GetAlbumKey(Path.Combine(_hwa, "song a"), _hwa));
+        }
     }
 }

@@ -26,9 +26,9 @@
 |------|------|
 | 0~21 | 기본 곡 (`FIRST_VER_DATA_TOP` ~ `FIRST_VER_DATA_END`) |
 | 22~53 | DLC 곡 (`DLC1_DATA_TOP` ~ `DLC2_02_DATA_END`) |
-| **54~511** | 비어 있음 → 모드의 커스텀 곡 ID |
-| 512 | `SAVEABLE_ID_END` (세이브 배열 크기) |
-| 8000~ | `UNIQUE_TOP`, 튜토리얼 등 |
+| **54~7999** (예약 값 제외) | 모드의 커스텀 곡 ID (`SAVEABLE_ID_END=512` 등 이름 붙은 enum 값은 건너뛰고 세이브 배열을 `EnsureSaveSlots`로 확장) |
+| 512 | `SAVEABLE_ID_END` (기본 세이브 배열 크기) |
+| 8000~ | `UNIQUE_TOP`, 튜토리얼·미리보기 등 |
 
 ## BMS → 게임 매핑 (`EnumValueHelper`)
 

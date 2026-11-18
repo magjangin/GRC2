@@ -13,22 +13,21 @@ BMS 차트가 게임 노트가 되기까지의 흐름을 한눈에 보고, 차�
 
 ```
 게임 시작: SceneDetector.OnInitializeMelon
-  └─ 모든 앨범의 모든 BMS 파싱 → ParsedBmsNotesByFile (전체 경로 키 캐시)
+  └─ 현재 선택 앨범의 BMS만 파싱 → ParsedBmsNotesByFile (전체 경로 키 캐시)
 플레이 씬 진입: SceneDetector.ReloadCurrentAlbumAssets
-  └─ 현재 앨범의 첫 BMS → NoteArrayHooks.UpdateBmsNotes
+  └─ 현재 앨범의 첫 BMS (캐시 없거나 수정 시각이 바뀌었으면 새로 파싱) → NoteArrayHooks.UpdateBmsNotes
 cFairyModeNotesManager.createAllNote [prefix: NoteArrayHooks]
   └─ ShouldInjectCustomContent() 이면
        BmsNoteConverter.ConvertBmsNotesToNoteCreateData
          ├─ 성공 → mFairyNoteCreateDataArray 교체
-         └─ null (주입 취소) → 원본 배열 유지: 원본 곡 노트가 커스텀 BGM 위에서 나옴
+         └─ null (주입 취소) → 원본 배열 유지 + GameHud 경고 8초 표시: 원본 곡 노트가 커스텀 BGM 위에서 나옴
 ```
 
-- 한 앨범에 BMS가 여러 개면 모두 파싱되지만 **첫 번째 파일만** 주입됩니다. "첫 번째"는 폴더 열거 순서이고
-  코드가 정렬하지 않으므로(NTFS는 보통 이름순) 파일이 여러 개일 때는 하나만 두는 것이 안전합니다([알려진_문제.md](../maintenance/알려진_문제.md) H8).
+- 한 앨범에 BMS가 여러 개면 **이름순 첫 번째 파일만** 주입됩니다([알려진_문제.md](../maintenance/알려진_문제.md) H8).
 - `createAllNote`는 곡 선택 씬의 옵션 미리보기 창에서도 불리지만, 모드는 플레이 씬에서만 주입하므로 미리보기에는 원본 샘플 노트가
   그대로 나옵니다(2026-10-04 수정, [알려진_문제.md](../maintenance/알려진_문제.md) H1).
-- 주입이 취소돼도 게임 화면에는 아무 표시가 없습니다. 반드시 로그(`BMS 노트 주입이 취소되었습니다`)를 확인하세요(H2).
-- BMS를 고치면 게임을 다시 시작해야 반영됩니다(파싱은 시작할 때 한 번).
+- 주입이 취소되면 플레이 화면 상단에 8초 동안 경고가 표시되고 로그(`BMS 노트 주입이 취소되었습니다`)에 상세 원인이 남습니다(H2).
+- BMS를 고치면 게임 재시작 없이 다음 플레이(또는 곡 선택 재진입)부터 반영됩니다(H12).
 - 커스텀 곡이 선택되지 않았거나 `SoundPlayerScene`/`MoviePlayer_MovieSelect`에서는 주입하지 않습니다.
 
 ## 차트 작성 규칙
@@ -69,9 +68,8 @@ cFairyModeNotesManager.createAllNote [prefix: NoteArrayHooks]
 - `#BPM 124`로 기본 BPM을 정합니다(없으면 120).
 - 노트 시간은 **시간(초) = tick × 240 / BPM**입니다(tick은 마디 단위, 1마디 = 4박).
   예: 124 BPM에서 5.5마디 = 5.5 × 240 / 124 ≈ 10.645초.
-- BPM 변속은 `#BPMxx: 값`(콜론 필요) 표와 채널 03~08의 인덱스로만 읽습니다. 표준 `#BPMxx 값`(콜론 없음), 채널 03의 직접 값,
-  마디 길이(채널 02), STOP(채널 09)은 지원하지 않습니다([알려진_문제.md](../maintenance/알려진_문제.md) E1).
-  **현재는 고정 BPM 차트를 권장합니다.**
+- BPM 변속은 채널 03(16진수 직접 BPM)과 채널 08(`#BPMxx: 값` 또는 `#BPMxx 값` 표 참조)을 지원합니다(E1).
+  마디 길이(채널 02)와 STOP(채널 09)은 지원하지 않습니다([알려진_문제.md](../maintenance/알려진_문제.md) E1).
 
 ### 함께 넣을 파일
 
