@@ -68,6 +68,7 @@ namespace GRC2.Core
             new FieldContract(typeof(cRythmGameResultSceneUpdater), "mMusicLVUI", typeof(cUIMusicLVLoopImage)),
             new FieldContract(typeof(cRythmGameResultSceneUpdater), "mMusicNameText", typeof(TextMeshProUGUI)),
             new FieldContract(typeof(cRythmGameResultSceneUpdater), "mArtWorkImage", typeof(Image)),
+            new FieldContract(typeof(cMusicSelectSceneSelectingMusicUI), "mMusicNameText", typeof(TextMeshProUGUI)),
         };
 
         /// <summary>필드 계약 중 지금 게임 어셈블리에서 깨진 것(없거나 타입이 다름)을 설명 문자열로 돌려줍니다. 부작용이 없어 테스트에서도 씁니다.</summary>
