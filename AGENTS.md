@@ -1,6 +1,6 @@
 # GRC2 — 인수인계 문서 (AGENTS.md)
 
-> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
+> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
 > 2026-11-17~18 변경은 곡 선택 화면까지 인게임으로 확인했다(7절에 범위 명시). **"실측"** 표시는 디스크에서 직접 읽은 값, **"미확인"**은 다음 세션에서 확인할 항목이다.
 
 ## 0. 프로젝트 개요
@@ -105,7 +105,7 @@
 ## 7. 다음 작업자에게
 
 - 작업 전 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 비교한다. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 144개 모두 통과해야 한다(2026-11-18 기준).
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 146개 모두 통과해야 한다(2026-11-19 기준).
 - 2026-11-18 제목 스크롤 인게임 확인: 곡 선택에서 `麦吉_Maggie x 盖盖Nyan - Summertime (Arrange ver.)`이 끝(`(Arrange ver.)`)까지 흘러 보임, 진단 로그 `[제목 스크롤] 대상 SongTitle: 넘침 모드 Overflow, … 가리는 부모 曲名`. **미확인:** 끝 대기 후 처음으로 돌아오는 반복과 짧은 제목 곡(변화 없어야 함)은 눈으로 보지 못했다(타이밍은 단위 테스트만).
 - 2026-11-18 외부 MusicID 맵 제거: `UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`, `MelonPreferences.cfg`의 `[GRC2_MusicID]`를 모두 쓰지 않고 시작할 때 자동으로 지운다. 배정은 메모리(`_sessionMap`)에서만 수행한다.
 - 2026-11-18 인게임 확인: 초기화 146ms 로그, 기존 5곡 ID 54~58 유지, 임시 테스트 앨범 ID 600 → `세이브 곡 칸을 512 → 601개로 늘렸습니다`·곡 선택에서 `MusicID: 600`, "주입 완료" 로그 1회. **미확인:** ID 512 이상 곡을 끝까지 플레이해 결과 화면·세이브까지 가는 것, 게임을 켠 채 곡을 추가했을 때의 재스캔(단위 테스트만). 실제 세이브 배열은 이 확인으로 601칸이 됐다(무해, 근거는 3절 MusicID 항목).

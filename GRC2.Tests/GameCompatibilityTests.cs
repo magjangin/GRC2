@@ -159,6 +159,15 @@ namespace GRC2.Tests
             Assert.True(missing.Count == 0, "MusicData에 없는 크레딧 게터: " + string.Join(", ", missing));
         }
 
+        [Fact]
+        public void TmpSettings_FallbackFontAssetsFieldResolves()
+        {
+            var tmpSettingsType = Assembly.Load("Unity.TextMeshPro").GetType("TMPro.TMP_Settings");
+            Assert.NotNull(tmpSettingsType);
+            var field = AccessTools.Field(tmpSettingsType, "m_fallbackFontAssets");
+            Assert.NotNull(field);
+        }
+
         [Theory]
         [InlineData("\"AppState\"\n{\n\t\"buildid\"\t\t\"13530823\"\n}", "13530823")]
         [InlineData("\"BuildID\" \"42\"", "42")]

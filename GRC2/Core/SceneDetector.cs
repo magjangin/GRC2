@@ -439,8 +439,11 @@ namespace GRC2.Core
 
             AlbumManager.ScanAlbums(_hwaFolderPath);
             _albumSignature = signature;
+            ParsedBmsNotesByFile.Clear();
+            _bmsParsedWriteTimeUtc.Clear();
             ParsedBmsNotes = new List<BmsNote>();
             _lastParsedBmsFile = null;
+            SongInfo = AlbumManager.GetCurrentSongInfo() ?? new SongInfo();
             MelonLogger.Msg($"[SceneDetector] hwa 폴더 변경 감지 - 앨범 다시 스캔: {AlbumManager.GetAllAlbums().Count}개 ({sw.ElapsedMilliseconds}ms)");
         }
         private void LoadCustomArtwork()
@@ -497,77 +500,7 @@ namespace GRC2.Core
 
             try
             {
-                if (sceneName == "FairyModeScene")
-                {
-                    HandleFairyModeScene();
-                    BgmBgaInjector.StartInjection(isPlayScene: true);
-                    BgmGameEndMonitor.AdjustMusicDataOnSceneLoad();
-                }
-                else if (sceneName == "PlayMovieScene")
-                {
-                    HandlePlayMovieScene();
-                    BgmBgaInjector.StartInjection(isPlayScene: true);
-                    BgmGameEndMonitor.AdjustMusicDataOnSceneLoad();
-                }
-                else if (sceneName == "RenderCutinScene")
-                {
-                    ModLog.Verbose("[SceneDetector] RenderCutinScene 로드 처리 시작 (플레이 씬 로딩)");
-                    CustomBgmPlayer.Cleanup();
-                    ModLog.Verbose("[SceneDetector] ✅ 로딩 씬 진입 - 커스텀 프리뷰 BGM 중지");
-
-                    BgmBgaInjector.StartInjection(isPlayScene: true);
-
-                    if (CustomAssetManager.IsCustomChartSelected())
-                    {
-                        ReloadCurrentAlbumAssets();
-                        PlaySceneArtworkInjector.StartArtworkInjection();
-                    }
-                }
-                else if (sceneName == ResultSceneName)
-                {
-                    MelonLogger.Msg($"[SceneDetector] 결과 씬 감지: {sceneName} - BGM 주입 중지");
-                    BgmBgaInjector.StopInjection();
-                    BgmBgaInjector.ResetPlaySceneState();
-                }
-                else if (sceneName.StartsWith("MusicSelectScene", StringComparison.Ordinal))
-                {
-                    // 실제 씬 파일명은 "MusicSelectScene_Hasegawa"처럼 접미사가 붙어있어
-                    // 정확히 일치하는 이름("MusicSelectScene")만 확인하면 이 분기가 절대
-                    // 실행되지 않습니다. 그 결과 플레이 씬에서 일시정지 메뉴로 곡 선택
-                    // 화면으로 돌아와도 _isPlayScene이 꺼지지 않아, 방금 플레이하던 곡의
-                    // 제목/아트워크 강제 치환이 곡 선택 화면에서도 계속 적용됩니다.
-                    MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
-                    BgmBgaInjector.StopInjection();
-                    BgmBgaInjector.ResetPlaySceneState();
-                    AudioClipPatch.ResetHandledSelection();
-                    RescanAlbumsIfChanged();
-                    FontFallback.LogCoverageDiagnostics();
-                }
-                else if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
-                {
-                    MelonLogger.Msg($"[SceneDetector] 씬 감지: {sceneName} - 커스텀 주입 비활성화 (플레이 씬 아님)");
-                    BgmBgaInjector.StopInjection();
-                    BgmBgaInjector.ResetPlaySceneState();
-                    CustomAssetManager.SetCustomChartSelected(false);
-                }
-                else
-                {
-                    MelonLogger.Msg($"[SceneDetector] 알 수 없는 씬: {sceneName} - 게임 플레이 씬일 수 있습니다");
-
-                    if (BgmBgaInjector.IsPlayScene())
-                    {
-                        ModLog.Verbose($"[SceneDetector] 플레이 씬 상태 감지: {sceneName}");
-                        if (CustomAssetManager.ShouldInjectCustomContent())
-                        {
-                            ReloadCurrentAlbumAssets();
-                            PlaySceneArtworkInjector.StartArtworkInjection();
-                        }
-                    }
-                    else
-                    {
-                        BgmBgaInjector.StartInjection(isPlayScene: false);
-                    }
-                }
+                RouteSceneLoaded(sceneName);
             }
             catch (Exception ex)
             {
@@ -575,14 +508,79 @@ namespace GRC2.Core
             }
         }
 
-        private void HandleFairyModeScene()
+        private void RouteSceneLoaded(string sceneName)
         {
-            HandlePlayScene("FairyModeScene");
+            if (sceneName == "FairyModeScene" || sceneName == "PlayMovieScene")
+            {
+                HandlePlayScene(sceneName);
+                BgmBgaInjector.StartInjection(isPlayScene: true);
+                BgmGameEndMonitor.AdjustMusicDataOnSceneLoad();
+                return;
+            }
+
+            if (sceneName == "RenderCutinScene")
+            {
+                ModLog.Verbose("[SceneDetector] RenderCutinScene 로드 처리 시작 (플레이 씬 로딩)");
+                CustomBgmPlayer.Cleanup();
+                ModLog.Verbose("[SceneDetector] ✅ 로딩 씬 진입 - 커스텀 프리뷰 BGM 중지");
+                BgmBgaInjector.StartInjection(isPlayScene: true);
+                InjectCurrentAlbumIfCustomSelected();
+                return;
+            }
+
+            if (sceneName == ResultSceneName)
+            {
+                MelonLogger.Msg($"[SceneDetector] 결과 씬 감지: {sceneName} - BGM 주입 중지");
+                BgmBgaInjector.StopInjection();
+                BgmBgaInjector.ResetPlaySceneState();
+                return;
+            }
+
+            if (sceneName.StartsWith("MusicSelectScene", StringComparison.Ordinal))
+            {
+                // 실제 씬 파일명은 "MusicSelectScene_Hasegawa"처럼 접미사가 붙어있어
+                // 정확히 일치하는 이름("MusicSelectScene")만 확인하면 이 분기가 절대
+                // 실행되지 않습니다. 그 결과 플레이 씬에서 일시정지 메뉴로 곡 선택
+                // 화면으로 돌아와도 _isPlayScene이 꺼지지 않아, 방금 플레이하던 곡의
+                // 제목/아트워크 강제 치환이 곡 선택 화면에서도 계속 적용됩니다.
+                MelonLogger.Msg($"[SceneDetector] 곡 선택 씬 감지: {sceneName} - 플레이 씬 상태 해제");
+                BgmBgaInjector.StopInjection();
+                BgmBgaInjector.ResetPlaySceneState();
+                AudioClipPatch.ResetHandledSelection();
+                RescanAlbumsIfChanged();
+                FontFallback.LogCoverageDiagnostics();
+                return;
+            }
+
+            if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
+            {
+                MelonLogger.Msg($"[SceneDetector] 씬 감지: {sceneName} - 커스텀 주입 비활성화 (플레이 씬 아님)");
+                BgmBgaInjector.StopInjection();
+                BgmBgaInjector.ResetPlaySceneState();
+                CustomAssetManager.SetCustomChartSelected(false);
+                return;
+            }
+
+            MelonLogger.Msg($"[SceneDetector] 알 수 없는 씬: {sceneName} - 게임 플레이 씬일 수 있습니다");
+            if (BgmBgaInjector.IsPlayScene())
+            {
+                ModLog.Verbose($"[SceneDetector] 플레이 씬 상태 감지: {sceneName}");
+                if (CustomAssetManager.ShouldInjectCustomContent())
+                    InjectCurrentAlbumIfCustomSelected();
+            }
+            else
+            {
+                BgmBgaInjector.StartInjection(isPlayScene: false);
+            }
         }
 
-        private void HandlePlayMovieScene()
+        private void InjectCurrentAlbumIfCustomSelected()
         {
-            HandlePlayScene("PlayMovieScene");
+            if (CustomAssetManager.IsCustomChartSelected())
+            {
+                ReloadCurrentAlbumAssets();
+                PlaySceneArtworkInjector.StartArtworkInjection();
+            }
         }
 
         private void HandlePlayScene(string sceneName)

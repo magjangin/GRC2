@@ -90,5 +90,15 @@ namespace GRC2.Tests
                 Directory.Delete(dir, recursive: true);
             }
         }
+
+        [Fact]
+        public void CharacterNames_Normalize_IsCaseInsensitiveAndHandlesAliases()
+        {
+            Assert.Equal("Morpho", CharacterNames.Normalize("  르호 "));
+            Assert.Equal("Morpho", CharacterNames.Normalize("morpho"));
+            Assert.Equal("Luxair", CharacterNames.Normalize("룩시아"));
+            Assert.Equal("Roro", CharacterNames.Normalize("roro"));
+            Assert.Equal("CustomChar", CharacterNames.Normalize(" CustomChar "));
+        }
     }
 }

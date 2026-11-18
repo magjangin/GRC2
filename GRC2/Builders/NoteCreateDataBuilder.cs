@@ -67,7 +67,7 @@ namespace GRC2.Builders
         {
             try
             {
-                if (noteCreateData == null)
+                if (noteCreateData == null || bmsNotes == null)
                 {
                     return null;
                 }

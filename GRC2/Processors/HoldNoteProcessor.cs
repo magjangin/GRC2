@@ -12,6 +12,7 @@ using MelonLoader;
 namespace GRC2.Processors
 {
     using NoteCreateData = FairyNoteEditorLoader.NoteCreateData;
+    using HoldEndKey = ValueTuple<int, bool, int>;
 
     public static class HoldNoteProcessor
     {
@@ -20,9 +21,9 @@ namespace GRC2.Processors
             return NoteSampleTime.ToSamples(timeSeconds);
         }
 
-        private static string BuildEndKey(int lane, bool isLeft, int endSample)
+        private static HoldEndKey BuildEndKey(int lane, bool isLeft, int endSample)
         {
-            return $"{lane}_{isLeft}_{endSample}";
+            return (lane, isLeft, endSample);
         }
         /// <summary>
         /// 홀드 노트 시작(02)과 끝(19)을 매칭하고 Duration을 계산합니다.
@@ -64,9 +65,9 @@ namespace GRC2.Processors
 
         private static HoldAttachResult AttachHoldEnd(
             BmsNote holdEnd,
-            Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
-            Dictionary<string, NoteCreateData> processedHoldStartsByEndKey,
+            Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
+            Dictionary<(int Lane, bool IsLeft), List<(HoldEndKey Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
+            Dictionary<HoldEndKey, NoteCreateData> processedHoldStartsByEndKey,
             float timeTolerance)
         {
             if (holdEnd.StartNote != null)
@@ -92,8 +93,8 @@ namespace GRC2.Processors
 
         private static void AttachExplicitStartReference(
             BmsNote holdEnd,
-            Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<string, NoteCreateData> processedHoldStartsByEndKey)
+            Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
+            Dictionary<HoldEndKey, NoteCreateData> processedHoldStartsByEndKey)
         {
             var holdStartBms = holdEnd.StartNote;
             var endSample = ToSampleIndex(holdStartBms.Time + holdStartBms.Duration);
@@ -118,9 +119,9 @@ namespace GRC2.Processors
 
         private static HoldAttachResult TryAttachExactFallback(
             BmsNote holdEnd,
-            string fallbackSearchKey,
-            Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<string, NoteCreateData> processedHoldStartsByEndKey,
+            HoldEndKey fallbackSearchKey,
+            Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
+            Dictionary<HoldEndKey, NoteCreateData> processedHoldStartsByEndKey,
             float timeTolerance)
         {
             if (!holdStartMap.TryGetValue(fallbackSearchKey, out var fallbackList) || fallbackList.Count == 0)
@@ -155,17 +156,18 @@ namespace GRC2.Processors
 
         private static HoldAttachResult TryAttachNearestFallback(
             BmsNote holdEnd,
-            string fallbackSearchKey,
-            Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
-            Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
-            Dictionary<string, NoteCreateData> processedHoldStartsByEndKey,
+            HoldEndKey fallbackSearchKey,
+            Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap,
+            Dictionary<(int Lane, bool IsLeft), List<(HoldEndKey Key, NoteCreateData Note, BmsNote BmsNote)>> holdStartByLane,
+            Dictionary<HoldEndKey, NoteCreateData> processedHoldStartsByEndKey,
             float timeTolerance)
         {
             var laneKey = (holdEnd.Lane, holdEnd.IsLeft);
             if (!holdStartByLane.TryGetValue(laneKey, out var laneNotes))
                 return HoldAttachResult.NotMatched;
 
-            string bestMatchKey = null;
+            HoldEndKey bestMatchKey = default;
+            bool hasBestMatchKey = false;
             (NoteCreateData Note, BmsNote BmsNote)? bestMatch = null;
             float bestTimeDiff = float.MaxValue;
 
@@ -177,12 +179,13 @@ namespace GRC2.Processors
                 if (timeDiff < timeTolerance && timeDiff < bestTimeDiff)
                 {
                     bestMatchKey = key;
+                    hasBestMatchKey = true;
                     bestMatch = (noteObj, bmsNote);
                     bestTimeDiff = timeDiff;
                 }
             }
 
-            if (!bestMatch.HasValue || bestMatchKey == null || !holdStartMap.TryGetValue(bestMatchKey, out var bestList) || bestList.Count == 0)
+            if (!bestMatch.HasValue || !hasBestMatchKey || !holdStartMap.TryGetValue(bestMatchKey, out var bestList) || bestList.Count == 0)
                 return HoldAttachResult.NotMatched;
 
             var (_, matchedBmsNote) = bestMatch.Value;
@@ -251,7 +254,7 @@ namespace GRC2.Processors
             ModLog.Verbose($"[HoldNoteProcessor] BPM: {baseBpm}, 시간 오차 허용 범위: {timeTolerance:F4}초");
 
             var holdStartByLane = BuildHoldStartByLane(holdStartMap);
-            var processedHoldStartsByEndKey = new Dictionary<string, NoteCreateData>();
+            var processedHoldStartsByEndKey = new Dictionary<HoldEndKey, NoteCreateData>();
             int successCount = 0;
             int failCount = 0;
 
@@ -282,7 +285,7 @@ namespace GRC2.Processors
             LogRemainingHoldStarts(holdStartMap);
         }
 
-        private static void LogHoldEndMatchFailure(BmsNote holdEnd, List<BmsNote> allBmsNotes, Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
+        private static void LogHoldEndMatchFailure(BmsNote holdEnd, List<BmsNote> allBmsNotes, Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
             MelonLogger.Warning($"[HoldNoteProcessor] 홀드 끝 노트 매칭 실패: Lane={holdEnd.Lane}, IsLeft={holdEnd.IsLeft}, Time={holdEnd.Time:F3}");
 
@@ -319,7 +322,7 @@ namespace GRC2.Processors
                 MelonLogger.Warning("[HoldNoteProcessor]   (해당 레인의 홀드 시작 노트가 holdStartMap에 없습니다)");
         }
 
-        private static void LogRemainingHoldStarts(Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
+        private static void LogRemainingHoldStarts(Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
             var remainingStartCount = holdStartMap.Values.Sum(list => list.Count);
             if (remainingStartCount <= 0)
@@ -355,13 +358,13 @@ namespace GRC2.Processors
             return noteListBySample;
         }
 
-        private static Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> BuildHoldStartMap(
+        private static Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> BuildHoldStartMap(
             Dictionary<int, List<NoteCreateData>> noteListBySample,
             List<BmsNote> allBmsNotes,
             out int matchedCount,
             out int unmatchedCount)
         {
-            var holdStartMap = new Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>>();
+            var holdStartMap = new Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>>();
             matchedCount = 0;
             unmatchedCount = 0;
 
@@ -418,17 +421,17 @@ namespace GRC2.Processors
                 noteObj.subLaneID == EnumValueHelper.GetSubLaneType(holdStartBms.Lane);
         }
 
-        private static Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>> BuildHoldStartByLane(
-            Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
+        private static Dictionary<(int Lane, bool IsLeft), List<(HoldEndKey Key, NoteCreateData Note, BmsNote BmsNote)>> BuildHoldStartByLane(
+            Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
-            var holdStartByLane = new Dictionary<(int Lane, bool IsLeft), List<(string Key, NoteCreateData Note, BmsNote BmsNote)>>();
+            var holdStartByLane = new Dictionary<(int Lane, bool IsLeft), List<(HoldEndKey Key, NoteCreateData Note, BmsNote BmsNote)>>();
             foreach (var kvp in holdStartMap)
             {
                 foreach (var (noteObj, bmsNote) in kvp.Value)
                 {
                     var laneKey = (bmsNote.Lane, bmsNote.IsLeft);
                     if (!holdStartByLane.ContainsKey(laneKey))
-                        holdStartByLane[laneKey] = new List<(string, NoteCreateData, BmsNote)>();
+                        holdStartByLane[laneKey] = new List<(HoldEndKey, NoteCreateData, BmsNote)>();
                     holdStartByLane[laneKey].Add((kvp.Key, noteObj, bmsNote));
                 }
             }
@@ -436,14 +439,14 @@ namespace GRC2.Processors
             return holdStartByLane;
         }
 
-        private static void AddHoldStart(Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap, string key, NoteCreateData noteObj, BmsNote bmsNote)
+        private static void AddHoldStart(Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap, HoldEndKey key, NoteCreateData noteObj, BmsNote bmsNote)
         {
             if (!holdStartMap.ContainsKey(key))
                 holdStartMap[key] = new List<(NoteCreateData, BmsNote)>();
             holdStartMap[key].Add((noteObj, bmsNote));
         }
 
-        private static void AddHoldStartAtFront(Dictionary<string, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap, string key, NoteCreateData noteObj, BmsNote bmsNote)
+        private static void AddHoldStartAtFront(Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap, HoldEndKey key, NoteCreateData noteObj, BmsNote bmsNote)
         {
             if (!holdStartMap.ContainsKey(key))
                 holdStartMap[key] = new List<(NoteCreateData, BmsNote)>();
