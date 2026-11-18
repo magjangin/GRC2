@@ -102,10 +102,12 @@ namespace GRC2.Harmony
 
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
-            // 폴더 키마다 고정 ID를 받습니다(UserData/GRC2/musicid_map.txt). 폴더를 추가·삭제해도 기존 곡의 ID와 기록이 그대로입니다(C4).
+            // 메모리에서 앨범 키마다 ID를 배정합니다(외부 맵 파일 없음). 한 실행 안에서는 이미 받은 ID가 유지됩니다.
             var ids = CustomMusicIdRegistry.Allocate(albums.Keys);
             if (ids.Assigned.Count > 0)
                 CustomMusicIdRegistry.EnsureSaveSlots(ids.Assigned.Values.Max());
+
+            var saveData = SingletonMonoBehaviour<sSaveDataDirector>.Instance?.getCurrentActiveGameData()?.playerMusicData;
 
             int injectedCount = 0;
             foreach (var pair in albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
@@ -113,7 +115,11 @@ namespace GRC2.Harmony
                 if (!ids.Assigned.TryGetValue(pair.Key, out int customIdValue))
                     continue;
 
-                if (TryCreateCustomItem(templateData, pair.Value, customIdValue, cellList.Count, out var newItem))
+                var savedSlot = saveData != null && customIdValue >= 0 && customIdValue < saveData.Length
+                    ? saveData[customIdValue]
+                    : null;
+
+                if (TryCreateCustomItem(templateData, pair.Value, customIdValue, cellList.Count, savedSlot, out var newItem))
                 {
                     cellList.Add(newItem);
                     injectedCount++;
@@ -130,6 +136,7 @@ namespace GRC2.Harmony
             AlbumInfo album,
             int customIdValue,
             int newIndex,
+            sSaveDataDirector.PlayerMusicPlayData savedSlot,
             out MusicSelectScrollItemData newItem)
         {
             newItem = null;
@@ -146,7 +153,7 @@ namespace GRC2.Harmony
             ApplyTitleFields(ref musicData, title);
             ApplyDifficultyLevels(ref musicData, album);
             ApplyAlbumMetadata(ref musicData, album, customIdValue);
-            ResetPerSongProgress(ref musicData);
+            ApplyPerSongProgress(ref musicData, savedSlot);
 
             newItem = new MusicSelectScrollItemData(newIndex, musicData);
 
@@ -247,10 +254,20 @@ namespace GRC2.Harmony
                 data.artistID = artist;
         }
 
-        private static void ResetPerSongProgress(ref MusicSelectData data)
+        /// <summary>
+        /// 세이브 슬롯(<c>playerMusicData[customIdValue]</c>)이 있으면 그 하이스코어·클리어 뱃지 배열을 연결하고,
+        /// 없으면 빈 배열로 초기화합니다. 예전에는 무조건 빈 배열을 넣어 BlockSave=0으로 저장한 기록이
+        /// 곡 선택 목록에는 표시되지 않았습니다.
+        /// </summary>
+        private static void ApplyPerSongProgress(ref MusicSelectData data, sSaveDataDirector.PlayerMusicPlayData savedSlot)
         {
-            data.highScoreArray = new int[data.highScoreArray?.Length ?? SongInfo.DifficultyKeys.Length];
-            data.clearBadgeArray = new ResultClearBadge[data.clearBadgeArray?.Length ?? SongInfo.DifficultyKeys.Length];
+            int len = SongInfo.DifficultyKeys.Length;
+            data.highScoreArray = savedSlot?.highScoreArray != null && savedSlot.highScoreArray.Length >= len
+                ? savedSlot.highScoreArray
+                : new int[data.highScoreArray?.Length ?? len];
+            data.clearBadgeArray = savedSlot?.playFlagArray != null && savedSlot.playFlagArray.Length >= len
+                ? savedSlot.playFlagArray
+                : new ResultClearBadge[data.clearBadgeArray?.Length ?? len];
         }
 
         private sealed class TemplateSong

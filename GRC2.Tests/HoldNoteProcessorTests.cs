@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using GRC2.Converters;
 using GRC2.Parsers;
 using GRC2.Processors;
 using Xunit;
@@ -23,6 +24,20 @@ namespace GRC2.Tests
             Assert.Equal(2f, firstStart.Duration, precision: 5);
             Assert.Null(secondStart.EndNote);
             Assert.Equal(0f, secondStart.Duration);
+        }
+
+        [Fact]
+        public void ApplyLoaderPostProcessing_SortsAndLinksSimultaneousNotes_AndSetsIsLast()
+        {
+            // Force GameCompatibilityTests static constructor to register AssemblyResolve for Assembly-CSharp
+            _ = new GameCompatibilityTests();
+
+            var result = BmsPostProcessingSmokeHelper.RunSamplePostProcessing();
+            Assert.Equal(new[] { 10000, 10000, 20000 }, result.SortedSamples);
+            Assert.True(result.LastNoteMarked);
+            Assert.False(result.FirstNoteMarkedLast);
+            Assert.True(result.SimultaneousLinked);
+            Assert.True(result.NearFlickFlagged);
         }
 
         private static BmsNote NewNote(NoteType type, int channel, float tick)

@@ -98,6 +98,41 @@ namespace GRC2.Tests
             Assert.Equal(54, parsed["한글 폴더"]);
             Assert.Equal(2, parsed.Count);
         }
+
+        [Fact]
+        public void StripIniSection_RemovesTargetSectionAndKeepsOtherSections()
+        {
+            var lines = new[]
+            {
+                "[GRCModHelper]",
+                "OpenModsFolderOnStartup = false",
+                "",
+                "[GRC2_MusicID]",
+                "# 주석",
+                "Map = [ \"54=shut up\", ]",
+                "",
+                "[UnityExplorer]",
+                "Hide = false"
+            };
+
+            var cleaned = CustomMusicIdAllocator.StripIniSection(lines, "GRC2_MusicID", out bool removed);
+
+            Assert.True(removed);
+            Assert.DoesNotContain(cleaned, l => l.Contains("GRC2_MusicID"));
+            Assert.DoesNotContain(cleaned, l => l.Contains("54=shut up"));
+            Assert.Contains("[GRCModHelper]", cleaned);
+            Assert.Contains("[UnityExplorer]", cleaned);
+        }
+
+        [Fact]
+        public void StripIniSection_WhenSectionAbsent_ReturnsFalseAndUnchanged()
+        {
+            var lines = new[] { "[GRCModHelper]", "OpenModsFolderOnStartup = false" };
+            var cleaned = CustomMusicIdAllocator.StripIniSection(lines, "GRC2_MusicID", out bool removed);
+
+            Assert.False(removed);
+            Assert.Equal(lines, cleaned);
+        }
     }
 
     public class ModLogTests

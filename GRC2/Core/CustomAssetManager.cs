@@ -19,6 +19,8 @@ namespace GRC2.Core
 
         private static readonly Dictionary<string, Sprite> ArtworkCache =
             new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DateTime> ArtworkCacheWriteTimeUtc =
+            new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly Queue<string> ArtworkCacheOrder = new Queue<string>();
         private static readonly Dictionary<string, List<Action<Sprite>>> PendingArtworkCallbacks =
             new Dictionary<string, List<Action<Sprite>>>(StringComparer.OrdinalIgnoreCase);
@@ -114,11 +116,12 @@ namespace GRC2.Core
             string normalizedPath = PathHelper.GetFullPathOrNull(imagePath);
             if (normalizedPath == null ||
                 !ArtworkCache.TryGetValue(normalizedPath, out sprite) ||
-                sprite == null)
+                sprite == null ||
+                IsArtworkCacheStale(normalizedPath))
             {
                 if (normalizedPath != null)
                 {
-                    ArtworkCache.Remove(normalizedPath);
+                    EvictCachedArtwork(normalizedPath);
                 }
 
                 sprite = null;
@@ -127,6 +130,38 @@ namespace GRC2.Core
 
             SelectArtwork(sprite);
             return true;
+        }
+
+        private static DateTime GetWriteTimeUtcOrMin(string path)
+        {
+            try { return File.GetLastWriteTimeUtc(path); }
+            catch { return DateTime.MinValue; }
+        }
+
+        private static bool IsArtworkCacheStale(string normalizedPath)
+        {
+            return !ArtworkCacheWriteTimeUtc.TryGetValue(normalizedPath, out var cachedAt) ||
+                   cachedAt != GetWriteTimeUtcOrMin(normalizedPath);
+        }
+
+        private static void EvictCachedArtwork(string normalizedPath)
+        {
+            if (ArtworkCache.TryGetValue(normalizedPath, out Sprite staleSprite))
+            {
+                ArtworkCache.Remove(normalizedPath);
+                ArtworkCacheWriteTimeUtc.Remove(normalizedPath);
+                if (staleSprite != null)
+                {
+                    Texture2D texture = staleSprite.texture;
+                    UnityEngine.Object.Destroy(staleSprite);
+                    if (texture != null)
+                        UnityEngine.Object.Destroy(texture);
+                }
+            }
+            else
+            {
+                ArtworkCacheWriteTimeUtc.Remove(normalizedPath);
+            }
         }
 
         private static IEnumerator LoadArtworkCoroutine(string imagePath)
@@ -208,6 +243,7 @@ namespace GRC2.Core
             }
 
             ArtworkCache[path] = sprite;
+            ArtworkCacheWriteTimeUtc[path] = GetWriteTimeUtcOrMin(path);
             TrimArtworkCache();
         }
 
@@ -234,6 +270,7 @@ namespace GRC2.Core
                 }
 
                 ArtworkCache.Remove(oldestPath);
+                ArtworkCacheWriteTimeUtc.Remove(oldestPath);
                 if (oldestSprite != null)
                 {
                     Texture2D texture = oldestSprite.texture;

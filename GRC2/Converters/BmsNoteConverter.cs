@@ -307,7 +307,7 @@ namespace GRC2.Converters
         /// 부스트(Boost_ButForSystem)와 isCritical은 BMS로 표현할 수 없어 옮기지 않습니다.
         /// 주의: 근접 플래그(isNearByFrontFlick4TapOrHold, isNearByFrontSlideEnd4Flick)는 판정 후보 창을 바꿉니다. 게임에서 판정을 확인한 뒤 머지하세요.
         /// </summary>
-        private static void ApplyLoaderPostProcessing(List<NoteCreateData> noteList)
+        internal static void ApplyLoaderPostProcessing(List<NoteCreateData> noteList)
         {
             if (noteList == null || noteList.Count == 0)
             {
@@ -435,6 +435,57 @@ namespace GRC2.Converters
         {
             var nodes = note.connectNodeDataArray;
             return nodes != null && nodes.Length > 0 ? nodes[0] : null;
+        }
+    }
+
+    /// <summary>GRC2.Tests가 Assembly-CSharp를 직접 참조하지 않고도 H15 후처리 동작을 검증할 수 있게 하는 스모크 헬퍼입니다.</summary>
+    internal static class BmsPostProcessingSmokeHelper
+    {
+        internal struct Result
+        {
+            public int[] SortedSamples;
+            public bool LastNoteMarked;
+            public bool FirstNoteMarkedLast;
+            public bool SimultaneousLinked;
+            public bool NearFlickFlagged;
+        }
+
+        internal static Result RunSamplePostProcessing()
+        {
+            var lateRight = new FairyNoteEditorLoader.NoteCreateData
+            {
+                perfectSample = 20000,
+                laneLeftRightID = NoteLaneLeftRight.Right,
+                subLaneID = NoteSubLaneType.Lane_1,
+                noteTypeID = NoteTypeId.Flick
+            };
+            var earlyLeft = new FairyNoteEditorLoader.NoteCreateData
+            {
+                perfectSample = 10000,
+                laneLeftRightID = NoteLaneLeftRight.Left,
+                subLaneID = NoteSubLaneType.Lane_1,
+                noteTypeID = NoteTypeId.Touch
+            };
+            var earlyRight = new FairyNoteEditorLoader.NoteCreateData
+            {
+                perfectSample = 10000,
+                laneLeftRightID = NoteLaneLeftRight.Right,
+                subLaneID = NoteSubLaneType.Lane_2,
+                noteTypeID = NoteTypeId.Touch
+            };
+
+            var list = new List<FairyNoteEditorLoader.NoteCreateData> { lateRight, earlyLeft, earlyRight };
+            BmsNoteConverter.ApplyLoaderPostProcessing(list);
+
+            return new Result
+            {
+                SortedSamples = list.Select(n => n.perfectSample).ToArray(),
+                LastNoteMarked = list[2].isLast,
+                FirstNoteMarkedLast = list[0].isLast,
+                SimultaneousLinked = ReferenceEquals(earlyLeft.simultaneouslyNote, earlyRight) &&
+                                     ReferenceEquals(earlyRight.simultaneouslyNote, earlyLeft),
+                NearFlickFlagged = earlyLeft.isNearByFrontFlick4TapOrHold && earlyRight.isNearByFrontFlick4TapOrHold
+            };
         }
     }
 }

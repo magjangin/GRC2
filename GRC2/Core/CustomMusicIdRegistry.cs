@@ -14,6 +14,10 @@ namespace GRC2.Core
     /// <summary>
     /// 커스텀 곡 MusicID 범위·배정·세이브 칸을 관리합니다.
     ///
+    /// 외부 맵 파일을 두지 않고, 시작할 때 레거시 맵 파일(<c>UserData/GRC2/musicid_map.txt</c>,
+    /// <c>savecustomkey/musicid_map.txt</c>)이나 <c>MelonPreferences.cfg</c>의 <c>[GRC2_MusicID]</c> 항목이 남아 있으면
+    /// 모두 지우고 메모리에서만 이름순으로 배정합니다(<see cref="CustomMusicIdAllocator"/>).
+    ///
     /// 범위: 원본 곡 다음 값(지금 54)부터 UNIQUE_TOP(8000) 직전까지, 게임이 이름 붙여 쓰는 값(SAVEABLE_ID_END=512 등)은 제외.
     /// 예전 상한은 SAVEABLE_ID_END 전인 511(458곡)이었습니다. 512 이상을 쓰려면 세이브 배열
     /// <c>playerMusicData</c>(기본 512칸)가 그 ID까지 있어야 하므로 <see cref="EnsureSaveSlots"/>로 늘립니다.
@@ -25,8 +29,13 @@ namespace GRC2.Core
     {
         private static HashSet<int> _definedValues;
         private static int _start = -1;
-        private static string _mapFilePath;
-        private static Dictionary<string, int> _lastSavedMap;
+        private static Dictionary<string, int> _sessionMap;
+
+        /// <summary>예전에 MelonPreferences.cfg에서 잠깐 쓰던 섹션 이름(정리용).</summary>
+        public const string LegacyPreferencesCategory = "GRC2_MusicID";
+
+        /// <summary>0.6.0까지 맵 파일을 두던 UserData 아래 폴더 이름(정리용).</summary>
+        private const string LegacyDataFolderName = "GRC2";
 
         /// <summary>UNIQUE_TOP(8000) 직전까지 씁니다.</summary>
         public static int End => (int)MusicID.UNIQUE_TOP - 1;
@@ -59,81 +68,91 @@ namespace GRC2.Core
         }
 
         /// <summary>
-        /// 맵 파일 위치를 정합니다: MelonLoader의 모드 데이터 폴더 <c>UserData/GRC2/musicid_map.txt</c>.
-        /// savecustomkey는 사용자가 고치는 설정 파일만 두는 폴더이고, hwa는 루트도 앨범으로 스캔돼 txt가 곡 정보로 읽히므로 둘 다 쓰지 않습니다.
-        /// 0.6.0 개발 중 잠깐 쓰던 savecustomkey/musicid_map.txt가 있으면 새 위치로 옮깁니다(ID 유지).
+        /// 메모리 배정을 초기화하고, 예전에 만들어졌던 외부 맵 파일(<c>UserData/GRC2/musicid_map.txt</c>,
+        /// <c>savecustomkey/musicid_map.txt</c>)과 <c>MelonPreferences.cfg</c>의 <c>[GRC2_MusicID]</c> 섹션이 남아 있으면 지웁니다.
         /// </summary>
         public static void Initialize(string gameFolder)
         {
+            _sessionMap = null;
+
+            var legacyFiles = new List<string>();
             string userData = null;
             try { userData = MelonLoader.Utils.MelonEnvironment.UserDataDirectory; }
             catch { /* 아래 대체 경로 사용 */ }
             if (string.IsNullOrEmpty(userData) && !string.IsNullOrEmpty(gameFolder))
                 userData = Path.Combine(gameFolder, "UserData");
-            if (string.IsNullOrEmpty(userData))
-                return;
-
-            _mapFilePath = Path.Combine(Path.Combine(userData, DataFolderName), CustomMusicIdAllocator.MapFileName);
-
+            if (!string.IsNullOrEmpty(userData))
+                legacyFiles.Add(Path.Combine(Path.Combine(userData, LegacyDataFolderName), CustomMusicIdAllocator.LegacyMapFileName));
             if (!string.IsNullOrEmpty(gameFolder))
-                MigrateLegacyMapFile(Path.Combine(Path.Combine(gameFolder, "savecustomkey"), CustomMusicIdAllocator.MapFileName));
+                legacyFiles.Add(Path.Combine(Path.Combine(gameFolder, "savecustomkey"), CustomMusicIdAllocator.LegacyMapFileName));
+
+            CleanupLegacyMapFiles(legacyFiles);
+            if (!string.IsNullOrEmpty(userData))
+                CleanupLegacyPreferencesSection(Path.Combine(userData, "MelonPreferences.cfg"));
         }
 
-        /// <summary>UserData 아래 이 모드의 폴더 이름.</summary>
-        public const string DataFolderName = "GRC2";
+        /// <summary>예전 외부 맵 파일과 빈 <c>UserData/GRC2</c> 폴더를 지웁니다.</summary>
+        internal static void CleanupLegacyMapFiles(IEnumerable<string> legacyPaths)
+        {
+            if (legacyPaths == null)
+                return;
 
-        private static void MigrateLegacyMapFile(string legacyPath)
+            foreach (var legacyPath in legacyPaths)
+            {
+                try
+                {
+                    if (!string.IsNullOrEmpty(legacyPath) && File.Exists(legacyPath))
+                    {
+                        File.Delete(legacyPath);
+                        MelonLogger.Msg($"[MusicID] 레거시 맵 파일을 삭제했습니다: {legacyPath}");
+                    }
+
+                    var dir = string.IsNullOrEmpty(legacyPath) ? null : Path.GetDirectoryName(legacyPath);
+                    if (!string.IsNullOrEmpty(dir) &&
+                        string.Equals(Path.GetFileName(dir), LegacyDataFolderName, StringComparison.OrdinalIgnoreCase) &&
+                        Directory.Exists(dir) && !Directory.GetFileSystemEntries(dir).Any())
+                    {
+                        Directory.Delete(dir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MelonLogger.Warning($"[MusicID] 레거시 맵 파일 삭제 실패({legacyPath}): {ex.Message}");
+                }
+            }
+        }
+
+        /// <summary>MelonPreferences.cfg에 남아 있는 [GRC2_MusicID] 섹션을 지웁니다.</summary>
+        internal static void CleanupLegacyPreferencesSection(string cfgPath)
         {
             try
             {
-                if (!File.Exists(legacyPath))
+                if (string.IsNullOrEmpty(cfgPath) || !File.Exists(cfgPath))
                     return;
 
-                if (File.Exists(_mapFilePath))
-                {
-                    // 새 위치가 이미 정본이므로 옛 파일만 지웁니다.
-                    File.Delete(legacyPath);
-                }
-                else
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(_mapFilePath));
-                    File.Move(legacyPath, _mapFilePath);
-                }
-                MelonLogger.Msg($"[MusicID] 맵 파일을 savecustomkey에서 {_mapFilePath}로 옮겼습니다.");
+                var lines = File.ReadAllLines(cfgPath);
+                var cleaned = CustomMusicIdAllocator.StripIniSection(lines, LegacyPreferencesCategory, out bool removed);
+                if (!removed)
+                    return;
+
+                File.WriteAllLines(cfgPath, cleaned);
+                MelonLogger.Msg($"[MusicID] MelonPreferences.cfg에서 레거시 [{LegacyPreferencesCategory}] 섹션을 정리했습니다.");
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"[MusicID] 옛 맵 파일 이동 실패({legacyPath}): {ex.Message}");
+                MelonLogger.Warning($"[MusicID] MelonPreferences.cfg 정리 실패: {ex.Message}");
             }
         }
 
         /// <summary>
-        /// 앨범 키마다 ID를 정합니다. 맵이 바뀌었을 때만 파일을 씁니다. 곡 선택 씬 한 번에 여러 번 불려도
-        /// 같은 결과면 디스크를 건드리지 않습니다.
+        /// 앨범 키마다 메모리에서 ID를 정합니다. 외부 파일을 읽거나 쓰지 않습니다.
+        /// 한 실행 안에서는 이미 받은 ID를 유지해 게임을 켠 채 곡을 추가해도 방금 선택·플레이하던 곡의 ID가 흔들리지 않습니다.
         /// </summary>
         public static CustomMusicIdAllocator.Result Allocate(IEnumerable<string> albumKeys)
         {
-            var existing = _lastSavedMap ?? (_mapFilePath != null
-                ? CustomMusicIdAllocator.Load(_mapFilePath)
-                : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase));
-
+            var existing = _sessionMap ?? new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var result = CustomMusicIdAllocator.Allocate(albumKeys, existing, Start, End, IsReserved);
-
-            if (result.Changed && _mapFilePath != null)
-            {
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(_mapFilePath));
-                    CustomMusicIdAllocator.Save(_mapFilePath, result.FullMap);
-                    MelonLogger.Msg($"[MusicID] 맵 저장: {result.FullMap.Count}개 ({_mapFilePath})");
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning($"[MusicID] 맵 파일을 쓰지 못했습니다(이번 실행에서는 메모리 값으로 진행): {ex.Message}");
-                }
-            }
-
-            _lastSavedMap = new Dictionary<string, int>(result.FullMap, StringComparer.OrdinalIgnoreCase);
+            _sessionMap = new Dictionary<string, int>(result.FullMap, StringComparer.OrdinalIgnoreCase);
 
             if (result.Skipped.Count > 0)
             {

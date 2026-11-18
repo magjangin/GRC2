@@ -27,7 +27,37 @@ namespace GRC2.Core
         /// <summary>마지막으로 검증한 Assembly-CSharp.dll의 MVID. Steam이 아닌 사본에서도 업데이트 여부를 알 수 있습니다.</summary>
         public const string TestedAssemblyMvid = "90b8351d-201c-4b67-8d98-87031a628c8e";
 
-        /// <summary>모드가 이름(문자열)으로 접근하는 게임 필드. FieldRefAccess를 새로 쓰면 여기에도 한 줄 추가합니다.</summary>
+        /// <summary>모드가 직접 기대하는 게임 enum 상수·기본값 계약. 게임 업데이트로 값이 바뀌면 시작 로그와 테스트가 잡습니다.</summary>
+        public struct ConstantContract
+        {
+            public readonly string Description;
+            public readonly int Expected;
+            public readonly int Actual;
+
+            public ConstantContract(string description, int expected, int actual)
+            {
+                Description = description;
+                Expected = expected;
+                Actual = actual;
+            }
+
+            public bool IsBroken => Expected != Actual;
+
+            public override string ToString() => $"{Description}: 기대 {Expected}, 현재 {Actual}";
+        }
+
+        public static readonly ConstantContract[] ConstantContracts =
+        {
+            new ConstantContract("MusicID.SAVEABLE_ID_END", 512, (int)soRythmGameMusicDataMap.MusicID.SAVEABLE_ID_END),
+            new ConstantContract("MusicID.UNIQUE_TOP", 8000, (int)soRythmGameMusicDataMap.MusicID.UNIQUE_TOP),
+            new ConstantContract("cBGMBeatManager.defaultFrequency", 48000, cBGMBeatManager.defaultFrequency),
+        };
+
+        /// <summary>상수 계약 중 깨진 것을 설명 문자열로 돌려줍니다.</summary>
+        public static List<string> FindBrokenConstantContracts()
+        {
+            return ConstantContracts.Where(c => c.IsBroken).Select(c => c.ToString()).ToList();
+        }
         public struct FieldContract
         {
             public readonly Type Owner;
@@ -129,8 +159,15 @@ namespace GRC2.Core
                     MelonLogger.Error($"[호환성] 게임 필드 불일치: {message}");
                 }
 
+                var brokenConstants = FindBrokenConstantContracts();
+                foreach (var message in brokenConstants)
+                {
+                    problems++;
+                    MelonLogger.Error($"[호환성] 게임 상수 불일치: {message}");
+                }
+
                 if (problems == 0)
-                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개 확인).");
+                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개, 상수 {ConstantContracts.Length}개 확인).");
                 else
                     MelonLogger.Warning($"[호환성] 문제 {problems}건. 곡 선택·결과 화면 등 일부 기능이 동작하지 않을 수 있습니다. " +
                         "HOOK_MAP.md와 AGENTS.md의 '업데이트 대응 절차'를 따라 훅 시그니처부터 다시 확인하세요.");

@@ -15,7 +15,7 @@
 - [README_legacy.md](archive/README_legacy.md): 예전 종합 문서. 참고용으로만 남겼습니다.
 
 모드는 `Assembly-CSharp`를 컴파일 타임 타입으로 직접 참조합니다. 비공개 필드는 `AccessTools.FieldRefAccess`로 접근하고,
-문자열로 찾는 메서드는 `cRythmGameManager.setPauseButtonPusable`(`SceneDetector`의 `AccessTools.MethodDelegate`) 하나뿐입니다.
+문자열로 찾는 메서드는 `CreditTextPatch.TargetMethods`(`MusicData.get*Text` 7개)뿐입니다.
 `Decompiled/`(게임 원본 디컴파일)는 저작권상 git에 없으므로, 문서에서 "`Decompiled/`로 확인"이라고 적은 내용은 로컬에서만 재현할 수 있습니다.
 
 ## 폴더

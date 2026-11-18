@@ -21,9 +21,7 @@ public static List<BmsNote> ParseBmsFile(string filePath, bool printSummary = tr
 }
 ```
 
-- 파일이 없으면 빈 리스트, 도중에 예외가 나면 그때까지 모은 노트를 반환합니다(BPM 단계에서 나면 빈 리스트).
-  주의: 노트 수집 이후 단계에서 예외가 나면 `Time`이 계산되지 않은(전부 0) 노트가 그대로 반환되어 주입 대상이 됩니다
-  ([알려진_문제.md](../maintenance/알려진_문제.md) H5).
+- 파일이 없거나 파싱 도중 예외가 나면 빈 리스트를 반환합니다(부분 결과로 `Time`이 0인 노트가 주입되지 않도록 전부 버림, H5).
 - 3·4·6단계는 [홀드_노트_처리_가이드.md](홀드_노트_처리_가이드.md)를 봅니다.
 
 ## 데이터 모델 ([BmsDataModels.cs](../../GRC2/Parsers/BmsDataModels.cs))
@@ -47,10 +45,10 @@ public class BmsNote
 ## 정규식
 
 ```csharp
-BpmRegex      = ^#BPM\s+([0-9.]+)                        // #BPM 124
-BpmIndexRegex = ^#BPM([0-9A-Fa-f]{2}):\s*([0-9.]+)       // #BPM01: 140  (콜론 필수)
-MeasureRegex  = ^#(\d{3})(\d{2}):                        // #00516:0001…
-WavKeyRegex   = ^#WAV([0-9A-Za-z]{2,3})(?:\s|:)          // WAV 키 폭 감지
+BpmRegex      = ^#BPM\s+([0-9.]+)                              // #BPM 124 (대소문자 무시)
+BpmIndexRegex = ^#BPM([0-9A-Fa-f]{2})(?::|\s)\s*([0-9.]+)      // #BPM01: 140 또는 #BPM01 140 (E1)
+MeasureRegex  = ^#(\d{3})(\d{2}):                              // #00516:0001…
+WavKeyRegex   = ^#WAV([0-9A-Za-z]{2,3})(?:\s|:)                // WAV 키 폭 감지
 ```
 
 `//`로 시작하는 줄과 빈 줄은 건너뜁니다. 채널은 두 자리 **10진수**로 읽으므로 `1A` 같은 16진 채널은 인식하지 않습니다.
@@ -68,9 +66,7 @@ ChannelToLaneMap = {
 
 `ParseNoteData(measure, channel, data, valueWidth)`:
 
-1. `data`를 `valueWidth`(2 또는 3)자씩 끊어 16진수로 읽습니다(`ParseHexData`, 읽지 못한 조각은 버림).
-   조각을 버리면 슬롯 수가 줄어 **그 마디의 뒤쪽 노트가 조용히 밀립니다**(경고 없음). 채널 03~08의 BPM 데이터는 폭 지정 없이
-   항상 2자리로 읽어 3자리 모드에서는 어긋납니다([알려진_문제.md](../maintenance/알려진_문제.md) H5).
+1. `data`를 `valueWidth`(2 또는 3)자씩 끊어 16진수로 읽습니다(`ParseHexData`, 읽지 못한 조각은 빈 슬롯 `0`으로 두어 뒤쪽 슬롯이 밀리지 않게 함, H5).
 2. 값이 0이 아니면 `tick = measure + i / 조각 수`로 노트를 만듭니다.
 3. `GetNoteType(value, out direction)`:
 
@@ -89,14 +85,12 @@ ChannelToLaneMap = {
 ## BPM
 
 - `#BPM n`: 기본 BPM (없으면 120). `baseFreq = 60 / BPM` (1박 길이).
-- `#BPMxx: n`: 인덱스 표(`bpmIndexTable[xx] = n`).
-- 채널 03~08의 데이터: 2자리씩 읽어 0이 아닌 값을 표 인덱스로 보고 `BpmChange { Tick, Bpm, Freq }`를 추가합니다.
-  표에 없는 인덱스면 기본 BPM을 씁니다.
+- `#BPMxx: n` 또는 `#BPMxx n`: 인덱스 표(`bpmIndexTable[xx] = n`).
+- 채널 03은 16진수 값 자체를 BPM으로 쓰고, 채널 08은 `#BPMxx` 표 인덱스로 참조해 `BpmChange { Tick, Bpm, Freq }`를 추가합니다(표에 없는 인덱스면 기본 BPM). 채널 04~07(BGA 채널)은 BPM 변화로 읽지 않습니다(E1).
 - 숫자는 `BmsParser.TryParseBpm`으로 읽습니다. 소수점은 시스템 문화권과 무관하게 항상 `.`이고, 숫자가 아니거나(`1.2.3`)
-  0 이하·무한대인 값은 그 줄만 경고(`BPM 값을 읽지 못해 이 줄을 무시합니다`)하고 건너뜁니다(2026-10-04 이전에는 `float.Parse`라
-  쉼표 소수점 환경에서 잘못 읽었고, 잘못된 줄 하나가 차트 전체를 빈 노트로 만들었습니다).
+  0 이하·무한대인 값은 그 줄만 경고(`BPM 값을 읽지 못해 이 줄을 무시합니다`)하고 건너뜁니다.
 
-표준 BMS와 다른 점(채널 03 직접 값, 04/06/07 BGA 채널, 02 마디 길이, 09 STOP)은 [알려진_문제.md](../maintenance/알려진_문제.md) E1에 있습니다.
+채널 02(마디 길이)와 09(STOP) 미지원은 [알려진_문제.md](../maintenance/알려진_문제.md) E1에 있습니다.
 
 ## 시간 계산
 
