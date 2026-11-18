@@ -41,71 +41,12 @@ namespace GRC2.Converters
                 var holdEndNotes = new List<BmsNote>(); // 홀드 끝 노트 저장
                 var fairyEndNotes = new List<BmsNote>(); // 페어리 끝 노트 저장
 
-                // 성능 최적화: 한 번만 정렬 (Time 기준)
-                var sortedBmsNotes = bmsNotes.OrderBy(n => n.Time).ToList();
+                ClassifyAndConvertNotes(bmsNotes, noteList, holdEndNotes, fairyEndNotes);
 
-                foreach (var bmsNote in sortedBmsNotes)
-                {
-                    try
-                    {
-                        // 홀드/페어리 끝 노트는 별도 처리
-                        if (bmsNote.Type == NoteType.HoldEnd)
-                        {
-                            holdEndNotes.Add(bmsNote);
-                            continue;
-                        }
-                        if (bmsNote.Type == NoteType.FairyEnd)
-                        {
-                            fairyEndNotes.Add(bmsNote);
-                            continue;
-                        }
-
-                        var noteCreateData = Builders.NoteCreateDataBuilder.CreateNoteCreateData(bmsNote);
-                        if (noteCreateData != null)
-                        {
-                            noteList.Add(noteCreateData);
-                        }
-                        else
-                        {
-                            MelonLogger.Warning($"[BmsNoteConverter] 노트 변환 실패: Time={bmsNote.Time}, Lane={bmsNote.Lane}, Type={bmsNote.Type}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", $"노트 변환 중 오류 (Time={bmsNote?.Time}, Type={bmsNote?.Type})");
-                    }
-                }
-
-                // 홀드 끝 노트 체크: 홀드 시작 노트가 있는데 끝 노트가 없는 경우 주입 금지
-                var missingHoldEnds = CheckMissingEndNotes(
-                    bmsNotes.Where(n => n.Type == NoteType.Hold),
-                    holdEndNotes,
-                    "홀드",
-                    "홀드 시작 노트(02 채널)",
-                    "홀드 끝 노트(19 채널)");
-
-                if (missingHoldEnds != null)
-                {
+                if (!ValidateStartEndPairs(bmsNotes, holdEndNotes, fairyEndNotes))
                     return null; // 주입 금지
-                }
 
                 ProcessHoldEndNotes(noteList, holdEndNotes, bmsNotes);
-
-                // 페어리 끝 노트 체크: 매칭된 페어리 시작(Duration>0)에 대해 끝이 있는지만 검사.
-                // 짝을 아예 찾지 못해 Duration이 0으로 남은 페어리는 여기서 걸러지지 않으므로,
-                // 아래 CheckIncompleteConnectedNotes가 최종 산출물 기준으로 다시 확인합니다.
-                var missingFairyEnds = CheckMissingEndNotes(
-                    bmsNotes.Where(n => n.Type == NoteType.Fairy && n.Duration > 0),
-                    fairyEndNotes,
-                    "페어리",
-                    "페어리 시작 노트(11-18 채널)",
-                    "페어리 끝 노트(1A-1B 채널)");
-
-                if (missingFairyEnds != null)
-                {
-                    return null; // 주입 금지
-                }
-
                 ProcessFairyEndNotes(noteList, fairyEndNotes, bmsNotes);
 
                 // 0초 더미 노트 필터링
@@ -120,9 +61,7 @@ namespace GRC2.Converters
 
                 // 최종 방어선: 게임에 넘길 수 없는 노트가 남아 있으면 주입 자체를 취소합니다.
                 if (CheckIncompleteConnectedNotes(noteList))
-                {
                     return null; // 주입 금지
-                }
 
                 // 원본 로더의 후처리(정렬, 동시 노트 연결, 근접 플래그, isLast)를 옮깁니다(H15).
                 try
@@ -143,6 +82,69 @@ namespace GRC2.Converters
                 Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", "변환 오류");
                 return null;
             }
+        }
+
+        private static void ClassifyAndConvertNotes(
+            List<BmsNote> bmsNotes,
+            List<NoteCreateData> noteList,
+            List<BmsNote> holdEndNotes,
+            List<BmsNote> fairyEndNotes)
+        {
+            // 성능 최적화: 한 번만 정렬 (Time 기준)
+            foreach (var bmsNote in bmsNotes.OrderBy(n => n.Time))
+            {
+                try
+                {
+                    if (bmsNote.Type == NoteType.HoldEnd)
+                    {
+                        holdEndNotes.Add(bmsNote);
+                        continue;
+                    }
+                    if (bmsNote.Type == NoteType.FairyEnd)
+                    {
+                        fairyEndNotes.Add(bmsNote);
+                        continue;
+                    }
+
+                    var noteCreateData = Builders.NoteCreateDataBuilder.CreateNoteCreateData(bmsNote);
+                    if (noteCreateData != null)
+                        noteList.Add(noteCreateData);
+                    else
+                        MelonLogger.Warning($"[BmsNoteConverter] 노트 변환 실패: Time={bmsNote.Time}, Lane={bmsNote.Lane}, Type={bmsNote.Type}");
+                }
+                catch (Exception ex)
+                {
+                    Helpers.ErrorLogger.LogException(ex, "[BmsNoteConverter]", $"노트 변환 중 오류 (Time={bmsNote?.Time}, Type={bmsNote?.Type})");
+                }
+            }
+        }
+
+        private static bool ValidateStartEndPairs(
+            List<BmsNote> bmsNotes,
+            List<BmsNote> holdEndNotes,
+            List<BmsNote> fairyEndNotes)
+        {
+            var missingHoldEnds = CheckMissingEndNotes(
+                bmsNotes.Where(n => n.Type == NoteType.Hold),
+                holdEndNotes,
+                "홀드",
+                "홀드 시작 노트(02 채널)",
+                "홀드 끝 노트(19 채널)");
+
+            if (missingHoldEnds != null)
+                return false;
+
+            // 페어리 끝 노트 체크: 매칭된 페어리 시작(Duration>0)에 대해 끝이 있는지만 검사.
+            // 짝을 아예 찾지 못해 Duration이 0으로 남은 페어리는 여기서 걸러지지 않으므로,
+            // CheckIncompleteConnectedNotes가 최종 산출물 기준으로 다시 확인합니다.
+            var missingFairyEnds = CheckMissingEndNotes(
+                bmsNotes.Where(n => n.Type == NoteType.Fairy && n.Duration > 0),
+                fairyEndNotes,
+                "페어리",
+                "페어리 시작 노트(11-18 채널)",
+                "페어리 끝 노트(1A-1B 채널)");
+
+            return missingFairyEnds == null;
         }
 
         private static void ProcessHoldEndNotes(List<NoteCreateData> noteList, List<BmsNote> holdEndNotes, List<BmsNote> bmsNotes)

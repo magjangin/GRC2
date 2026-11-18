@@ -30,9 +30,18 @@ namespace GRC2.Parsers
             ("원작 게임", CreditPattern(@"원작\s*게임|원작|게임|game\s*title|game|原作"), (info, value) => info.GameTitle = value)
         };
 
+        private static readonly Regex TitleRegex =
+            new Regex(@"^#?(곡\s*제목|곡명|제목|title|name)\s*[:=：\s]\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex DifficultyRegex =
+            new Regex(@"^#?(난이도|difficulty|level)\s*[:=：\s]\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex CharacterRegex =
+            new Regex(@"^#?(캐릭터|character|artistid)\s*[:=：\s]\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex DifficultyNumberRegex =
+            new Regex(@"^#?(easy|normal|hard|expert)\s*[:=：\s]\s*(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         private static Regex CreditPattern(string keys)
         {
-            return new Regex(@"^#?(" + keys + @")\s*[:=：\s]\s*(.+)", RegexOptions.IgnoreCase);
+            return new Regex(@"^#?(" + keys + @")\s*[:=：\s]\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         }
 
         /// <summary>
@@ -54,97 +63,19 @@ namespace GRC2.Parsers
             {
                 ModLog.Verbose($"[SongInfoParser] 곡 정보 파일 파싱 시작: {Path.GetFileName(filePath)}");
 
-                string text = "";
-                string encodingUsed = "Default/BOM Detect";
-
-                // BOM이 있으면 그 인코딩을 따르고, 없으면 UTF-8로 읽습니다.
-                // 예전 주석은 CP949라고 했지만 Unity Mono에서 Encoding.Default는 UTF-8입니다(알려진 문제 G). 그래서 명시합니다.
-                using (var reader = new StreamReader(filePath, System.Text.Encoding.UTF8, true))
-                {
-                    text = reader.ReadToEnd();
-                    encodingUsed = reader.CurrentEncoding.EncodingName;
-                }
-                
-                ModLog.Verbose($"[SongInfoParser] 인코딩 결정: {encodingUsed}");
+                string text = ReadFileText(filePath);
                 string[] lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-                
+
                 foreach (var line in lines)
                 {
-                    string trimmedLine = line.Trim();
-                    if (string.IsNullOrWhiteSpace(trimmedLine) || trimmedLine.StartsWith("//"))
-                        continue;
-
-                    // 인라인 주석 제거
-                    int commentIndex = trimmedLine.IndexOf("//");
-                    if (commentIndex >= 0)
-                    {
-                        trimmedLine = trimmedLine.Substring(0, commentIndex).Trim();
-                    }
-
+                    string trimmedLine = StripInlineComment(line);
                     if (string.IsNullOrWhiteSpace(trimmedLine))
                         continue;
 
-                    // 제목 필드
-                    var titleMatch = Regex.Match(trimmedLine, @"^#?(곡\s*제목|곡명|제목|title|name)\s*[:=：\s]\s*(.+)", RegexOptions.IgnoreCase);
-                    if (titleMatch.Success)
-                    {
-                        songInfo.Title = titleMatch.Groups[2].Value.Trim().Normalize(System.Text.NormalizationForm.FormC);
-                        
-                        // 디버깅 로그
-                        ModLog.Verbose($"[SongInfoParser] 곡 제목 파싱: '{songInfo.Title}'");
-                        continue;
-                    }
-
-                    // 크레딧 필드 (아티스트, 작사, 작곡, 편곡, 채보, 수록 CD, 원작 게임)
-                    if (TryApplyCreditLine(trimmedLine, songInfo, out string creditLabel, out string creditValue))
-                    {
-                        ModLog.Verbose($"[SongInfoParser] {creditLabel}: {creditValue}");
-                        continue;
-                    }
-
-                    // 난이도 필드
-                    var difficultyMatch = Regex.Match(trimmedLine, @"^#?(난이도|difficulty|level)\s*[:=：\s]\s*(.+)", RegexOptions.IgnoreCase);
-                    if (difficultyMatch.Success)
-                    {
-                        var difficultyStr = difficultyMatch.Groups[2].Value.Trim();
-                        songInfo.Difficulties = difficultyStr.Split(new[] { ',', '，', '|', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                            .Select(d => d.Trim())
-                            .Where(d => !string.IsNullOrEmpty(d))
-                            .ToList();
-                        ModLog.Verbose($"[SongInfoParser] 난이도 목록: {string.Join(", ", songInfo.Difficulties)}");
-                        continue;
-                    }
-                    
-                    // 캐릭터/아티스트ID 필드
-                    var characterMatch = Regex.Match(trimmedLine, @"^#?(캐릭터|character|artistid)\s*[:=：\s]\s*(.+)", RegexOptions.IgnoreCase);
-                    if (characterMatch.Success)
-                    {
-                        songInfo.Character = characterMatch.Groups[2].Value.Trim();
-                        ModLog.Verbose($"[SongInfoParser] 캐릭터(ArtistID): {songInfo.Character}");
-                        continue;
-                    }
-                    
-                    // 난이도 숫자 매핑 (easy: 5 등)
-                    var difficultyNumberMatch = Regex.Match(trimmedLine, @"^#?(easy|normal|hard|expert)\s*[:=：\s]\s*(\d+)", RegexOptions.IgnoreCase);
-                    if (difficultyNumberMatch.Success)
-                    {
-                        var difficultyName = difficultyNumberMatch.Groups[1].Value.Trim().ToLower();
-                        if (int.TryParse(difficultyNumberMatch.Groups[2].Value.Trim(), out int difficultyNumber))
-                        {
-                            songInfo.DifficultyNumbers[difficultyName] = difficultyNumber;
-                            ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyName} = {difficultyNumber}");
-                        }
-                        continue;
-                    }
+                    ApplyMetadataLine(trimmedLine, songInfo);
                 }
 
-                // 난이도 숫자 매핑 로그
-                var difficultyNumbersStr = string.Join(", ", songInfo.DifficultyNumbers.Select(kvp => $"{kvp.Key}={kvp.Value}"));
-                ModLog.Verbose($"[SongInfoParser] 곡 정보 파싱 완료 - 제목: {songInfo.Title}, 아티스트: {songInfo.Artist}, 난이도: {string.Join(", ", songInfo.Difficulties)}");
-                if (!string.IsNullOrEmpty(difficultyNumbersStr))
-                {
-                    ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyNumbersStr}");
-                }
+                LogParsedSummary(songInfo);
             }
             catch (Exception ex)
             {
@@ -152,6 +83,89 @@ namespace GRC2.Parsers
             }
 
             return songInfo;
+        }
+
+        private static string ReadFileText(string filePath)
+        {
+            // BOM이 있으면 그 인코딩을 따르고, 없으면 UTF-8로 읽습니다.
+            // 예전 주석은 CP949라고 했지만 Unity Mono에서 Encoding.Default는 UTF-8입니다(알려진 문제 G). 그래서 명시합니다.
+            using (var reader = new StreamReader(filePath, System.Text.Encoding.UTF8, true))
+            {
+                string text = reader.ReadToEnd();
+                ModLog.Verbose($"[SongInfoParser] 인코딩 결정: {reader.CurrentEncoding.EncodingName}");
+                return text;
+            }
+        }
+
+        private static string StripInlineComment(string line)
+        {
+            string trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("//"))
+                return string.Empty;
+
+            int commentIndex = trimmed.IndexOf("//");
+            if (commentIndex >= 0)
+                trimmed = trimmed.Substring(0, commentIndex).Trim();
+
+            return trimmed;
+        }
+
+        private static void ApplyMetadataLine(string trimmedLine, SongInfo songInfo)
+        {
+            var titleMatch = TitleRegex.Match(trimmedLine);
+            if (titleMatch.Success)
+            {
+                songInfo.Title = titleMatch.Groups[2].Value.Trim().Normalize(System.Text.NormalizationForm.FormC);
+                ModLog.Verbose($"[SongInfoParser] 곡 제목 파싱: '{songInfo.Title}'");
+                return;
+            }
+
+            if (TryApplyCreditLine(trimmedLine, songInfo, out string creditLabel, out string creditValue))
+            {
+                ModLog.Verbose($"[SongInfoParser] {creditLabel}: {creditValue}");
+                return;
+            }
+
+            var difficultyMatch = DifficultyRegex.Match(trimmedLine);
+            if (difficultyMatch.Success)
+            {
+                var difficultyStr = difficultyMatch.Groups[2].Value.Trim();
+                songInfo.Difficulties = difficultyStr.Split(new[] { ',', '，', '|', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(d => d.Trim())
+                    .Where(d => !string.IsNullOrEmpty(d))
+                    .ToList();
+                ModLog.Verbose($"[SongInfoParser] 난이도 목록: {string.Join(", ", songInfo.Difficulties)}");
+                return;
+            }
+
+            var characterMatch = CharacterRegex.Match(trimmedLine);
+            if (characterMatch.Success)
+            {
+                songInfo.Character = characterMatch.Groups[2].Value.Trim();
+                ModLog.Verbose($"[SongInfoParser] 캐릭터(ArtistID): {songInfo.Character}");
+                return;
+            }
+
+            var difficultyNumberMatch = DifficultyNumberRegex.Match(trimmedLine);
+            if (difficultyNumberMatch.Success)
+            {
+                var difficultyName = difficultyNumberMatch.Groups[1].Value.Trim().ToLowerInvariant();
+                if (int.TryParse(difficultyNumberMatch.Groups[2].Value.Trim(), out int difficultyNumber))
+                {
+                    songInfo.DifficultyNumbers[difficultyName] = difficultyNumber;
+                    ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyName} = {difficultyNumber}");
+                }
+            }
+        }
+
+        private static void LogParsedSummary(SongInfo songInfo)
+        {
+            ModLog.Verbose($"[SongInfoParser] 곡 정보 파싱 완료 - 제목: {songInfo.Title}, 아티스트: {songInfo.Artist}, 난이도: {string.Join(", ", songInfo.Difficulties)}");
+            if (songInfo.DifficultyNumbers.Count > 0)
+            {
+                var difficultyNumbersStr = string.Join(", ", songInfo.DifficultyNumbers.Select(kvp => $"{kvp.Key}={kvp.Value}"));
+                ModLog.Verbose($"[SongInfoParser] 난이도 숫자 매핑: {difficultyNumbersStr}");
+            }
         }
 
         /// <summary>

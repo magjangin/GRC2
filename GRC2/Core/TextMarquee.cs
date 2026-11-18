@@ -29,6 +29,7 @@ namespace GRC2.Core
         private RectTransform _rect;
         private RectMask2D _selfMask;
         private readonly MarqueeTimeline _timeline = new MarqueeTimeline();
+        private readonly Vector3[] _corners = new Vector3[4];
 
         private bool _captured;
         private TextOverflowModes _origOverflow;
@@ -181,7 +182,6 @@ namespace GRC2.Core
         {
             right = float.PositiveInfinity;
             string name = null;
-            var corners = new Vector3[4];
             for (Transform t = transform.parent; t != null; t = t.parent)
             {
                 RectTransform rt = t as RectTransform;
@@ -194,10 +194,10 @@ namespace GRC2.Core
                 if (!clips)
                     continue;
 
-                rt.GetWorldCorners(corners);
+                rt.GetWorldCorners(_corners);
                 float localRight = Mathf.Max(
-                    _rect.InverseTransformPoint(corners[2]).x,
-                    _rect.InverseTransformPoint(corners[3]).x);
+                    _rect.InverseTransformPoint(_corners[2]).x,
+                    _rect.InverseTransformPoint(_corners[3]).x);
                 if (localRight < right)
                 {
                     right = localRight;

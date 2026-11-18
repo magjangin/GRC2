@@ -183,9 +183,9 @@ namespace GRC2.Injectors
         private static IEnumerator SyncCoroutine()
         {
             float lastSyncTime = 0f;
-            float syncInterval = 0.1f; // 0.1초마다 동기화 확인
-            bool hasSyncedOnce = false; // 최소 한 번은 동기화했는지 여부
-            bool wasPlaying = false; // 이전 프레임에서 재생 중이었는지
+            const float syncInterval = 0.1f;
+            bool hasSyncedOnce = false;
+            bool wasPlaying = false;
 
             while (_isSyncing)
             {
@@ -195,39 +195,17 @@ namespace GRC2.Injectors
                 {
                     _bgmAudioSource = GetCurrentAudioSource();
                     if (_bgmAudioSource == null)
-                    {
                         continue;
-                    }
                 }
 
                 try
                 {
-                    bool isPlaying = _bgmAudioSource.isPlaying;
-                    float bgmTime = 0f;
+                    float bgmTime = ReadCurrentBgmTime(out bool isPlaying);
 
-                    // BGM이 방금 재생되기 시작했는지 확인
                     if (isPlaying && !wasPlaying)
-                    {
-                        hasSyncedOnce = false; // 재생이 시작되었으므로 다시 동기화 필요
-                    }
+                        hasSyncedOnce = false;
                     wasPlaying = isPlaying;
 
-                    // BGM이 재생 중이면 시간 가져오기
-                    if (isPlaying)
-                    {
-                        bgmTime = _bgmAudioSource.time;
-                        if (bgmTime <= 0f)
-                        {
-                            bgmTime = GetBgmTimeFromManager();
-                        }
-                    }
-                    else
-                    {
-                        // 재생 중이 아니어도 cBGMBeatManager에서 시간 가져오기 시도
-                        bgmTime = GetBgmTimeFromManager();
-                    }
-
-                    // BGM이 재생되기 시작했고 아직 동기화하지 않았으면 즉시 동기화
                     if (isPlaying && !hasSyncedOnce && bgmTime > 0f)
                     {
                         SyncBgaToBgm();
@@ -237,40 +215,10 @@ namespace GRC2.Injectors
                     }
 
                     if (bgmTime <= 0f)
-                    {
                         continue;
-                    }
 
-                    // BGA와 BGM 시간 차이 확인
-                    bool needsSync = false;
-                    float maxTimeDiff = 0f;
-                    float bgaTime = 0f;
-
-                    foreach (var videoPlayer in _videoPlayers)
-                    {
-                        if (videoPlayer == null || !videoPlayer.isPlaying || !videoPlayer.isPrepared)
-                        {
-                            continue;
-                        }
-                        float currentBgaTime = (float)videoPlayer.time;
-                        if (bgaTime == 0f)
-                        {
-                            bgaTime = currentBgaTime;
-                        }
-
-                        float expectedVideoTime = (float)(bgmTime % videoPlayer.length);
-                        float timeDiff = Mathf.Abs((float)(videoPlayer.time - expectedVideoTime));
-                        maxTimeDiff = Mathf.Max(maxTimeDiff, timeDiff);
-                        
-                        // 0.1초 이상 차이나면 동기화
-                        if (timeDiff > 0.1f)
-                        {
-                            needsSync = true;
-                        }
-                    }
-
-                    // 동기화가 필요한 경우에만 수행 (재동기화 시에만 로그)
-                    if (needsSync && Mathf.Abs(bgmTime - lastSyncTime) > 1f)
+                    if (TryFindResyncNeed(bgmTime, out float bgaTime, out float maxTimeDiff) &&
+                        Mathf.Abs(bgmTime - lastSyncTime) > 1f)
                     {
                         MelonLogger.Msg($"[BGABGMSyncHook] 재동기화 완료: BGA {bgaTime:F3}초 -> BGM {bgmTime:F3}초 (차이 {maxTimeDiff:F3}초)");
                         SyncBgaToBgm();
@@ -283,6 +231,44 @@ namespace GRC2.Injectors
                     MelonLogger.Warning($"[BGAPlayerHook] 동기화 모니터링 오류: {ex.Message}");
                 }
             }
+        }
+
+        private static float ReadCurrentBgmTime(out bool isPlaying)
+        {
+            isPlaying = _bgmAudioSource.isPlaying;
+            if (isPlaying)
+            {
+                float time = _bgmAudioSource.time;
+                return time > 0f ? time : GetBgmTimeFromManager();
+            }
+
+            return GetBgmTimeFromManager();
+        }
+
+        private static bool TryFindResyncNeed(float bgmTime, out float bgaTime, out float maxTimeDiff)
+        {
+            bool needsSync = false;
+            maxTimeDiff = 0f;
+            bgaTime = 0f;
+
+            foreach (var videoPlayer in _videoPlayers)
+            {
+                if (videoPlayer == null || !videoPlayer.isPlaying || !videoPlayer.isPrepared)
+                    continue;
+
+                float currentBgaTime = (float)videoPlayer.time;
+                if (bgaTime == 0f)
+                    bgaTime = currentBgaTime;
+
+                float expectedVideoTime = (float)(bgmTime % videoPlayer.length);
+                float timeDiff = Mathf.Abs((float)(videoPlayer.time - expectedVideoTime));
+                maxTimeDiff = Mathf.Max(maxTimeDiff, timeDiff);
+
+                if (timeDiff > 0.1f)
+                    needsSync = true;
+            }
+
+            return needsSync;
         }
 
         private static void StopSync()

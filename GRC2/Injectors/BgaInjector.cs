@@ -25,43 +25,67 @@ namespace GRC2.Injectors
 
         public static IEnumerator TryInjectBgaCoroutine(string bgaFilePath)
         {
-            VideoPlayer[] videoPlayers = null;
+            var activeVideoPlayers = FindActiveVideoPlayers();
+            if (activeVideoPlayers.Count == 0)
+                yield break;
+
+            string fileUrl = BuildBgaFileUrl(bgaFilePath);
+            long fileSizeBytes = GetBgaFileSizeBytes(bgaFilePath);
+
+            MelonLogger.Msg($"[BgaInjector] 커스텀 BGA를 {activeVideoPlayers.Count}개 VideoPlayer에 설정");
+            PrepareVideoPlayers(activeVideoPlayers, fileUrl);
+
+            yield return WaitForPlayersPreparedCoroutine(activeVideoPlayers, fileSizeBytes);
+
+            MelonLogger.Msg("[BgaInjector] BGA 준비 완료, 재생 시작");
+            StartPreparedVideoPlayers(activeVideoPlayers);
+
+            yield return new WaitForSeconds(0.5f);
+
+            var playingVideoPlayers = CollectPlayingVideoPlayers(activeVideoPlayers);
+            if (playingVideoPlayers.Length > 0)
+            {
+                MelonLogger.Msg($"[BGAPlayerHook] BGA 교체 완료 및 재생 시작: {Path.GetFileName(bgaFilePath)}");
+                MelonLogger.Msg($"[BgaInjector] BGA 재생 중 ({playingVideoPlayers.Length}/{activeVideoPlayers.Count}개 VideoPlayer)");
+                _bgaInjected = true;
+
+                StopOriginalCrossfade();
+                StartBgmSync(playingVideoPlayers);
+            }
+            else
+            {
+                MelonLogger.Warning("[BgaInjector] BGA 재생 실패 - VideoPlayer가 재생되지 않습니다");
+            }
+        }
+
+        private static System.Collections.Generic.List<VideoPlayer> FindActiveVideoPlayers()
+        {
+            var activeVideoPlayers = new System.Collections.Generic.List<VideoPlayer>();
             try
             {
-                videoPlayers = UnityEngine.Object.FindObjectsOfType<VideoPlayer>();
+                var videoPlayers = UnityEngine.Object.FindObjectsOfType<VideoPlayer>();
                 if (videoPlayers == null || videoPlayers.Length == 0)
-                {
-                    // VideoPlayer를 찾을 수 없으면 조용히 종료 (플레이 씬이 아닐 수 있음)
-                    yield break;
-                }
+                    return activeVideoPlayers;
 
+                // FindObjectsOfType<VideoPlayer>()는 기본적으로 비활성 오브젝트를 포함하지 않으므로,
+                // 여기서 걸러지는 vp는 전부 이미 activeInHierarchy == true입니다.
+                foreach (var vp in videoPlayers)
+                {
+                    if (vp != null && vp.gameObject.activeInHierarchy)
+                        activeVideoPlayers.Add(vp);
+                }
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[BgaInjector] VideoPlayer 찾기 실패: {ex.Message}");
                 MelonLogger.Warning($"[BgaInjector] 스택 트레이스: {ex.StackTrace}");
-                yield break;
             }
 
-            // 활성화된 VideoPlayer 목록 준비
-            // FindObjectsOfType<VideoPlayer>()는 기본적으로 비활성 오브젝트를 포함하지 않으므로,
-            // 여기서 걸러지는 vp는 전부 이미 activeInHierarchy == true입니다.
-            var activeVideoPlayers = new System.Collections.Generic.List<VideoPlayer>();
-            foreach (var vp in videoPlayers)
-            {
-                if (vp != null && vp.gameObject.activeInHierarchy)
-                {
-                    activeVideoPlayers.Add(vp);
-                }
-            }
+            return activeVideoPlayers;
+        }
 
-            if (activeVideoPlayers.Count == 0)
-            {
-                // 활성화된 VideoPlayer가 없으면 조용히 종료 (플레이 씬이 아닐 수 있음)
-                yield break;
-            }
-
-            // 파일 경로를 file:// URL로 변환
+        private static string BuildBgaFileUrl(string bgaFilePath)
+        {
             // '#', '%', '?'가 든 경로는 문자열을 이어 붙인 URL이 잘못 해석됩니다(I1). 그런 경로만 인코딩된 URI를 쓰고,
             // 나머지는 예전 방식을 그대로 둡니다(인게임에서 재생이 확인된 형태).
             var fileUrl = "file://" + bgaFilePath.Replace("\\", "/");
@@ -70,29 +94,32 @@ namespace GRC2.Injectors
                 try { fileUrl = new Uri(Path.GetFullPath(bgaFilePath)).AbsoluteUri; }
                 catch (Exception ex) { MelonLogger.Warning($"[BgaInjector] 경로 URI 변환 실패, 기본 방식 사용: {ex.Message}"); }
             }
-            
-            // 파일 크기 확인 (대용량 지원)
-            long fileSizeBytes = 0;
+            return fileUrl;
+        }
+
+        private static long GetBgaFileSizeBytes(string bgaFilePath)
+        {
             try
             {
                 var fileInfo = new FileInfo(bgaFilePath);
-                fileSizeBytes = fileInfo.Length;
+                long fileSizeBytes = fileInfo.Length;
                 var fileSizeMB = fileSizeBytes / (1024.0 * 1024.0);
                 MelonLogger.Msg($"[BgaInjector] BGA 주입 시도: {Path.GetFileName(bgaFilePath)} ({fileSizeMB:F2} MB)");
-                
+
                 if (fileSizeMB > 500)
-                {
                     MelonLogger.Warning($"[BgaInjector] 대용량 비디오 파일 감지 ({fileSizeMB:F2} MB). Prepare에 시간이 걸릴 수 있습니다.");
-                }
+
+                return fileSizeBytes;
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"[BgaInjector] 파일 크기 확인 실패: {ex.Message}");
+                return 0;
             }
+        }
 
-            MelonLogger.Msg($"[BgaInjector] 커스텀 BGA를 {activeVideoPlayers.Count}개 VideoPlayer에 설정");
-
-            // 모든 VideoPlayer에 BGA 설정
+        private static void PrepareVideoPlayers(System.Collections.Generic.List<VideoPlayer> activeVideoPlayers, string fileUrl)
+        {
             foreach (var vp in activeVideoPlayers)
             {
                 try
@@ -100,7 +127,7 @@ namespace GRC2.Injectors
                     ModLog.Verbose($"[BgaInjector] {vp.gameObject.name}에 BGA 설정 중...");
                     vp.source = VideoSource.Url;
                     vp.url = fileUrl;
-                    vp.isLooping = true; // 반복 재생
+                    vp.isLooping = true;
                     vp.Prepare();
                 }
                 catch (Exception ex)
@@ -108,8 +135,12 @@ namespace GRC2.Injectors
                     MelonLogger.Warning($"[BgaInjector] {vp.gameObject.name} BGA 설정 실패: {ex.Message}");
                 }
             }
+        }
 
-            // Prepare 완료 대기 (파일 크기에 따라 타임아웃 동적 조정)
+        private static IEnumerator WaitForPlayersPreparedCoroutine(
+            System.Collections.Generic.List<VideoPlayer> activeVideoPlayers,
+            long fileSizeBytes)
+        {
             // 기본 5초 + 파일 크기당 추가 시간 (100MB당 1초, 최대 60초).
             // 프레임이 아니라 실제 시간으로 셉니다. 프레임으로 세면 144Hz 화면에서 2.4배 짧아집니다(F3).
             float maxWaitSeconds = 5f;
@@ -125,26 +156,12 @@ namespace GRC2.Injectors
 
             while (!allPrepared && Time.realtimeSinceStartup - waitStart < maxWaitSeconds)
             {
-                allPrepared = true;
+                allPrepared = activeVideoPlayers.All(vp => vp.isPrepared);
 
-                foreach (var vp in activeVideoPlayers)
-                {
-                    if (!vp.isPrepared)
-                    {
-                        allPrepared = false;
-                        break;
-                    }
-                }
-
-                // 1초마다 진행 상황 로깅 (대용량 파일용)
                 if (!allPrepared && Time.realtimeSinceStartup >= nextLogAt)
                 {
                     var elapsed = Time.realtimeSinceStartup - waitStart;
-                    int preparedCount = 0;
-                    foreach (var vp in activeVideoPlayers)
-                    {
-                        if (vp.isPrepared) preparedCount++;
-                    }
+                    int preparedCount = activeVideoPlayers.Count(vp => vp.isPrepared);
                     ModLog.Verbose($"[BgaInjector] BGA Prepare 대기 중... ({elapsed:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
                     nextLogAt += 1f;
                 }
@@ -155,13 +172,11 @@ namespace GRC2.Injectors
             {
                 var elapsedSeconds = Time.realtimeSinceStartup - waitStart;
                 MelonLogger.Warning($"[BgaInjector] 일부 BGA 준비 시간 초과 ({elapsedSeconds:F1}초 경과, 최대 {maxWaitSeconds:F1}초)");
-                // 일부만 준비되어도 계속 진행
             }
+        }
 
-            MelonLogger.Msg("[BgaInjector] BGA 준비 완료, 재생 시작");
-            
-            // 모든 VideoPlayer 재생
-            int playingCount = 0;
+        private static void StartPreparedVideoPlayers(System.Collections.Generic.List<VideoPlayer> activeVideoPlayers)
+        {
             foreach (var vp in activeVideoPlayers)
             {
                 try
@@ -170,7 +185,6 @@ namespace GRC2.Injectors
                     {
                         ModLog.Verbose($"[BgaInjector] {vp.gameObject.name} 재생 시작");
                         vp.Play();
-                        playingCount++;
                     }
                     else
                     {
@@ -182,57 +196,42 @@ namespace GRC2.Injectors
                     MelonLogger.Warning($"[BgaInjector] {vp.gameObject.name} 재생 시작 실패: {ex.Message}");
                 }
             }
+        }
 
-            // 재생 확인
-            yield return new WaitForSeconds(0.5f);
-            
-            int actuallyPlayingCount = 0;
-            foreach (var vp in activeVideoPlayers)
+        private static VideoPlayer[] CollectPlayingVideoPlayers(System.Collections.Generic.List<VideoPlayer> activeVideoPlayers)
+        {
+            var playing = activeVideoPlayers.Where(vp => vp != null && vp.isPlaying).ToArray();
+            foreach (var vp in playing)
+                ModLog.Verbose($"[BgaInjector] {vp.gameObject.name} 재생 중 ✓");
+            return playing;
+        }
+
+        private static void StopOriginalCrossfade()
+        {
+            // 게임 자체 BGA 크로스페이드 코루틴이 곡 막바지에 원본 클립으로 되돌리는 것을 방지
+            try
             {
-                if (vp != null && vp.isPlaying)
-                {
-                    actuallyPlayingCount++;
-                    ModLog.Verbose($"[BgaInjector] {vp.gameObject.name} 재생 중 ✓");
-                }
+                var movieSceneManager = UnityEngine.Object.FindObjectOfType<cPlayMovieSceneManager>();
+                if (movieSceneManager != null)
+                    BgaCrossfadePatch.TryStopSwapCoroutine(movieSceneManager);
             }
-            
-            if (actuallyPlayingCount > 0)
+            catch (Exception ex)
             {
-                var bgaFileName = Path.GetFileName(bgaFilePath);
-                MelonLogger.Msg($"[BGAPlayerHook] BGA 교체 완료 및 재생 시작: {bgaFileName}");
-                MelonLogger.Msg($"[BgaInjector] BGA 재생 중 ({actuallyPlayingCount}/{activeVideoPlayers.Count}개 VideoPlayer)");
-                _bgaInjected = true;
+                MelonLogger.Warning($"[BgaInjector] 크로스페이드 코루틴 정지 시도 오류: {ex.Message}");
+            }
+        }
 
-                // 게임 자체 BGA 크로스페이드 코루틴이 곡 막바지에 원본 클립으로 되돌리는 것을 방지
-                try
-                {
-                    var movieSceneManager = UnityEngine.Object.FindObjectOfType<cPlayMovieSceneManager>();
-                    if (movieSceneManager != null)
-                    {
-                        BgaCrossfadePatch.TryStopSwapCoroutine(movieSceneManager);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning($"[BgaInjector] 크로스페이드 코루틴 정지 시도 오류: {ex.Message}");
-                }
-
-                // BGA와 BGM 동기화 시작
-                var playingVideoPlayers = activeVideoPlayers.Where(vp => vp != null && vp.isPlaying).ToArray();
-                ModLog.Verbose($"[BgaInjector] 동기화 시작 시도: {playingVideoPlayers.Length}개 VideoPlayer 재생 중");
-                if (playingVideoPlayers.Length > 0)
-                {
-                    ModLog.Verbose("[BgaInjector] BgaBgmSyncManager.StartSync 호출");
-                    BgaBgmSyncManager.StartSync(playingVideoPlayers);
-                }
-                else
-                {
-                    MelonLogger.Warning("[BgaInjector] 재생 중인 VideoPlayer가 없어 동기화를 시작할 수 없습니다");
-                }
+        private static void StartBgmSync(VideoPlayer[] playingVideoPlayers)
+        {
+            ModLog.Verbose($"[BgaInjector] 동기화 시작 시도: {playingVideoPlayers.Length}개 VideoPlayer 재생 중");
+            if (playingVideoPlayers.Length > 0)
+            {
+                ModLog.Verbose("[BgaInjector] BgaBgmSyncManager.StartSync 호출");
+                BgaBgmSyncManager.StartSync(playingVideoPlayers);
             }
             else
             {
-                MelonLogger.Warning("[BgaInjector] BGA 재생 실패 - VideoPlayer가 재생되지 않습니다");
+                MelonLogger.Warning("[BgaInjector] 재생 중인 VideoPlayer가 없어 동기화를 시작할 수 없습니다");
             }
         }
     }

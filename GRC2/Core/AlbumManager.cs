@@ -53,7 +53,7 @@ namespace GRC2.Core
         /// 아티스트 ID별 첫 곡 정보 저장 (아티스트ID -> (MusicID, 제목))
         /// </summary>
         private static Dictionary<string, (MusicID musicId, string title)> _artistIdToFirstSong =
-            new Dictionary<string, (MusicID, string)>();
+            new Dictionary<string, (MusicID, string)>(StringComparer.OrdinalIgnoreCase);
 
         #region 아티스트 첫 곡 매핑
 
@@ -76,26 +76,13 @@ namespace GRC2.Core
                 return null;
 
             if (_artistIdToFirstSong.TryGetValue(artistId, out var songInfo))
+                return songInfo;
+
+            string normalizedId = CharacterNames.Normalize(artistId);
+            if (!string.IsNullOrWhiteSpace(normalizedId) &&
+                _artistIdToFirstSong.TryGetValue(normalizedId, out songInfo))
             {
                 return songInfo;
-            }
-
-            var normalizedId = CharacterNames.Normalize(artistId);
-            foreach (var kvp in _artistIdToFirstSong)
-            {
-                var normalizedKey = CharacterNames.Normalize(kvp.Key);
-                if (string.Equals(normalizedKey, normalizedId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return kvp.Value;
-                }
-            }
-
-            foreach (var kvp in _artistIdToFirstSong)
-            {
-                if (string.Equals(kvp.Key, artistId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return kvp.Value;
-                }
             }
 
             return null;
