@@ -331,6 +331,35 @@ Removal risk:
 
 - gameplay may still function, but UI may show original song data.
 
+### Long song title scrolling (music select)
+
+Owner files:
+
+- `GRC2/Harmony/SongTitleMarqueePatch.cs`
+- `GRC2/Core/TextMarquee.cs` (MonoBehaviour added to the title TMP; not a patch)
+- `GRC2/Helpers/MarqueeTimeline.cs` (pure timing math, tested by `MarqueeTimelineTests`)
+
+Patched game targets:
+
+- `IntiCreates.cMusicSelectSceneSelectingMusicUI.setDispMusicData` (postfix):
+  attaches `TextMarquee` once to `mMusicNameText` (field contract).
+
+Purpose:
+
+- the selected-song bar title (`SongTitle`, TMP overflow `Overflow`, left aligned,
+  auto size on, 813 wide) is clipped by the parent mask `曲名`, so long titles were
+  cut. When the text is wider than the visible area, `TextMarquee` waits 1.5 s,
+  scrolls left at 80 units/s until the end is visible, holds 1.5 s and restarts.
+  It moves the text by a negative left `margin`, not the RectTransform, so the
+  bar's open/close animation is untouched. If a title TMP clips itself (overflow
+  mode other than `Overflow`) it adds a `RectMask2D` padded vertically.
+- the game's own `cUICommonScrollText` has an empty `Update` in this build, so it
+  cannot be reused.
+
+Removal risk:
+
+- long titles are cut again; nothing else depends on it.
+
 ### Credit text (artist, lyricist, composer, arranger, charter, CD, game)
 
 Owner file:
@@ -743,6 +772,10 @@ of the current source baseline:
   replaces it, so the manifest is currently writable)
 
 ## Cleanup Log
+
+### 2026-11-18 (title scrolling)
+
+- added long song title scrolling on the music select bar (`SongTitleMarqueePatch`).
 
 ### 2026-11-16 (update resilience)
 
