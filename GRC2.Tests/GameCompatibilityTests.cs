@@ -56,7 +56,8 @@ namespace GRC2.Tests
         [Fact]
         public void CustomMusicIdRange_StartsAfterOriginalSongsAndSkipsNamedEnumValues()
         {
-            Assert.Equal(54, CustomMusicIdRegistry.Start);
+            Assert.Equal(GameCompatibility.TestedCustomMusicIdStart, CustomMusicIdRegistry.Start);
+            Assert.Equal(54, GameCompatibility.TestedCustomMusicIdStart);
             Assert.Equal(7999, CustomMusicIdRegistry.End);
             Assert.True(CustomMusicIdRegistry.IsReserved(512));
             Assert.True(CustomMusicIdRegistry.IsReserved(0));
@@ -81,6 +82,53 @@ namespace GRC2.Tests
 
             Assert.True(missing.Count == 0,
                 "GameCompatibility.FieldContracts에 없는 FieldRefAccess 필드: " + string.Join(", ", missing));
+        }
+
+        /// <summary>
+        /// 모드 소스가 쓰는 게임 enum 멤버(빌드 때 숫자로 박힘)가 전부 ConstantContracts에 있는지 확인합니다.
+        /// 계약 표에 없는 멤버는 게임이 값을 바꿔도 시작 로그가 알려 주지 못합니다.
+        /// </summary>
+        [Fact]
+        public void ConstantContracts_CoverEveryGameEnumMemberInSource()
+        {
+            var gameEnums = new[] { "NoteTypeId", "NoteDirectionIndex", "NoteSubLaneType", "NoteLaneLeftRight", "JudgeType", "MusicID" };
+            var known = GameCompatibility.ConstantContracts.Select(c => c.Description).ToHashSet();
+
+            var root = FindRepoRoot();
+            var pattern = new Regex(@"\b(" + string.Join("|", gameEnums) + @")\.([A-Za-z_]\w*)\b");
+            var missing = Directory.GetFiles(Path.Combine(root, "GRC2"), "*.cs", SearchOption.AllDirectories)
+                .Where(p => !p.Contains(@"\obj\") && !p.Contains("/obj/") && !p.EndsWith("GameCompatibility.cs"))
+                .SelectMany(p => pattern.Matches(StripComments(File.ReadAllText(p))).Cast<Match>())
+                .Select(m => m.Groups[1].Value + "." + m.Groups[2].Value)
+                .Distinct()
+                .Where(n => !known.Contains(n))
+                .ToList();
+
+            Assert.True(missing.Count == 0,
+                "GameCompatibility.ConstantContracts에 없는 게임 enum 멤버: " + string.Join(", ", missing));
+        }
+
+        [Fact]
+        public void RuntimeLookups_ReadLoadedAssemblyAndReportMissingNames()
+        {
+            var musicId = Assembly.Load("Assembly-CSharp").GetType("IntiCreates.soRythmGameMusicDataMap+MusicID");
+            Assert.Equal(8000, GameCompatibility.RuntimeEnumValue(musicId, "UNIQUE_TOP"));
+            Assert.Null(GameCompatibility.RuntimeEnumValue(musicId, "NO_SUCH_MEMBER"));
+            Assert.Equal(-7, GameCompatibility.RuntimeEnumValueOr(musicId, "NO_SUCH_MEMBER", -7));
+
+            var beat = Assembly.Load("Assembly-CSharp").GetType("IntiCreates.cBGMBeatManager");
+            Assert.Equal(48000, GameCompatibility.RuntimeConstValue(beat, "defaultFrequency"));
+            Assert.Null(GameCompatibility.RuntimeConstValue(beat, "noSuchField"));
+
+            var missing = new GameCompatibility.ConstantContract("X", "Y", 1, () => null);
+            Assert.True(missing.IsBroken);
+            Assert.Contains("현재 없음", missing.ToString());
+        }
+
+        private static string StripComments(string source)
+        {
+            source = Regex.Replace(source, @"/\*.*?\*/", "", RegexOptions.Singleline);
+            return Regex.Replace(source, @"//[^\n]*", "");
         }
 
         /// <summary>

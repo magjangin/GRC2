@@ -37,8 +37,18 @@ namespace GRC2.Core
         /// <summary>0.6.0까지 맵 파일을 두던 UserData 아래 폴더 이름(정리용).</summary>
         private const string LegacyDataFolderName = "GRC2";
 
-        /// <summary>UNIQUE_TOP(8000) 직전까지 씁니다.</summary>
-        public static int End => (int)MusicID.UNIQUE_TOP - 1;
+        /// <summary>
+        /// UNIQUE_TOP(8000) 직전까지 씁니다. enum 값은 빌드 때 숫자로 박히므로 런타임에 이름으로 읽어
+        /// 게임이 값을 옮겨도 따라가게 합니다(<see cref="GameCompatibility.RuntimeEnumValueOr"/>).
+        /// </summary>
+        public static int End => _end >= 0 ? _end : (_end = UniqueTop - 1);
+        private static int _end = -1;
+
+        private static int UniqueTop =>
+            GameCompatibility.RuntimeEnumValueOr(typeof(MusicID), nameof(MusicID.UNIQUE_TOP), (int)MusicID.UNIQUE_TOP);
+
+        private static int SaveableIdEnd =>
+            GameCompatibility.RuntimeEnumValueOr(typeof(MusicID), nameof(MusicID.SAVEABLE_ID_END), (int)MusicID.SAVEABLE_ID_END);
 
         /// <summary>원본 곡 MusicID 중 SAVEABLE_ID_END 미만의 최댓값 + 1. 게임에 곡이 추가되면 자동으로 밀립니다(C4 (3)).</summary>
         public static int Start
@@ -47,7 +57,7 @@ namespace GRC2.Core
             {
                 if (_start < 0)
                 {
-                    int saveableEnd = (int)MusicID.SAVEABLE_ID_END;
+                    int saveableEnd = SaveableIdEnd;
                     _start = DefinedValues.Where(v => v >= 0 && v < saveableEnd).DefaultIfEmpty(-1).Max() + 1;
                 }
                 return _start;

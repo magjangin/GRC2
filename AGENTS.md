@@ -1,6 +1,6 @@
 # GRC2 — 인수인계 문서 (AGENTS.md)
 
-> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
+> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
 > 2026-11-17~18 변경은 곡 선택 화면까지 인게임으로 확인했다(7절에 범위 명시). **"실측"** 표시는 디스크에서 직접 읽은 값, **"미확인"**은 다음 세션에서 확인할 항목이다.
 
 ## 0. 프로젝트 개요
@@ -50,8 +50,9 @@
 - **BGM은 48kHz만 가정한다.** 노트 시계를 BGM 샘플레이트에 맞추지 않고, 아니면 오류 로그만 남긴다(B1).
 - **패치는 `PatchAll` 한 번 + 실패 시 클래스별 재시도**(`SceneDetector.InitializeHarmony`). Harmony는 첫 실패에서 멈춰 뒤 클래스를 빠뜨리기 때문이다(H4).
 - **필드 이름 접근과 상수 전제는 `GameCompatibility`에 모은다.** 게임 업데이트 때 무엇이 깨졌는지 시작 로그(`[호환성]`)와 `GameCompatibilityTests`로 바로 알기 위해서다(2026-11-16, 2026-11-18 상수 계약 추가). 새 `FieldRefAccess<..>("이름")`를 쓰면 `FieldContracts` 표에도 한 줄 넣어야 테스트가 통과한다.
+- **게임 enum·const 값은 반드시 이름으로 런타임에 읽어 비교한다**(2026-11-20). C#은 `NoteTypeId.Hold`, `MusicID.UNIQUE_TOP` 같은 값을 모드 DLL에 숫자로 박아 넣으므로, `(int)MusicID.UNIQUE_TOP`으로 점검하면 게임이 바뀌어도 배포된 DLL의 점검은 영원히 통과한다(실제로 2026-11-18~19 코드가 그랬다). `GameCompatibility.RuntimeEnumValue`/`RuntimeConstValue`를 쓴다. 노트 변환·판정이 쓰는 게임 enum 멤버(`NoteTypeId`·`NoteDirectionIndex`·`NoteSubLaneType`·`NoteLaneLeftRight`·`JudgeType`·`MusicID`)는 모두 `ConstantContracts`에 있어야 하고, 소스에 새 멤버를 쓰면 `ConstantContracts_CoverEveryGameEnumMemberInSource`가 실패한다. 값이 바뀌면 재빌드해야 노트 변환이 고쳐진다.
 - **게임 폰트에 없는 글자는 TMP 전역 fallback으로 그린다**(`Core/FontFallback.cs`, 2026-11-17). 게임은 언어별 Static TMP 아틀라스만 써서 커스텀 곡의 간체 한자 등이 □로 나왔다. 첫 씬 로드 때 `hwa/fonts/` → 윈도우 폰트(msyh·msjh·YuGothM·meiryo·malgun·seguisym) 순으로 Dynamic `TMP_FontAsset`을 만들어 `TMP_Settings.fallbackFontAssets`에 붙인다. 게임 폰트에 있는 글자는 바꾸지 않으므로 Harmony 훅이 필요 없고, 언어를 바꿔도 유지된다.
-- **커스텀 MusicID는 54~7999(이름 붙은 enum 값 제외), 외부 맵 파일 없이 메모리에서만 배정**(`Core/CustomMusicIdRegistry.cs`, `Helpers/CustomMusicIdAllocator.cs`, 2026-11-18). 예전 상한 511(458곡)은 세이브 `playerMusicData`가 512칸이라서였다. 세이브가 JsonUtility JSON이라 배열을 늘려도 그대로 저장·로드되고 게임 루프는 512까지만 돌거나 `getIsUsableMusicID`로 걸러서, 곡 목록을 만들 때 `EnsureSaveSlots`로 늘린다. 8000 이상은 튜토리얼·미리보기(`UNIQUE_TOP`) 전용이라 쓰지 않는다. 처음에는 폴더 → ID를 외부 파일(`UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`)이나 `MelonPreferences.cfg`의 `[GRC2_MusicID]`에 두었으나, 사용자가 외부 맵 데이터 자체를 원치 않아(2026-11-18) 모두 제거하고 메모리에서만 이름순으로 배정한다. 한 실행 안에서는 이미 배정된 ID를 기억해 게임을 켠 채 곡을 추가해도 방금 선택·플레이하던 곡의 ID가 흔들리지 않는다. 시작할 때 남아 있는 레거시 맵 파일과 `MelonPreferences.cfg`의 `[GRC2_MusicID]` 섹션은 자동으로 지운다.
+- **커스텀 MusicID는 54~7999(이름 붙은 enum 값 제외), 외부 맵 파일 없이 메모리에서만 배정**(`Core/CustomMusicIdRegistry.cs`, `Helpers/CustomMusicIdAllocator.cs`, 2026-11-18). 예전 상한 511(458곡)은 세이브 `playerMusicData`가 512칸이라서였다. 세이브가 JsonUtility JSON이라 배열을 늘려도 그대로 저장·로드되고 게임 루프는 512까지만 돌거나 `getIsUsableMusicID`로 걸러서, 곡 목록을 만들 때 `EnsureSaveSlots`로 늘린다. 8000 이상은 튜토리얼·미리보기(`UNIQUE_TOP`) 전용이라 쓰지 않는다. 처음에는 폴더 → ID를 외부 파일(`UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`)이나 `MelonPreferences.cfg`의 `[GRC2_MusicID]`에 두었으나, 사용자가 외부 맵 데이터 자체를 원치 않아(2026-11-18) 모두 제거하고 메모리에서만 이름순으로 배정한다. 한 실행 안에서는 이미 배정된 ID를 기억해 게임을 켠 채 곡을 추가해도 방금 선택·플레이하던 곡의 ID가 흔들리지 않는다. 대신 실행 사이에는 ID를 기억하지 않으므로, 앞 이름의 폴더를 추가·삭제하거나 게임에 원본 곡이 추가되면 ID가 밀려 `BlockSave=0` 기록이 다른 곡에 붙어 보일 수 있다(알려진_문제 C4 남은 한계, 원본 곡 추가는 `[호환성]` 경고). 범위 끝 `UNIQUE_TOP`과 경계 `SAVEABLE_ID_END`는 런타임에 이름으로 읽는다(2026-11-20). 시작할 때 남아 있는 레거시 맵 파일과 `MelonPreferences.cfg`의 `[GRC2_MusicID]` 섹션은 자동으로 지운다.
 - **로그는 `ModLog`로 나눈다**(2026-11-18). 곡·노트·매핑마다 찍히는 것은 `ModLog.Verbose`(config `VerboseLog=1`일 때만), 같은 상태를 반복해 알리는 것은 `ModLog.InfoOnChange`. 곡 상한을 올리면 곡 수에 비례하는 로그가 수천 줄이 되기 때문이다. 경고·오류는 그대로 `MelonLogger`.
 - **곡 선택 화면에서 긴 제목은 옆으로 흘린다**(`Core/TextMarquee.cs`, `Harmony/SongTitleMarqueePatch.cs`, 2026-11-18). 선택한 곡 막대의 제목 `SongTitle`은 부모 마스크 `曲名`이 잘라 긴 제목이 끊겼다. 넘칠 때만 1.5초 대기 → 초당 80 이동 → 끝에서 1.5초 대기 → 처음으로를 반복한다. RectTransform이 아니라 TMP 왼쪽 `margin`을 음수로 바꿔 옮기므로 막대 열기·닫기 애니메이션과 부딪히지 않는다. 원본 곡에도 같이 적용된다.
 - **시작할 때는 현재 곡 BMS만 파싱**하고, 곡 선택 씬 진입 때 `hwa` 지문이 바뀌었으면 다시 스캔한다(2026-11-18). 한 실행 안에서는 세션 맵(`_sessionMap`)이 이미 배정된 ID를 유지하므로 게임을 켠 채 곡을 추가해도 방금 고른 곡의 ID가 바뀌지 않는다. 아트워크 캐시도 파일 수정 시각을 함께 비교해 같은 이름으로 덮어쓴 이미지를 다시 읽는다.
@@ -85,6 +86,7 @@
 - **게임의 `cUICommonScrollText`로 제목 스크롤** → 이 빌드에서는 `Update`가 비어 있는 미완성 컴포넌트라 쓸 수 없다. 직접 `TextMarquee`를 붙인다.
 - **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `AccessTools.FieldRefAccess`.
 - **`GRC2.Tests`를 솔루션에 넣지 않기** → `test_debug.bat`이 테스트 0개로 "성공"했다(F). 지금은 솔루션에 포함.
+- **게임 enum·const를 코드로 읽어 상수 계약 점검하기**(`new ConstantContract(..., 512, (int)MusicID.SAVEABLE_ID_END)`) → 컴파일러가 둘 다 숫자로 박아 넣어 "기대 512, 현재 512"를 영원히 비교했다. 테스트도 다시 빌드할 때만 새 값을 보므로 배포된 DLL의 시작 점검은 업데이트를 못 잡았다(2026-11-20 수정, 이름으로 런타임 조회).
 
 ## 6. 빌드 명령 및 배포 경로
 
@@ -98,14 +100,16 @@
   ```powershell
   dotnet build "GRC2.Tests\GRC2.Tests.csproj" -c Release
   ```
-- 빌드/배포 스크립트: `build_debug.bat`, `build_release.bat`, `test_debug.bat`
+- 빌드/배포 스크립트: `build_debug.bat`, `build_release.bat`, `test_debug.bat`(테스트 전에 `tools\check_game_version.ps1`로 설치본 버전을 먼저 비교, 다르면 경고만)
+- 게임 버전 점검만: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\check_game_version.ps1` (기준 값은 `GameCompatibility.cs`에서 읽음, 다르면 종료 코드 1)
 - 배포는 스크립트가 처리한다: `build_debug.bat`, `build_release.bat` (내용에 Mods 경로 복사 포함)
 - 배포 위치: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\Mods\`
 
 ## 7. 다음 작업자에게
 
-- 작업 전 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 비교한다. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 146개 모두 통과해야 한다(2026-11-19 기준).
+- 작업 전 `tools\check_game_version.ps1`로(또는 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 직접) 비교한다. 2026-11-20 기준 Build ID·MVID 모두 같음. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 148개 모두 통과해야 한다(2026-11-20 기준).
+- 2026-11-20 상수 계약 런타임화는 빌드·단위 테스트로만 확인했다. **미확인:** 인게임 시작 로그의 `[호환성] 점검 통과 (필드 23개, 상수 26개 확인)` 줄.
 - 2026-11-18 제목 스크롤 인게임 확인: 곡 선택에서 `麦吉_Maggie x 盖盖Nyan - Summertime (Arrange ver.)`이 끝(`(Arrange ver.)`)까지 흘러 보임, 진단 로그 `[제목 스크롤] 대상 SongTitle: 넘침 모드 Overflow, … 가리는 부모 曲名`. **미확인:** 끝 대기 후 처음으로 돌아오는 반복과 짧은 제목 곡(변화 없어야 함)은 눈으로 보지 못했다(타이밍은 단위 테스트만).
 - 2026-11-18 외부 MusicID 맵 제거: `UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`, `MelonPreferences.cfg`의 `[GRC2_MusicID]`를 모두 쓰지 않고 시작할 때 자동으로 지운다. 배정은 메모리(`_sessionMap`)에서만 수행한다.
 - 2026-11-18 인게임 확인: 초기화 146ms 로그, 기존 5곡 ID 54~58 유지, 임시 테스트 앨범 ID 600 → `세이브 곡 칸을 512 → 601개로 늘렸습니다`·곡 선택에서 `MusicID: 600`, "주입 완료" 로그 1회. **미확인:** ID 512 이상 곡을 끝까지 플레이해 결과 화면·세이브까지 가는 것, 게임을 켠 채 곡을 추가했을 때의 재스캔(단위 테스트만). 실제 세이브 배열은 이 확인으로 601칸이 됐다(무해, 근거는 3절 MusicID 항목).
