@@ -163,26 +163,39 @@ namespace GRC2.Processors
         {
             if (start == null || unmatchedEnds == null || unmatchedEnds.Count == 0) return null;
 
-            var candidates = unmatchedEnds
-                .Where(end => end != null && end.StartNote == null && end.Lane == start.Lane && end.IsLeft == start.IsLeft)
-                .Select(end => new
-                {
-                    End = end,
-                    Delta = end.Time - start.Time
-                })
-                .Where(x => x.Delta >= -timeTolerance);
+            BmsNote bestEnd = null;
+            int bestNegOrder = int.MaxValue;
+            float bestAbsDelta = float.MaxValue;
+            float bestTick = float.MaxValue;
 
-            if (preferWindow)
+            foreach (var end in unmatchedEnds)
             {
-                candidates = candidates.Where(x => x.Delta <= windowSeconds);
+                if (end == null || end.StartNote != null || end.Lane != start.Lane || end.IsLeft != start.IsLeft)
+                    continue;
+
+                float delta = end.Time - start.Time;
+                if (delta < -timeTolerance)
+                    continue;
+                if (preferWindow && delta > windowSeconds)
+                    continue;
+
+                int negOrder = delta < 0f ? 1 : 0;
+                float absDelta = Math.Abs(delta);
+                bool isBetter = bestEnd == null
+                    || negOrder < bestNegOrder
+                    || (negOrder == bestNegOrder && absDelta < bestAbsDelta)
+                    || (negOrder == bestNegOrder && absDelta == bestAbsDelta && end.Tick < bestTick);
+
+                if (isBetter)
+                {
+                    bestEnd = end;
+                    bestNegOrder = negOrder;
+                    bestAbsDelta = absDelta;
+                    bestTick = end.Tick;
+                }
             }
 
-            return candidates
-                .OrderBy(x => x.Delta < 0f ? 1 : 0)
-                .ThenBy(x => Math.Abs(x.Delta))
-                .ThenBy(x => x.End.Tick)
-                .Select(x => x.End)
-                .FirstOrDefault();
+            return bestEnd;
         }
 
         private static bool IsWithinPreferredWindow(BmsNote start, BmsNote end, float timeTolerance, float preferredWindow)

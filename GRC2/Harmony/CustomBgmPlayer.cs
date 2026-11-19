@@ -64,6 +64,11 @@ namespace GRC2.Harmony
                 yield break;
             }
 
+            yield return DownloadAndPlayBgmCoroutine(normalizedPath, requestVersion);
+        }
+
+        private static IEnumerator DownloadAndPlayBgmCoroutine(string normalizedPath, int requestVersion)
+        {
             string fileUri = new Uri(normalizedPath).AbsoluteUri;
             using (UnityWebRequest request =
                 UnityWebRequestMultimedia.GetAudioClip(fileUri, AudioType.UNKNOWN))
@@ -79,43 +84,37 @@ namespace GRC2.Harmony
 
                 yield return request.SendWebRequest();
                 if (ReferenceEquals(_activeRequest, request))
-                {
                     _activeRequest = null;
-                }
 
-                if (requestVersion != _requestVersion ||
-                    !Core.CustomAssetManager.IsCustomChartSelected())
-                {
+                if (requestVersion != _requestVersion || !Core.CustomAssetManager.IsCustomChartSelected())
                     yield break;
-                }
 
                 if (request.result != UnityWebRequest.Result.Success)
                 {
-                    MelonLogger.Warning(
-                        $"[CustomBgmPlayer] 프리뷰 로드 실패: {request.error}");
+                    MelonLogger.Warning($"[CustomBgmPlayer] 프리뷰 로드 실패: {request.error}");
                     yield break;
                 }
 
-                AudioClip loadedClip;
-                try
-                {
-                    loadedClip = DownloadHandlerAudioClip.GetContent(request);
-                }
-                catch (Exception ex)
-                {
-                    MelonLogger.Warning(
-                        $"[CustomBgmPlayer] 프리뷰 클립 생성 실패: {ex.Message}");
-                    yield break;
-                }
-
+                AudioClip loadedClip = TryExtractAudioClip(request);
                 if (loadedClip == null)
-                {
                     yield break;
-                }
 
                 loadedClip.name = Path.GetFileNameWithoutExtension(normalizedPath);
                 AddToCache(normalizedPath, loadedClip);
                 PlayClip(normalizedPath, loadedClip);
+            }
+        }
+
+        private static AudioClip TryExtractAudioClip(UnityWebRequest request)
+        {
+            try
+            {
+                return DownloadHandlerAudioClip.GetContent(request);
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[CustomBgmPlayer] 프리뷰 클립 생성 실패: {ex.Message}");
+                return null;
             }
         }
 

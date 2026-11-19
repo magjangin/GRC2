@@ -347,5 +347,19 @@ namespace GRC2.Core
         {
             return !IsSceneWhereInjectionDisallowed() && IsCustomChartSelected();
         }
+
+        /// <summary>
+        /// 비동기 아트워크 콜백 시점에 현재 선택된 앨범의 이미지가 여전히 요청한 경로인지 확인합니다.
+        /// </summary>
+        public static bool IsCurrentAlbumArtwork(string requestedFullPath)
+        {
+            string currentPath = AlbumManager.GetCurrentImageFile();
+            if (string.IsNullOrWhiteSpace(currentPath) || string.IsNullOrWhiteSpace(requestedFullPath))
+                return false;
+
+            string currentFullPath = PathHelper.GetFullPathOrNull(currentPath);
+            return currentFullPath != null &&
+                string.Equals(currentFullPath, requestedFullPath, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

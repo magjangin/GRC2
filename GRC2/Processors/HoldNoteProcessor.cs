@@ -30,36 +30,69 @@ namespace GRC2.Processors
         /// </summary>
         public static void MatchHoldNotes(List<BmsNote> notes)
         {
+            if (notes == null || notes.Count == 0)
+                return;
+
             // 같은 레인에서 02(시작)와 19(끝)을 매칭
             // 노트 채널만 필터링 (11, 12, 14, 15, 16, 18)
-            var validChannels = BmsNoteDataParser.ChannelToLaneMap.Keys.ToHashSet();
-            var holdStarts = notes.Where(n => n.Type == NoteType.Hold && validChannels.Contains(n.Channel)).ToList();
-            var holdEnds = notes.Where(n => n.Type == NoteType.HoldEnd && validChannels.Contains(n.Channel)).ToList();
+            var holdStarts = new List<BmsNote>();
+            var holdEndsByLane = new Dictionary<(int Lane, bool IsLeft), List<BmsNote>>();
+
+            foreach (var note in notes)
+            {
+                if (note == null || !BmsNoteDataParser.ChannelToLaneMap.ContainsKey(note.Channel))
+                    continue;
+
+                if (note.Type == NoteType.Hold)
+                {
+                    holdStarts.Add(note);
+                }
+                else if (note.Type == NoteType.HoldEnd)
+                {
+                    var key = (note.Lane, note.IsLeft);
+                    if (!holdEndsByLane.TryGetValue(key, out var laneEnds))
+                    {
+                        laneEnds = new List<BmsNote>();
+                        holdEndsByLane[key] = laneEnds;
+                    }
+                    laneEnds.Add(note);
+                }
+            }
+
+            if (holdStarts.Count == 0 || holdEndsByLane.Count == 0)
+                return;
+
+            foreach (var laneEnds in holdEndsByLane.Values)
+                laneEnds.Sort((a, b) => a.Tick.CompareTo(b.Tick));
+
+            holdStarts.Sort((a, b) => a.Tick.CompareTo(b.Tick));
 
             // 끝 노트 하나는 시작 노트 하나에만 짝지어야 합니다. 같은 끝을 두 홀드가 나눠 쓰면 두 홀드가 겹칩니다(E3).
-            // 시작을 시각순으로 훑어, 아직 짝이 없는 가장 이른 끝을 붙입니다. 끝을 못 찾은 시작은 Duration이 0으로 남아
-            // BmsNoteConverter의 끝 노트 검사에서 주입이 취소됩니다.
-            var usedEnds = new HashSet<BmsNote>();
-            foreach (var start in holdStarts.OrderBy(s => s.Tick))
+            // 시작·끝 모두 Tick 오름차순이므로 레인별 커서를 전진시키면 O(H log H)에 짝을 찾습니다.
+            var nextEndIndexByLane = new Dictionary<(int Lane, bool IsLeft), int>();
+            foreach (var start in holdStarts)
             {
-                // 같은 레인과 방향(IsLeft)에서 아직 짝이 없는 가장 가까운 19(Hold end) 찾기
-                var end = holdEnds
-                    .Where(e => !usedEnds.Contains(e) && e.Lane == start.Lane && e.IsLeft == start.IsLeft && e.Tick > start.Tick)
-                    .OrderBy(e => e.Tick)
-                    .FirstOrDefault();
+                var key = (start.Lane, start.IsLeft);
+                if (!holdEndsByLane.TryGetValue(key, out var laneEnds))
+                    continue;
 
-                if (end != null)
+                nextEndIndexByLane.TryGetValue(key, out int idx);
+                while (idx < laneEnds.Count && laneEnds[idx].Tick <= start.Tick)
+                    idx++;
+
+                if (idx >= laneEnds.Count)
                 {
-                    usedEnds.Add(end);
-                    // Duration 계산 (Tick 단위로 저장, 나중에 Time으로 변환됨)
-                    start.Duration = end.Tick - start.Tick;
-
-                    // 상호 참조 설정 (직접 연결)
-                    start.EndNote = end;
-                    end.StartNote = start;
-
-                    // 끝 노트는 제거하지 않고 유지 (connectNodeDataArray에 추가하기 위해)
+                    nextEndIndexByLane[key] = idx;
+                    continue;
                 }
+
+                var end = laneEnds[idx];
+                nextEndIndexByLane[key] = idx + 1;
+
+                // Duration 계산 (Tick 단위로 저장, 나중에 Time으로 변환됨)
+                start.Duration = end.Tick - start.Tick;
+                start.EndNote = end;
+                end.StartNote = start;
             }
         }
 
