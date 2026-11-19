@@ -221,14 +221,9 @@ namespace GRC2.Harmony
                     requestedImage,
                     loadedSprite =>
                     {
-                        string currentImage = AlbumManager.GetCurrentImageFile();
                         if (artworkImage == null ||
                             !CustomAssetManager.ShouldInjectCustomContent() ||
-                            string.IsNullOrWhiteSpace(currentImage) ||
-                            !string.Equals(
-                                System.IO.Path.GetFullPath(currentImage),
-                                requestedImage,
-                                StringComparison.OrdinalIgnoreCase))
+                            !CustomAssetManager.IsCurrentAlbumArtwork(requestedImage))
                         {
                             return;
                         }

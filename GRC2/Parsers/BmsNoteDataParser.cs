@@ -63,25 +63,48 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
-        /// 16진수 데이터 파싱
+        /// 16진수 데이터 파싱 (Substring 할당 없이 직접 파싱)
         /// </summary>
         public static List<int> ParseHexData(string data, int valueWidth = 2)
         {
             var values = new List<int>();
-            var trimmed = data.Trim();
-
-            if (valueWidth <= 0)
+            if (string.IsNullOrWhiteSpace(data) || valueWidth <= 0)
                 return values;
-            
+
+            var trimmed = data.Trim();
+            int capacity = trimmed.Length / valueWidth;
+            if (capacity > 0)
+                values.Capacity = capacity;
+
             // WAV 키 폭에 맞춰 2자리 또는 3자리 단위로 16진수 파싱.
             // 읽지 못한 조각은 버리지 않고 0(빈 슬롯)으로 둡니다. 버리면 뒤의 슬롯이 앞으로 밀려 노트 시각이 틀어집니다.
             for (int i = 0; i + valueWidth <= trimmed.Length; i += valueWidth)
             {
-                var hex = trimmed.Substring(i, valueWidth);
-                values.Add(int.TryParse(hex, System.Globalization.NumberStyles.AllowHexSpecifier, System.Globalization.CultureInfo.InvariantCulture, out int value) ? value : 0);
+                values.Add(ParseHexTokenOrZero(trimmed, i, valueWidth));
             }
 
             return values;
+        }
+
+        private static int ParseHexTokenOrZero(string text, int start, int length)
+        {
+            int acc = 0;
+            for (int j = 0; j < length; j++)
+            {
+                int digit = HexCharToInt(text[start + j]);
+                if (digit < 0)
+                    return 0;
+                acc = (acc << 4) | digit;
+            }
+            return acc;
+        }
+
+        private static int HexCharToInt(char c)
+        {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            return -1;
         }
 
         /// <summary>

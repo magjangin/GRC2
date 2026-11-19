@@ -312,24 +312,49 @@ namespace GRC2.Converters
         internal static void ApplyLoaderPostProcessing(List<NoteCreateData> noteList)
         {
             if (noteList == null || noteList.Count == 0)
-            {
                 return;
-            }
 
             // 원본은 OrderBy(안정 정렬)를 씁니다. 같은 시각의 노트 순서가 같아야 isLast가 같은 노트에 붙습니다.
             var notes = noteList.Where(n => n != null).OrderBy(n => n.perfectSample).ToList();
             noteList.Clear();
             noteList.AddRange(notes);
             if (notes.Count == 0)
-            {
                 return;
+
+            CollectFlickAndFairyMetadata(notes, out int maxFlickSample, out var flickSamples, out var fairies);
+
+            foreach (var note4 in notes)
+            {
+                // 원본: flag는 이 노트를 처리하기 시작할 때 동시 노트 연결이 없었는지를 봅니다.
+                bool flag = note4.simultaneouslyNote == null;
+                ApplyProximityFlags(note4, maxFlickSample, flickSamples, fairies);
+
+                // 동시 노트 연결은 원본처럼 노트 순서대로 훑습니다. 연결이 이미 있는 노트(flag가 꺼진 노트)는 건너뜁니다.
+                if (flag)
+                {
+                    foreach (var note5 in notes)
+                    {
+                        if (note4.laneLeftRightID != note5.laneLeftRightID)
+                            LinkSimultaneousNotes(note4, note5);
+                    }
+                }
             }
 
+            // 원본은 정렬된 배열의 마지막 원소(최상위 노트)에 isLast를 붙입니다.
+            notes[notes.Count - 1].isLast = true;
+        }
+
+        private static void CollectFlickAndFairyMetadata(
+            List<NoteCreateData> notes,
+            out int maxFlickSample,
+            out HashSet<int> flickSamples,
+            out List<NoteCreateData> fairies)
+        {
             // 안쪽 루프가 노트마다 모든 노트를 다시 훑던 플릭·페어리 조건은 한 번만 구해 둡니다(P2).
-            // 결과는 같습니다. 플릭은 샘플 집합과 최댓값이면 충분하고, 플릭 조건은 가장 늦은 플릭에서 가장 쉽게 만족합니다.
-            int maxFlickSample = int.MinValue;
-            var flickSamples = new HashSet<int>();
-            var fairies = new List<NoteCreateData>();
+            maxFlickSample = int.MinValue;
+            flickSamples = new HashSet<int>();
+            fairies = new List<NoteCreateData>();
+
             foreach (var note in notes)
             {
                 if (note.noteTypeID == NoteTypeId.Flick)
@@ -342,58 +367,35 @@ namespace GRC2.Converters
                     fairies.Add(note);
                 }
             }
+        }
 
-            foreach (var note4 in notes)
+        private static void ApplyProximityFlags(
+            NoteCreateData note4,
+            int maxFlickSample,
+            HashSet<int> flickSamples,
+            List<NoteCreateData> fairies)
+        {
+            bool isTapOrHold = note4.noteTypeID == NoteTypeId.Touch || note4.noteTypeID == NoteTypeId.Hold;
+            if (note4.noteTypeID == NoteTypeId.Hold && flickSamples.Contains(note4.perfectSample))
+                note4.isSameTimingWithFlick = true;
+
+            // 원본은 차이의 하한을 두지 않습니다. 뒤에 있는 플릭도 차이가 음수라 이 조건을 만족합니다. 그대로 옮깁니다.
+            if (isTapOrHold && maxFlickSample != int.MinValue && note4.perfectSample - maxFlickSample <= 9600)
+                note4.isNearByFrontFlick4TapOrHold = true;
+
+            if (note4.noteTypeID != NoteTypeId.Flick)
+                return;
+
+            foreach (var fairy in fairies)
             {
-                // 원본: flag는 이 노트를 처리하기 시작할 때 동시 노트 연결이 없었는지를 봅니다.
-                bool flag = note4.simultaneouslyNote == null;
-                bool flag2 = note4.noteTypeID == NoteTypeId.Touch || note4.noteTypeID == NoteTypeId.Hold;
-                bool flag3 = note4.noteTypeID == NoteTypeId.Flick;
+                var fairyEnd = FirstConnectNode(fairy);
+                if (fairyEnd == null)
+                    continue;
 
-                if (note4.noteTypeID == NoteTypeId.Hold && flickSamples.Contains(note4.perfectSample))
-                {
-                    note4.isSameTimingWithFlick = true;
-                }
-
-                // 원본은 차이의 하한을 두지 않습니다. 뒤에 있는 플릭도 차이가 음수라 이 조건을 만족합니다. 그대로 옮깁니다.
-                if (flag2 && maxFlickSample != int.MinValue && note4.perfectSample - maxFlickSample <= 9600)
-                {
-                    note4.isNearByFrontFlick4TapOrHold = true;
-                }
-
-                if (flag3)
-                {
-                    foreach (var fairy in fairies)
-                    {
-                        var fairyEnd = FirstConnectNode(fairy);
-                        if (fairyEnd == null)
-                        {
-                            continue;
-                        }
-
-                        int diff = note4.perfectSample - fairyEnd.perfectSample;
-                        if (diff <= 3000 && diff >= 0)
-                        {
-                            note4.isNearByFrontSlideEnd4Flick = true;
-                        }
-                    }
-                }
-
-                // 동시 노트 연결은 원본처럼 노트 순서대로 훑습니다. 연결이 이미 있는 노트(flag가 꺼진 노트)는 건너뜁니다.
-                if (flag)
-                {
-                    foreach (var note5 in notes)
-                    {
-                        if (note4.laneLeftRightID != note5.laneLeftRightID)
-                        {
-                            LinkSimultaneousNotes(note4, note5);
-                        }
-                    }
-                }
+                int diff = note4.perfectSample - fairyEnd.perfectSample;
+                if (diff <= 3000 && diff >= 0)
+                    note4.isNearByFrontSlideEnd4Flick = true;
             }
-
-            // 원본은 정렬된 배열의 마지막 원소(최상위 노트)에 isLast를 붙입니다.
-            notes[notes.Count - 1].isLast = true;
         }
 
         /// <summary>좌우 레인이 다른 두 노트가 같은 시각이면 동시 노트로 잇습니다. 원본 로더의 조건을 그대로 옮긴 것입니다.</summary>

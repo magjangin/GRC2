@@ -154,14 +154,9 @@ namespace GRC2.Harmony
                 requestedPath,
                 sprite =>
                 {
-                    string currentPath = AlbumManager.GetCurrentImageFile();
                     if (sprite == null ||
                         !CustomAssetManager.IsCustomChartSelected() ||
-                        string.IsNullOrEmpty(currentPath) ||
-                        !string.Equals(
-                            Path.GetFullPath(currentPath),
-                            requestedPath,
-                            StringComparison.OrdinalIgnoreCase))
+                        !CustomAssetManager.IsCurrentAlbumArtwork(requestedPath))
                     {
                         return;
                     }

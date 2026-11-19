@@ -132,7 +132,7 @@ namespace GRC2.Parsers
                 if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//"))
                     continue;
 
-                // 기본 BPM 설정 (#BPM)
+                // 기본 BPM 설정 (#BPM) 및 인덱스 테이블 (#BPMXX: value)
                 if (line.StartsWith("#BPM", StringComparison.OrdinalIgnoreCase))
                 {
                     var match = BpmRegex.Match(line);
@@ -148,20 +148,20 @@ namespace GRC2.Parsers
                             MelonLogger.Warning($"[BmsParser] BPM 값을 읽지 못해 이 줄을 무시합니다: {line.Trim()}");
                         }
                     }
-                }
 
-                // BPM 인덱스 테이블 (#BPMXX: value) — measure 데이터에서 hexValue로 참조됨
-                var bpmMatch = BpmIndexRegex.Match(line);
-                if (bpmMatch.Success)
-                {
-                    var bpmIndex = Convert.ToInt32(bpmMatch.Groups[1].Value, 16);
-                    if (TryParseBpm(bpmMatch.Groups[2].Value, out var bpmValue))
+                    // BPM 인덱스 테이블 (#BPMXX: value) — measure 데이터에서 hexValue로 참조됨
+                    var bpmMatch = BpmIndexRegex.Match(line);
+                    if (bpmMatch.Success)
                     {
-                        bpmIndexTable[bpmIndex] = bpmValue;
-                    }
-                    else
-                    {
-                        MelonLogger.Warning($"[BmsParser] BPM 값을 읽지 못해 이 줄을 무시합니다: {line.Trim()}");
+                        var bpmIndex = Convert.ToInt32(bpmMatch.Groups[1].Value, 16);
+                        if (TryParseBpm(bpmMatch.Groups[2].Value, out var bpmValue))
+                        {
+                            bpmIndexTable[bpmIndex] = bpmValue;
+                        }
+                        else
+                        {
+                            MelonLogger.Warning($"[BmsParser] BPM 값을 읽지 못해 이 줄을 무시합니다: {line.Trim()}");
+                        }
                     }
                 }
             }

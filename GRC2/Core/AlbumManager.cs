@@ -362,14 +362,25 @@ namespace GRC2.Core
                 hash *= FnvPrime;
             }
 
+            void MixInt64(long value)
+            {
+                ulong u = (ulong)value;
+                for (int i = 0; i < 8; i++)
+                {
+                    hash ^= (byte)(u & 0xFF);
+                    hash *= FnvPrime;
+                    u >>= 8;
+                }
+            }
+
             void MixFolder(DirectoryInfo dir)
             {
                 Mix(dir.Name);
                 foreach (var file in dir.EnumerateFiles().OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
                 {
                     Mix(file.Name);
-                    Mix(file.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
-                    Mix(file.LastWriteTimeUtc.Ticks.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                    MixInt64(file.Length);
+                    MixInt64(file.LastWriteTimeUtc.Ticks);
                 }
             }
 
