@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using IntiCreates;
+using IntiCreates.RythmGame;
+using IntiCreates.RythmGame.FairyMode;
 using MelonLoader;
 using TMPro;
 using UnityEngine;
@@ -24,31 +26,132 @@ namespace GRC2.Core
         /// <summary>마지막으로 검증한 Assembly-CSharp.dll의 MVID. Steam이 아닌 사본에서도 업데이트 여부를 알 수 있습니다.</summary>
         public const string TestedAssemblyMvid = "90b8351d-201c-4b67-8d98-87031a628c8e";
 
-        /// <summary>모드가 직접 기대하는 게임 enum 상수·기본값 계약. 게임 업데이트로 값이 바뀌면 시작 로그와 테스트가 잡습니다.</summary>
+        /// <summary>검증 빌드에서의 커스텀 MusicID 시작 번호(원본 곡 마지막 ID 53 + 1). 다르면 게임에 원본 곡이 추가된 것입니다.</summary>
+        public const int TestedCustomMusicIdStart = 54;
+
+        /// <summary>
+        /// 모드가 직접 기대하는 게임 enum 상수·const 값 계약. 게임 업데이트로 값이 바뀌면 시작 로그와 테스트가 잡습니다.
+        ///
+        /// 주의: C#은 enum 멤버와 <c>const</c> 필드를 <b>모드 DLL을 빌드할 때 숫자로 박아 넣습니다</b>(인라인).
+        /// 그래서 <c>(int)MusicID.UNIQUE_TOP</c>처럼 코드로 읽으면 게임이 값을 바꿔도 예전 빌드의 숫자가 나와
+        /// 점검이 영원히 통과합니다(2026-11-20까지의 버그). 실제 값은 반드시 이름으로 런타임에 읽습니다
+        /// (<see cref="RuntimeEnumValue"/>, <see cref="RuntimeConstValue"/>).
+        /// </summary>
         public struct ConstantContract
         {
-            public readonly string Description;
+            /// <summary>소유 타입 이름(enum 이름 또는 클래스 이름). 소스 커버리지 테스트가 씁니다.</summary>
+            public readonly string OwnerName;
+            /// <summary>enum 멤버 또는 const 필드 이름.</summary>
+            public readonly string MemberName;
             public readonly int Expected;
-            public readonly int Actual;
+            private readonly Func<int?> _readActual;
 
-            public ConstantContract(string description, int expected, int actual)
+            public ConstantContract(string ownerName, string memberName, int expected, Func<int?> readActual)
             {
-                Description = description;
+                OwnerName = ownerName;
+                MemberName = memberName;
                 Expected = expected;
-                Actual = actual;
+                _readActual = readActual;
             }
 
-            public bool IsBroken => Expected != Actual;
+            public string Description => $"{OwnerName}.{MemberName}";
 
-            public override string ToString() => $"{Description}: 기대 {Expected}, 현재 {Actual}";
+            /// <summary>지금 로드된 게임 어셈블리의 값. 이름이 없으면 null.</summary>
+            public int? Actual => _readActual?.Invoke();
+
+            public bool IsBroken => Actual != Expected;
+
+            public override string ToString()
+            {
+                var actual = Actual;
+                return actual.HasValue
+                    ? $"{Description}: 기대 {Expected}, 현재 {actual.Value}"
+                    : $"{Description}: 기대 {Expected}, 현재 없음(이름이 바뀌었거나 삭제됨)";
+            }
         }
 
+        private static ConstantContract EnumContract<TEnum>(string memberName, int expected) where TEnum : struct
+            => new ConstantContract(typeof(TEnum).Name, memberName, expected, () => RuntimeEnumValue(typeof(TEnum), memberName));
+
+        private static ConstantContract ConstContract(Type owner, string fieldName, int expected)
+            => new ConstantContract(owner.Name, fieldName, expected, () => RuntimeConstValue(owner, fieldName));
+
+        /// <summary>
+        /// 모드 코드가 이름으로 쓰는 게임 enum 멤버·const 전부. 소스에서 새 게임 enum 멤버를 쓰면
+        /// <c>ConstantContracts_CoverEveryGameEnumMemberInSource</c> 테스트가 여기 한 줄 넣으라고 실패합니다.
+        /// </summary>
         public static readonly ConstantContract[] ConstantContracts =
         {
-            new ConstantContract("MusicID.SAVEABLE_ID_END", 512, (int)soRythmGameMusicDataMap.MusicID.SAVEABLE_ID_END),
-            new ConstantContract("MusicID.UNIQUE_TOP", 8000, (int)soRythmGameMusicDataMap.MusicID.UNIQUE_TOP),
-            new ConstantContract("cBGMBeatManager.defaultFrequency", 48000, cBGMBeatManager.defaultFrequency),
+            // MusicID 범위(CustomMusicIdRegistry): 512 = 세이브 경계, 8000 이상 = 튜토리얼·미리보기 전용.
+            EnumContract<soRythmGameMusicDataMap.MusicID>("SAVEABLE_ID_END", 512),
+            EnumContract<soRythmGameMusicDataMap.MusicID>("UNIQUE_TOP", 8000),
+            // BGM 48kHz 전제(알려진_문제 B1).
+            ConstContract(typeof(cBGMBeatManager), "defaultFrequency", 48000),
+            // 노트 변환(EnumValueHelper·BmsNoteConverter): 값이 바뀌면 노트 종류·방향·레인이 엉뚱하게 주입됩니다.
+            EnumContract<NoteTypeId>("Touch", 0),
+            EnumContract<NoteTypeId>("Flick", 1),
+            EnumContract<NoteTypeId>("Fairy", 2),
+            EnumContract<NoteTypeId>("Hold", 3),
+            EnumContract<NoteTypeId>("Hold_Middle", 5),
+            EnumContract<NoteDirectionIndex>("LEFT_BOTTOM", 0),
+            EnumContract<NoteDirectionIndex>("CENTER_BOTTOM", 1),
+            EnumContract<NoteDirectionIndex>("RIGHT_BOTTOM", 2),
+            EnumContract<NoteDirectionIndex>("LEFT_MIDDLE", 3),
+            EnumContract<NoteDirectionIndex>("CENTER_MIDDLE", 4),
+            EnumContract<NoteDirectionIndex>("RIGHT_MIDDLE", 5),
+            EnumContract<NoteDirectionIndex>("LEFT_TOP", 6),
+            EnumContract<NoteDirectionIndex>("CENTER_TOP", 7),
+            EnumContract<NoteDirectionIndex>("RIGHT_TOP", 8),
+            EnumContract<NoteDirectionIndex>("NUM", 9), // slideEndFlickDirection "없음" 표시(NoteCreateDataBuilder)
+            EnumContract<NoteSubLaneType>("Lane_1", 0),
+            EnumContract<NoteSubLaneType>("Lane_2", 1),
+            EnumContract<NoteSubLaneType>("Lane_3", 2),
+            EnumContract<NoteLaneLeftRight>("Left", 0),
+            EnumContract<NoteLaneLeftRight>("Right", 1),
+            // 판정(JudgePerfectPatch·AutoPlayPatch 등).
+            EnumContract<JudgeType>("PERFECT", 0),
+            EnumContract<JudgeType>("MISS", 4),
+            EnumContract<JudgeType>("INVALID", 5),
         };
+
+        /// <summary>enum 멤버의 값을 지금 로드된 게임 어셈블리에서 이름으로 읽습니다. 이름이 없으면 null.</summary>
+        public static int? RuntimeEnumValue(Type enumType, string memberName)
+        {
+            try
+            {
+                if (enumType == null || !enumType.IsEnum || string.IsNullOrEmpty(memberName))
+                    return null;
+                if (!Enum.GetNames(enumType).Contains(memberName))
+                    return null;
+                return Convert.ToInt32(Enum.Parse(enumType, memberName));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>정수 const/static 필드 값을 지금 로드된 게임 어셈블리에서 이름으로 읽습니다. 없으면 null.</summary>
+        public static int? RuntimeConstValue(Type owner, string fieldName)
+        {
+            try
+            {
+                var field = owner?.GetField(fieldName, BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+                if (field == null)
+                    return null;
+                return Convert.ToInt32(field.IsLiteral ? field.GetRawConstantValue() : field.GetValue(null));
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 범위 계산처럼 값 자체가 필요한 곳에서 씁니다. 런타임 값을 우선하고, 이름이 없어졌으면 빌드 당시 값으로 대체합니다.
+        /// </summary>
+        public static int RuntimeEnumValueOr(Type enumType, string memberName, int fallback)
+            => RuntimeEnumValue(enumType, memberName) ?? fallback;
 
         /// <summary>상수 계약 중 깨진 것을 설명 문자열로 돌려줍니다.</summary>
         public static List<string> FindBrokenConstantContracts()
@@ -161,6 +264,16 @@ namespace GRC2.Core
                 {
                     problems++;
                     MelonLogger.Error($"[호환성] 게임 상수 불일치: {message}");
+                }
+
+                // 커스텀 ID 시작 번호는 원본 곡 수에 따라 런타임에 정해집니다. 게임에 곡이 추가되면 모든 커스텀 곡 ID가 밀리고,
+                // 예전 커스텀 곡 기록(BlockSave=0)이 남은 세이브 칸을 새 원본 곡이 물려받습니다(알려진_문제 C4 남은 한계).
+                int customStart = CustomMusicIdRegistry.Start;
+                if (customStart != TestedCustomMusicIdStart)
+                {
+                    problems++;
+                    MelonLogger.Warning($"[호환성] 커스텀 MusicID 시작 번호가 {TestedCustomMusicIdStart} → {customStart}로 바뀌었습니다(원본 곡 추가). " +
+                        $"세이브 칸 {TestedCustomMusicIdStart}~{customStart - 1}에 예전 커스텀 곡 기록이 남아 있으면 새 원본 곡 기록처럼 보일 수 있습니다.");
                 }
 
                 if (problems == 0)

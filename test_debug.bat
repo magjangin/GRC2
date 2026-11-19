@@ -22,6 +22,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+echo [INFO] Checking installed game build against tested build...
+powershell -NoProfile -ExecutionPolicy Bypass -File "!SCRIPT_DIR!tools\check_game_version.ps1"
+if errorlevel 1 (
+    echo [WARN] Installed game differs from the tested build. Failing GameCompatibilityTests below show what broke.
+)
+echo.
+
 echo [INFO] Restoring test dependencies...
 dotnet restore "!SOLUTION_PATH!" -v minimal
 if errorlevel 1 (

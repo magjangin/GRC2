@@ -777,6 +777,21 @@ of the current source baseline:
 
 ## Cleanup Log
 
+### 2026-11-20 (constant contracts read at runtime)
+
+- No hook was added, removed or changed.
+- `GameCompatibility.ConstantContracts` now reads each game enum member / `const` **by name at runtime**
+  (`RuntimeEnumValue`, `RuntimeConstValue`). Before this, the check compared `(int)MusicID.SAVEABLE_ID_END` with a literal;
+  the C# compiler inlines both, so a shipped DLL could never notice a changed game value.
+- The contract list now covers every game enum member the note converter and judge patches use
+  (`NoteTypeId`, `NoteDirectionIndex`, `NoteSubLaneType`, `NoteLaneLeftRight`, `JudgeType`, `MusicID`; 26 entries).
+  `ConstantContracts_CoverEveryGameEnumMemberInSource` fails when source uses a member that is not listed.
+- `CustomMusicIdRegistry.End` / `Start` read `UNIQUE_TOP` / `SAVEABLE_ID_END` at runtime, so the custom range follows the game.
+- Startup report warns when the custom MusicID start differs from `TestedCustomMusicIdStart` (54), i.e. official songs were added
+  and custom IDs (and their `BlockSave=0` records) shifted.
+- `tools/check_game_version.ps1` compares the installed build ID / MVID with `GameCompatibility` without launching the game;
+  `test_debug.bat` runs it before the tests (warning only).
+
 ### 2026-11-18 (in-memory MusicID allocation, save progress link, title scrolling)
 
 - Removed external MusicID map persistence (`UserData/GRC2/musicid_map.txt`,
