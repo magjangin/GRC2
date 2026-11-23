@@ -326,14 +326,8 @@ namespace GRC2.Core
         {
             try
             {
-                UnityEngine.SceneManagement.Scene scene =
-                    UnityEngine.SceneManagement.SceneManager.GetActiveScene();
-                if (!scene.IsValid())
-                {
-                    return false;
-                }
-
-                string name = scene.name ?? string.Empty;
+                // 이름은 씬 핸들이 바뀔 때만 다시 읽습니다(매 프레임 불리는 경로라 문자열 할당을 피함, P11).
+                string name = ActiveSceneName.Current;
                 return name == "SoundPlayerScene" ||
                        name == "MoviePlayer_MovieSelect";
             }

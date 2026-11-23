@@ -15,8 +15,8 @@ namespace GRC2.Injectors
     /// </summary>
     internal static class BgmFinishTimeManager
     {
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
+            new LazyFieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
 
         private static float _targetFinishTime = 0f;
 
@@ -59,7 +59,7 @@ namespace GRC2.Injectors
                 return 0f;
             }
 
-            var noteArray = NoteArrayRef(notesManager);
+            var noteArray = NoteArrayRef[notesManager];
             if (noteArray == null || noteArray.Length == 0)
             {
                 return 0f;
@@ -102,8 +102,8 @@ namespace GRC2.Injectors
     {
         private const float TimingWaitTimeout = 15f;
 
-        private static readonly AccessTools.FieldRef<cRythmGameManager, FairyNoteEditorLoader.MusicData> MusicDataRef =
-            AccessTools.FieldRefAccess<cRythmGameManager, FairyNoteEditorLoader.MusicData>("mRythmGameMusicData");
+        private static readonly LazyFieldRef<cRythmGameManager, FairyNoteEditorLoader.MusicData> MusicDataRef =
+            new LazyFieldRef<cRythmGameManager, FairyNoteEditorLoader.MusicData>("mRythmGameMusicData");
 
         /// <summary>
         /// 새 플레이 씬 진입 시 이전 곡의 종료 시간을 초기화합니다.
@@ -179,7 +179,7 @@ namespace GRC2.Injectors
         {
             try
             {
-                var musicData = MusicDataRef(manager);
+                var musicData = MusicDataRef[manager];
                 if (musicData == null)
                     return;
 

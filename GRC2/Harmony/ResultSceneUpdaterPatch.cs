@@ -20,17 +20,17 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cRythmGameResultSceneUpdater), "initializePreFade")]
     public static class ResultSceneUpdaterPatch
     {
-        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam> SceneInitParamRef =
-            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam>("mSceneInitializeParam");
+        private static readonly LazyFieldRef<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam> SceneInitParamRef =
+            new LazyFieldRef<cRythmGameResultSceneUpdater, cRythmGameResultSceneManageObject.InitializeParam>("mSceneInitializeParam");
 
-        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage> MusicLvUiRef =
-            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage>("mMusicLVUI");
+        private static readonly LazyFieldRef<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage> MusicLvUiRef =
+            new LazyFieldRef<cRythmGameResultSceneUpdater, cUIMusicLVLoopImage>("mMusicLVUI");
 
-        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, TextMeshProUGUI> MusicNameTextRef =
-            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, TextMeshProUGUI>("mMusicNameText");
+        private static readonly LazyFieldRef<cRythmGameResultSceneUpdater, TextMeshProUGUI> MusicNameTextRef =
+            new LazyFieldRef<cRythmGameResultSceneUpdater, TextMeshProUGUI>("mMusicNameText");
 
-        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, UnityEngine.UI.Image> ArtworkImageRef =
-            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, UnityEngine.UI.Image>("mArtWorkImage");
+        private static readonly LazyFieldRef<cRythmGameResultSceneUpdater, UnityEngine.UI.Image> ArtworkImageRef =
+            new LazyFieldRef<cRythmGameResultSceneUpdater, UnityEngine.UI.Image>("mArtWorkImage");
 
         /// <summary>
         /// 원본 initializePreFade는 시작 직전 문지기(coOpenPreMusicStartWindow)가 원본 곡
@@ -90,7 +90,7 @@ namespace GRC2.Harmony
                 var songInfo = AlbumManager.GetCurrentSongInfo();
                 if (songInfo?.DifficultyNumbers == null || songInfo.DifficultyNumbers.Count == 0) return;
 
-                var sceneInitParam = SceneInitParamRef(updater);
+                var sceneInitParam = SceneInitParamRef[updater];
                 if (sceneInitParam == null) return;
 
                 int difficultyIndex = (int)sceneInitParam.difficulty;
@@ -99,7 +99,7 @@ namespace GRC2.Harmony
                 string key = SongInfo.DifficultyKeys[difficultyIndex];
                 if (!songInfo.DifficultyNumbers.TryGetValue(key, out int level)) return;
 
-                var musicLvUi = MusicLvUiRef(updater);
+                var musicLvUi = MusicLvUiRef[updater];
                 if (musicLvUi == null) return;
 
                 musicLvUi.setLV(level);
@@ -118,7 +118,7 @@ namespace GRC2.Harmony
                 var songInfo = AlbumManager.GetCurrentSongInfo();
                 if (songInfo == null || string.IsNullOrEmpty(songInfo.Title)) return;
 
-                var textComponent = MusicNameTextRef(updater);
+                var textComponent = MusicNameTextRef[updater];
                 if (textComponent == null)
                 {
                     MelonLogger.Warning("[ResultSceneUpdaterPatch] mMusicNameText가 아직 설정되지 않았습니다.");
@@ -187,10 +187,10 @@ namespace GRC2.Harmony
                 yield return null;
             }
 
-            if (updater == null)
+            if (updater == null || !ArtworkImageRef.IsAvailable)
                 yield break;
 
-            var image = ArtworkImageRef(updater);
+            var image = ArtworkImageRef[updater];
             if (image != null)
             {
                 image.sprite = customSprite;

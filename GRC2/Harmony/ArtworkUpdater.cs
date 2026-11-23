@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using GRC2.Core;
 using HarmonyLib;
 using IntiCreates;
@@ -13,11 +14,11 @@ namespace GRC2.Harmony
     /// </summary>
     public static class ArtworkUpdater
     {
-        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager> ArtworkManagerRef =
-            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager>("mArtWorkAndMusicDetail");
+        private static readonly LazyFieldRef<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager> ArtworkManagerRef =
+            new LazyFieldRef<cMusicSelectSceneUIUpdater, cMusicSelectArtWorkManager>("mArtWorkAndMusicDetail");
 
-        private static readonly AccessTools.FieldRef<cMusicSelectArtWorkManager, cMusicSelectArtWork> ArtWorkRef =
-            AccessTools.FieldRefAccess<cMusicSelectArtWorkManager, cMusicSelectArtWork>("mArtWork");
+        private static readonly LazyFieldRef<cMusicSelectArtWorkManager, cMusicSelectArtWork> ArtWorkRef =
+            new LazyFieldRef<cMusicSelectArtWorkManager, cMusicSelectArtWork>("mArtWork");
 
         public static void UpdateArtwork(
             cMusicSelectSceneUIUpdater instance)
@@ -89,10 +90,11 @@ namespace GRC2.Harmony
         private static cMusicSelectArtWork FindArtworkInstance(
             cMusicSelectSceneUIUpdater sceneUpdater)
         {
-            cMusicSelectArtWorkManager artworkManager = ArtworkManagerRef(sceneUpdater);
-            if (artworkManager != null)
+            // 필드가 사라진 업데이트에서는 예외 대신 아래 씬 검색으로 넘어갑니다(예전에는 예외라 대체 경로까지 못 갔음).
+            cMusicSelectArtWorkManager artworkManager = ArtworkManagerRef.IsAvailable ? ArtworkManagerRef[sceneUpdater] : null;
+            if (artworkManager != null && ArtWorkRef.IsAvailable)
             {
-                cMusicSelectArtWork artwork = ArtWorkRef(artworkManager);
+                cMusicSelectArtWork artwork = ArtWorkRef[artworkManager];
                 if (artwork != null)
                 {
                     return artwork;

@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using GRC2.Core;
 using HarmonyLib;
 using IntiCreates;
@@ -17,8 +18,8 @@ namespace GRC2.Harmony
     {
         public static bool IsEnabled => CustomKeySettings.AutoPlay;
 
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, bool> AutoPlayFieldRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, bool>("mIsCurrentAutoPlay");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, bool> AutoPlayFieldRef =
+            new LazyFieldRef<cFairyModeNotesManager, bool>("mIsCurrentAutoPlay");
 
         [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]
         private static class ForceOnNoteCreatePatch
@@ -26,8 +27,10 @@ namespace GRC2.Harmony
             [HarmonyPrefix]
             private static void Prefix(cFairyModeNotesManager __instance)
             {
-                if (IsEnabled)
-                    AutoPlayFieldRef(__instance) = true;
+                // 이 Prefix에는 try가 없어 예외가 나면 createAllNote 자체가 깨집니다(곡 로딩 실패).
+                // 필드가 사라진 업데이트에서도 곡은 뜨도록 확인부터 합니다. setIsAutoPlay 쪽 강제는 그대로 동작합니다.
+                if (IsEnabled && AutoPlayFieldRef.IsAvailable)
+                    AutoPlayFieldRef[__instance] = true;
             }
         }
 

@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using System;
 using GRC2.Core;
 using HarmonyLib;
@@ -15,14 +16,18 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cMusicSelectSceneSelectingMusicUI), nameof(cMusicSelectSceneSelectingMusicUI.setDispMusicData))]
     public static class SongTitleMarqueePatch
     {
-        private static readonly AccessTools.FieldRef<cMusicSelectSceneSelectingMusicUI, TextMeshProUGUI> MusicNameText =
-            AccessTools.FieldRefAccess<cMusicSelectSceneSelectingMusicUI, TextMeshProUGUI>("mMusicNameText");
+        private static readonly LazyFieldRef<cMusicSelectSceneSelectingMusicUI, TextMeshProUGUI> MusicNameText =
+            new LazyFieldRef<cMusicSelectSceneSelectingMusicUI, TextMeshProUGUI>("mMusicNameText");
 
         private static void Postfix(cMusicSelectSceneSelectingMusicUI __instance)
         {
+            // 곡 선택 커서가 움직일 때마다 불리므로 필드가 없으면 경고를 반복하지 않고 조용히 넘어갑니다(경고는 LazyFieldRef가 한 번).
+            if (!MusicNameText.IsAvailable)
+                return;
+
             try
             {
-                TextMarquee.Attach(MusicNameText(__instance));
+                TextMarquee.Attach(MusicNameText[__instance]);
             }
             catch (Exception ex)
             {

@@ -21,11 +21,21 @@ namespace GRC2.Helpers
         /// <summary>항상 남기는 일반 로그.</summary>
         public static void Info(string message) => MelonLogger.Msg(message);
 
-        /// <summary>VerboseLog=1일 때만 남기는 상세 로그.</summary>
+        /// <summary>VerboseLog=1일 때만 남기는 상세 로그(보간 없는 고정 문자열용).</summary>
         public static void Verbose(string message)
         {
             if (IsVerbose)
                 MelonLogger.Msg(message);
+        }
+
+        /// <summary>
+        /// VerboseLog=1일 때만 남기는 상세 로그. <c>ModLog.Verbose($"...{x}...")</c>는 이 오버로드로 묶여,
+        /// 꺼져 있으면 문자열을 아예 만들지 않습니다(<see cref="VerboseLogHandler"/>, 알려진_문제 P10).
+        /// </summary>
+        public static void Verbose(ref VerboseLogHandler message)
+        {
+            if (message.IsEnabled)
+                MelonLogger.Msg(message.ToString());
         }
 
         private static readonly Dictionary<string, string> _lastByKey = new Dictionary<string, string>(StringComparer.Ordinal);

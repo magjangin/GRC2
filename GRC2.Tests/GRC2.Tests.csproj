@@ -5,6 +5,8 @@
     <IsPackable>false</IsPackable>
     <RootNamespace>GRC2.Tests</RootNamespace>
     <AssemblyName>GRC2.Tests</AssemblyName>
+    <!-- GRC2와 같게: ModLog.Verbose($"...")가 보간 처리기 오버로드로 묶이는지 확인하는 테스트가 있습니다. -->
+    <LangVersion>10.0</LangVersion>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.12.0" />

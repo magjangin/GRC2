@@ -19,8 +19,8 @@ namespace GRC2.Harmony
 
         public static bool ShouldBlock => CustomKeySettings.BlockSave;
 
-        private static readonly AccessTools.FieldRef<cRythmGameResultSceneUpdater, int> OldHighScoreRef =
-            AccessTools.FieldRefAccess<cRythmGameResultSceneUpdater, int>("mOldPlayHighScore");
+        private static readonly LazyFieldRef<cRythmGameResultSceneUpdater, int> OldHighScoreRef =
+            new LazyFieldRef<cRythmGameResultSceneUpdater, int>("mOldPlayHighScore");
 
         private sealed class Snapshot
         {
@@ -101,7 +101,9 @@ namespace GRC2.Harmony
                 if (!ShouldBlock)
                     return;
 
-                OldHighScoreRef(__instance) = 0;
+                // 필드가 사라져도 아래 기록 원복은 계속해야 하므로 이 줄만 건너뜁니다.
+                if (OldHighScoreRef.IsAvailable)
+                    OldHighScoreRef[__instance] = 0;
 
                 if (__state == null)
                     return;
@@ -137,8 +139,8 @@ namespace GRC2.Harmony
             [HarmonyPrefix]
             private static void Prefix(cRythmGameResultSceneUpdater __instance)
             {
-                if (ShouldBlock)
-                    OldHighScoreRef(__instance) = 0;
+                if (ShouldBlock && OldHighScoreRef.IsAvailable)
+                    OldHighScoreRef[__instance] = 0;
             }
         }
 
@@ -160,7 +162,7 @@ namespace GRC2.Harmony
 
         private static bool IsResultScene()
         {
-            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == ResultSceneName;
+            return ActiveSceneName.Is(ResultSceneName);
         }
     }
 }

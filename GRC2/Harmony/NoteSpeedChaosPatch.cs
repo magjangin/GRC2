@@ -23,8 +23,9 @@ namespace GRC2.Harmony
         private static readonly Dictionary<FairyNoteEditorLoader.NoteCreateData, float> NoteMultipliers =
             new Dictionary<FairyNoteEditorLoader.NoteCreateData, float>();
 
-        private static readonly Dictionary<(NoteLaneLeftRight, NoteSubLaneType), float> LaneMultipliers =
-            new Dictionary<(NoteLaneLeftRight, NoteSubLaneType), float>();
+        // 노트마다 매 프레임 조회되므로 열거형 튜플 대신 정수 키를 씁니다. Mono(.NET Framework)에서 열거형 튜플의
+        // 기본 비교자는 GetHashCode/Equals에서 박싱할 수 있습니다(알려진_문제 P5).
+        private static readonly Dictionary<long, float> LaneMultipliers = new Dictionary<long, float>();
 
         [HarmonyPatch(typeof(cNotecWorkBase), "getNoteSpeed")]
         private static class GetNoteSpeedPatch
@@ -64,7 +65,7 @@ namespace GRC2.Harmony
 
         private static float GetLaneMultiplier(NoteLaneLeftRight lane, NoteSubLaneType subLane)
         {
-            var key = (lane, subLane);
+            long key = ((long)(int)lane << 32) | (uint)(int)subLane;
             if (!LaneMultipliers.TryGetValue(key, out var multiplier))
             {
                 multiplier = RandomInRange();

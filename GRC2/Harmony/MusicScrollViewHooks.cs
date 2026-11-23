@@ -21,8 +21,8 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cMusicSelectScrollView), "initializeMusicDataByDefault")]
     public static class MusicScrollViewHooks
     {
-        private static readonly AccessTools.FieldRef<cMusicSelectScrollView, List<MusicSelectScrollItemData>> CellListRef =
-            AccessTools.FieldRefAccess<cMusicSelectScrollView, List<MusicSelectScrollItemData>>("mCellHaviableMusicDataList");
+        private static readonly LazyFieldRef<cMusicSelectScrollView, List<MusicSelectScrollItemData>> CellListRef =
+            new LazyFieldRef<cMusicSelectScrollView, List<MusicSelectScrollItemData>>("mCellHaviableMusicDataList");
 
         // 커스텀 MusicID 범위·배정은 CustomMusicIdRegistry가 정합니다(54~7999, 예약 값 제외, 폴더별 고정 ID).
 
@@ -38,7 +38,7 @@ namespace GRC2.Harmony
                 if (__instance == null || CustomAssetManager.IsSceneWhereInjectionDisallowed())
                     return;
 
-                var cellList = CellListRef(__instance);
+                var cellList = CellListRef[__instance];
                 if (cellList == null || cellList.Count == 0)
                     return;
 

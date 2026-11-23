@@ -30,13 +30,18 @@ using MelonLoader;
 //      빌드 번호
 //      수정 버전
 //
-[assembly: AssemblyVersion("0.6.0.0")]
-[assembly: AssemblyFileVersion("0.6.0.0")]
+[assembly: AssemblyVersion("0.7.0.0")]
+[assembly: AssemblyFileVersion("0.7.0.0")]
 
 // MelonLoader 모드 정보
-[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.6.0", "화영왕")]
+[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.0", "화영왕")]
 [assembly: MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")]
 [assembly: MelonColor(0, 255, 255, 255)] // Cyan (R, G, B, A)
+
+// MelonLoader는 기본으로 모드 어셈블리의 [HarmonyPatch]를 자동 적용합니다. 모드도 SceneDetector.InitializeHarmony에서
+// 직접 적용(실패 시 클래스별 격리)하므로, 이 특성이 없으면 모든 훅이 두 번 걸립니다(알려진_문제 P4: 노트 변환 2회,
+// 판정바 틱 2회, 제목 이중 치환). 자동 적용을 끄고 모드 쪽 적용만 남깁니다.
+[assembly: MelonLoader.HarmonyDontPatchAll]
 
 // 테스트 프로젝트가 internal 판정 함수(ModLog.ShouldLogOnChange 등)를 확인합니다.
 [assembly: System.Runtime.CompilerServices.InternalsVisibleTo("GRC2.Tests")]

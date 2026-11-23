@@ -7,6 +7,17 @@ Harmony 특성으로 패치 대상을 선언합니다. 모드 시작 시
 `SceneDetector.InitializeHarmony()`가 `PatchAll()`을 한 번 호출하며, 이후 별도
 Patcher 초기화나 지연 등록 코루틴은 사용하지 않습니다.
 
+**MelonLoader 자동 패치는 꺼 둡니다** (`AssemblyInfo.cs`의 `[assembly: MelonLoader.HarmonyDontPatchAll]`). 이 특성이 없으면
+MelonLoader가 모드 어셈블리의 `[HarmonyPatch]`를 먼저 자동 적용하고, 모드가 다른 Harmony ID로 한 번 더 적용해 **모든 훅이 두 번**
+돕니다(2026-11-23까지 실제로 그랬음: 노트 변환 2회, 판정바 틱 2회, 노트 속도 카오스 배율 제곱, 제목 이중 치환 — 알려진_문제 P4).
+이 특성을 지우지 마세요.
+
+**게임 필드는 `LazyFieldRef`로 접근합니다** (`Helpers/LazyFieldRef.cs`, 2026-11-23). 패치 클래스의 `static readonly` 필드 초기화에서
+`AccessTools.FieldRefAccess`를 부르면, 업데이트로 필드 하나가 사라졌을 때 정적 초기화가 던져 같은 클래스의 다른 기능까지 멈춥니다.
+`LazyFieldRef`는 처음 쓸 때 조회하고, 못 찾으면 `[호환성]` 경고를 한 번 남긴 뒤 그 필드를 쓰는 경로만 예외를 받습니다.
+노트·커서처럼 자주 불리는 경로는 `IsAvailable`로 먼저 확인해 예외·경고가 반복되지 않게 합니다. `LazyFieldRefTests`가
+`static readonly AccessTools.FieldRef<` 재도입을 막고, `GameCompatibilityTests`가 이름을 `FieldContracts`와 대조합니다.
+
 ## 프로젝트 참조
 
 `GRC2/GRC2.csproj`의 `GameManaged` 경로를 기준으로 다음 어셈블리를

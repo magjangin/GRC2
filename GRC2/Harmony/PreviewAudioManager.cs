@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using HarmonyLib;
 using IntiCreates;
 using MelonLoader;
@@ -29,10 +30,10 @@ namespace GRC2.Harmony
         private static readonly Dictionary<AudioSource, MutedAudioState> MutedSources =
             new Dictionary<AudioSource, MutedAudioState>();
 
-        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, AudioSource> PreviewSourceRef =
-            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mPreviewAudioSorce");
-        private static readonly AccessTools.FieldRef<cMusicSelectSceneUIUpdater, AudioSource> AmbientSourceRef =
-            AccessTools.FieldRefAccess<cMusicSelectSceneUIUpdater, AudioSource>("mAmbientAudioSorce");
+        private static readonly LazyFieldRef<cMusicSelectSceneUIUpdater, AudioSource> PreviewSourceRef =
+            new LazyFieldRef<cMusicSelectSceneUIUpdater, AudioSource>("mPreviewAudioSorce");
+        private static readonly LazyFieldRef<cMusicSelectSceneUIUpdater, AudioSource> AmbientSourceRef =
+            new LazyFieldRef<cMusicSelectSceneUIUpdater, AudioSource>("mAmbientAudioSorce");
         private static bool _isMonitoring;
 
         /// <summary>원본 미리듣기 소스를 음소거하기 직전의 양수 볼륨입니다. 커스텀 미리듣기가 옵션 음량과 크게 어긋나지 않게 맞추는 데 씁니다(I2).</summary>
@@ -194,8 +195,9 @@ namespace GRC2.Harmony
                 return Array.Empty<AudioSource>();
             }
 
-            AudioSource preview = PreviewSourceRef(updater);
-            AudioSource ambient = AmbientSourceRef(updater);
+            // 필드가 사라진 업데이트에서는 그 소스만 빼고 진행합니다(예외로 프리뷰 처리 전체가 멈추지 않게).
+            AudioSource preview = PreviewSourceRef.IsAvailable ? PreviewSourceRef[updater] : null;
+            AudioSource ambient = AmbientSourceRef.IsAvailable ? AmbientSourceRef[updater] : null;
 
             if (preview == null)
             {

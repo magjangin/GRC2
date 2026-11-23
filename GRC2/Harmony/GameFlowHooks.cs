@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using System;
 using GRC2.Core;
 using GRC2.Injectors;
@@ -14,8 +15,8 @@ namespace GRC2.Harmony
     /// </summary>
     public static class GameFlowHooks
     {
-        private static readonly AccessTools.FieldRef<cMusicSelectPreMusicStartWindowManager, Image> PreMusicArtworkImageRef =
-            AccessTools.FieldRefAccess<cMusicSelectPreMusicStartWindowManager, Image>("mArtworkImage");
+        private static readonly LazyFieldRef<cMusicSelectPreMusicStartWindowManager, Image> PreMusicArtworkImageRef =
+            new LazyFieldRef<cMusicSelectPreMusicStartWindowManager, Image>("mArtworkImage");
 
         /// <summary>cMusicSelectSceneUIUpdater.initializePreDataLoad가 실행되는 동안에만 true입니다.</summary>
         private static bool _inMusicSelectPreDataLoad;
@@ -206,7 +207,7 @@ namespace GRC2.Harmony
                 if (string.IsNullOrWhiteSpace(imageFile))
                     return;
 
-                Image artworkImage = PreMusicArtworkImageRef(__instance);
+                Image artworkImage = PreMusicArtworkImageRef[__instance];
                 if (artworkImage == null)
                     return;
 

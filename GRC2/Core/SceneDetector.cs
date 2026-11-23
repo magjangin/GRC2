@@ -191,6 +191,7 @@ namespace GRC2.Core
                 catch (Exception ex)
                 {
                     failed++;
+                    GameCompatibility.RecordHookFailure($"패치 클래스 {type.FullName} ({ex.Message})");
                     MelonLogger.Error($"[SceneDetector] 패치 클래스 적용 실패: {type.FullName} - {ex.Message}");
                 }
             }
@@ -239,28 +240,14 @@ namespace GRC2.Core
         #region 플레이 씬에서 Space/ESC 키 입력 시 일시정지 메뉴를 여닫는 처리
 
         // 진입점 클래스의 정적 초기화에서 필드 이름 조회가 던지면(게임 업데이트로 필드가 바뀐 경우) 모드 전체가 로드되지 않습니다.
-        // 그래서 처음 쓸 때 한 번만 조회하고, 실패하면 일시정지 단축키만 꺼집니다.
-        private static AccessTools.FieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> _pauseMenuWorkRef;
-        private static bool _pauseMenuWorkRefFailed;
+        // 그래서 처음 쓸 때 한 번만 조회하고(LazyFieldRef), 실패하면 일시정지 단축키 일부만 꺼집니다.
+        private static readonly LazyFieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud> PauseMenuWorkRef =
+            new LazyFieldRef<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
 
         private static IntiCreates.cRythmGamePauseMenuHud GetPauseMenuWork(IntiCreates.cRythmGameManager manager)
         {
-            if (_pauseMenuWorkRef == null && !_pauseMenuWorkRefFailed)
-            {
-                try
-                {
-                    _pauseMenuWorkRef = AccessTools.FieldRefAccess<IntiCreates.cRythmGameManager, IntiCreates.cRythmGamePauseMenuHud>("mPauseMenuWork");
-                }
-                catch (Exception ex)
-                {
-                    _pauseMenuWorkRefFailed = true;
-                    MelonLogger.Error($"[SceneDetector] mPauseMenuWork 필드를 찾지 못해 일시정지 단축키 일부가 꺼집니다: {ex.Message}");
-                }
-            }
-
-            return _pauseMenuWorkRef == null ? null : _pauseMenuWorkRef(manager);
+            return PauseMenuWorkRef.IsAvailable ? PauseMenuWorkRef[manager] : null;
         }
-
 
         private static void HandlePauseKeyInput()
         {

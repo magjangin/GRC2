@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using System;
 using GRC2.Injectors;
 using HarmonyLib;
@@ -22,8 +23,8 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cPlayMovieSceneManager), "requestPlay")]
     public static class BgaCrossfadePatch
     {
-        private static readonly AccessTools.FieldRef<cPlayMovieSceneManager, Coroutine> SwapCoroutineRef =
-            AccessTools.FieldRefAccess<cPlayMovieSceneManager, Coroutine>("mUpdateSwapCoroutine");
+        private static readonly LazyFieldRef<cPlayMovieSceneManager, Coroutine> SwapCoroutineRef =
+            new LazyFieldRef<cPlayMovieSceneManager, Coroutine>("mUpdateSwapCoroutine");
 
         /// <summary>
         /// 게임의 requestPlay()가 BgaInjector의 주입 완료보다 먼저 끝나 코루틴이 이미
@@ -46,12 +47,12 @@ namespace GRC2.Harmony
 
             try
             {
-                var coroutine = SwapCoroutineRef(manager);
+                var coroutine = SwapCoroutineRef[manager];
                 if (coroutine == null)
                     return;
 
                 manager.StopCoroutine(coroutine);
-                SwapCoroutineRef(manager) = null;
+                SwapCoroutineRef[manager] = null;
                 MelonLogger.Msg("[BgaCrossfadePatch] 게임 자체 BGA 크로스페이드 코루틴 정지 (커스텀 BGA 유지)");
             }
             catch (Exception ex)

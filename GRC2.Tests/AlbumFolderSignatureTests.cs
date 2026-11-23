@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using GRC2.Core;
 using Xunit;
@@ -67,6 +67,18 @@ namespace GRC2.Tests
             Assert.Equal("root", AlbumManager.GetAlbumKey(_hwa, _hwa));
             Assert.Equal("hwa", AlbumManager.GetAlbumKey(Path.Combine(_hwa, "hwa"), _hwa));
             Assert.Equal("song a", AlbumManager.GetAlbumKey(Path.Combine(_hwa, "song a"), _hwa));
+        }
+
+        [Theory]
+        [InlineData(new[] { "Hold end.wav", "b.mp3", "a.ogg" }, "a.ogg")]
+        [InlineData(new[] { "Hold end.wav", "z.mp3", "b.mp3" }, "b.mp3")]
+        [InlineData(new[] { "Hold end.wav", "kick.wav", "Music.wav" }, "Music.wav")]
+        [InlineData(new[] { "Hold end.wav", "kick.wav" }, null)]
+        public void ChooseBgmFile_PrefersOggThenMp3ThenNamedWav(string[] names, string expected)
+        {
+            var paths = Array.ConvertAll(names, n => Path.Combine(_hwa, "song a", n));
+            string chosen = AlbumManager.ChooseBgmFile(paths);
+            Assert.Equal(expected, chosen == null ? null : Path.GetFileName(chosen));
         }
     }
 }
