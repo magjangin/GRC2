@@ -24,20 +24,20 @@ namespace GRC2.Harmony
     public static class JudgmentBarPatch
     {
         // 두 플래그 모두 각 override가 base.onJudgeMent 호출 뒤에 켜므로, 베이스의 Postfix에서는 이번 호출 전 값이 보입니다.
-        private static readonly AccessTools.FieldRef<cFairyHoldNoteWork, bool> HoldJudgedFirstRef =
-            AccessTools.FieldRefAccess<cFairyHoldNoteWork, bool>("mIsJudgedFirst");
-        private static readonly AccessTools.FieldRef<cFairySlideNoteWork, bool> SlideJudgedFirstNoteRef =
-            AccessTools.FieldRefAccess<cFairySlideNoteWork, bool>("mIsJudgedFirstNote");
+        private static readonly LazyFieldRef<cFairyHoldNoteWork, bool> HoldJudgedFirstRef =
+            new LazyFieldRef<cFairyHoldNoteWork, bool>("mIsJudgedFirst");
+        private static readonly LazyFieldRef<cFairySlideNoteWork, bool> SlideJudgedFirstNoteRef =
+            new LazyFieldRef<cFairySlideNoteWork, bool>("mIsJudgedFirstNote");
 
         // 판정 범위는 인스펙터 값([SerializeField])이라 디컴파일 기본값과 다를 수 있어 실제 인스턴스에서 읽습니다.
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, float> TapPerfectRangeRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, float>("tap_perfectJudgeRange");
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, int> TapGreatRangeRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, int>("tap_greatJudgeRange");
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, int> TapGoodRangeRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, int>("tap_goodJudgeRange");
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, int> TapBadRangeRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, int>("tap_badJudgeRange");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, float> TapPerfectRangeRef =
+            new LazyFieldRef<cFairyModeNotesManager, float>("tap_perfectJudgeRange");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, int> TapGreatRangeRef =
+            new LazyFieldRef<cFairyModeNotesManager, int>("tap_greatJudgeRange");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, int> TapGoodRangeRef =
+            new LazyFieldRef<cFairyModeNotesManager, int>("tap_goodJudgeRange");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, int> TapBadRangeRef =
+            new LazyFieldRef<cFairyModeNotesManager, int>("tap_badJudgeRange");
 
         private static cFairyModeNotesManager _rangeSource;
 
@@ -79,13 +79,13 @@ namespace GRC2.Harmony
                         return;
                     case NoteTypeId.Hold:
                         var hold = __instance as cFairyHoldNoteWork;
-                        if (hold != null && HoldJudgedFirstRef(hold))
+                        if (hold != null && HoldJudgedFirstRef.IsAvailable && HoldJudgedFirstRef[hold])
                             return;
                         showTick = true;
                         break;
                     case NoteTypeId.Fairy:
                         var slide = __instance as cFairySlideNoteWork;
-                        if (slide == null || !SlideJudgedFirstNoteRef(slide))
+                        if (slide == null || !SlideJudgedFirstNoteRef.IsAvailable || !SlideJudgedFirstNoteRef[slide])
                             return;
                         showTick = false;
                         break;
@@ -107,12 +107,17 @@ namespace GRC2.Harmony
             if (manager == null || ReferenceEquals(manager, _rangeSource))
                 return;
 
+            // 노트마다 불리는 경로라, 필드를 못 찾으면 예외·경고를 반복하지 않고 기본 범위를 유지합니다.
+            if (!TapPerfectRangeRef.IsAvailable || !TapGreatRangeRef.IsAvailable ||
+                !TapGoodRangeRef.IsAvailable || !TapBadRangeRef.IsAvailable)
+                return;
+
             _rangeSource = manager;
             GameHud.SetJudgeRanges(
-                TapPerfectRangeRef(manager),
-                TapGreatRangeRef(manager),
-                TapGoodRangeRef(manager),
-                TapBadRangeRef(manager));
+                TapPerfectRangeRef[manager],
+                TapGreatRangeRef[manager],
+                TapGoodRangeRef[manager],
+                TapBadRangeRef[manager]);
         }
     }
 }

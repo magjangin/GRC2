@@ -11,7 +11,9 @@ File: `GRC2/Core/SceneDetector.cs`
 
 Main startup path. It:
 
-- applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`;
+- applies every `[HarmonyPatch]` in the mod assembly through `SceneDetector.InitializeHarmony()`
+  (MelonLoader's own auto-patch is disabled by `[assembly: HarmonyDontPatchAll]`; without it every hook ran twice
+  until 2026-11-23 — see 알려진_문제 P4);
 - locates the game `hwa` folder;
 - logs startup compatibility (`GameCompatibility.LogStartupReport`: Build ID, `Assembly-CSharp` MVID, `FieldContracts`, `ConstantContracts`);
 - reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then runs

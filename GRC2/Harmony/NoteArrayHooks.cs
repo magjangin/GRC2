@@ -14,8 +14,8 @@ namespace GRC2.Harmony
     [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]
     public static class NoteArrayHooks
     {
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]> NoteArrayRef =
+            new LazyFieldRef<cFairyModeNotesManager, FairyNoteEditorLoader.NoteCreateData[]>("mFairyNoteCreateDataArray");
 
         /// <summary>주입이 취소됐을 때 플레이 화면에 경고를 띄우는 시간(초)입니다.</summary>
         private const float WarningSeconds = 8f;
@@ -61,7 +61,7 @@ namespace GRC2.Harmony
                 }
 
                 // BMS 노트 배열로 교체
-                NoteArrayRef(instance) = noteCreateDataArray;
+                NoteArrayRef[instance] = noteCreateDataArray;
                 MelonLogger.Msg($"[NoteArrayHooks] BMS 노트 교체 완료: {noteCreateDataArray.Length}개");
             }
             catch (Exception ex)

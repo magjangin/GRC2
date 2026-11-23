@@ -1,3 +1,4 @@
+using GRC2.Helpers;
 using GRC2.Core;
 using HarmonyLib;
 using IntiCreates;
@@ -17,8 +18,8 @@ namespace GRC2.Harmony
     {
         public static bool IsEnabled => CustomKeySettings.AutoPlay;
 
-        private static readonly AccessTools.FieldRef<cFairyModeNotesManager, bool> AutoPlayFieldRef =
-            AccessTools.FieldRefAccess<cFairyModeNotesManager, bool>("mIsCurrentAutoPlay");
+        private static readonly LazyFieldRef<cFairyModeNotesManager, bool> AutoPlayFieldRef =
+            new LazyFieldRef<cFairyModeNotesManager, bool>("mIsCurrentAutoPlay");
 
         [HarmonyPatch(typeof(cFairyModeNotesManager), "createAllNote")]
         private static class ForceOnNoteCreatePatch
@@ -27,7 +28,7 @@ namespace GRC2.Harmony
             private static void Prefix(cFairyModeNotesManager __instance)
             {
                 if (IsEnabled)
-                    AutoPlayFieldRef(__instance) = true;
+                    AutoPlayFieldRef[__instance] = true;
             }
         }
 

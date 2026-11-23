@@ -148,12 +148,25 @@ namespace GRC2.Injectors
 
         private static cBGMBeatManager _cachedBgmManager;
 
+        /// <summary>
+        /// cBGMBeatManager를 못 찾았을 때 다시 찾기까지의 간격(초). 동기화 루프가 0.1초마다 시간을 읽으므로
+        /// 매니저가 없는 씬(무비 씬 등)에서는 0.1초마다 씬 전체를 훑었습니다(2026-11-23 감사).
+        /// </summary>
+        private const float ManagerSearchRetrySeconds = 1f;
+        private static float _nextManagerSearchTime;
+
         private static cBGMBeatManager GetBgmBeatManager()
         {
             if (_cachedBgmManager != null)
             {
                 return _cachedBgmManager;
             }
+
+            if (Time.unscaledTime < _nextManagerSearchTime)
+            {
+                return null;
+            }
+            _nextManagerSearchTime = Time.unscaledTime + ManagerSearchRetrySeconds;
 
             cBGMBeatManager[] managers =
                 UnityEngine.Object.FindObjectsOfType<cBGMBeatManager>();
@@ -187,6 +200,7 @@ namespace GRC2.Injectors
             bool hasSyncedOnce = false;
             bool wasPlaying = false;
             var wait = new WaitForSeconds(syncInterval); // 재사용: 0.1초마다 할당하지 않도록
+            float nextSourceSearchTime = 0f;
 
             while (_isSyncing)
             {
@@ -194,6 +208,11 @@ namespace GRC2.Injectors
 
                 if (_bgmAudioSource == null || _videoPlayers == null)
                 {
+                    // 오디오 소스를 잃었을 때 0.1초마다 씬 전체 AudioSource를 훑지 않도록 1초 간격으로만 다시 찾습니다.
+                    if (Time.unscaledTime < nextSourceSearchTime)
+                        continue;
+                    nextSourceSearchTime = Time.unscaledTime + ManagerSearchRetrySeconds;
+
                     _bgmAudioSource = GetCurrentAudioSource();
                     if (_bgmAudioSource == null)
                         continue;
@@ -284,6 +303,7 @@ namespace GRC2.Injectors
             _bgmAudioSource = null;
             _videoPlayers = null;
             _cachedBgmManager = null;
+            _nextManagerSearchTime = 0f;
 
             MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
         }

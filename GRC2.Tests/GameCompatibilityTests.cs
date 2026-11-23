@@ -74,7 +74,7 @@ namespace GRC2.Tests
 
             var known = GameCompatibility.FieldContracts.Select(c => c.Name).ToHashSet();
             var missing = modSources
-                .SelectMany(p => Regex.Matches(File.ReadAllText(p), @"FieldRefAccess<[^>]+>>?\(""(\w+)""\)").Cast<Match>())
+                .SelectMany(p => Regex.Matches(File.ReadAllText(p), @"(?:FieldRefAccess|LazyFieldRef)<[^>]+>>?\(""(\w+)""\)").Cast<Match>())
                 .Select(m => m.Groups[1].Value)
                 .Distinct()
                 .Where(n => !known.Contains(n))

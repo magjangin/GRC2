@@ -1,13 +1,13 @@
 # GRC2 — 인수인계 문서 (AGENTS.md)
 
-> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
+> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`), 2026-11-23 갱신(Harmony 이중 패치 수정 `HarmonyDontPatchAll`, 게임 필드 접근 `LazyFieldRef` 격리, BGA 동기화 재탐색 간격, `CHANGELOG.md`·`tools/release.ps1`, v0.7.0). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
 > 2026-11-17~18 변경은 곡 선택 화면까지 인게임으로 확인했다(7절에 범위 명시). **"실측"** 표시는 디스크에서 직접 읽은 값, **"미확인"**은 다음 세션에서 확인할 항목이다.
 
 ## 0. 프로젝트 개요
 
-- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.6.0, GitHub 릴리즈 v0.6.0). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
+- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.7.0, GitHub 최신 릴리즈 v0.6.0 — v0.7.0은 게임 PC에서 `tools/release.ps1 -Publish`로 게시). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
 - **종류:** 게임 모드
-- **최근 수정일(파일 기준):** 2026-11-18
+- **최근 수정일(파일 기준):** 2026-11-23
 - **git 원격:** `origin`(GitHub magjangin/GRC2), `local`(`H:\local-repos\GRC2.git`) — 둘 다 main을 밀어 둔다
 - **최근 커밋:** `git log --oneline -8`로 본다(여기 복사해 두면 금방 낡는다). 2026-11-18 작업은 `feat/font-fallback-and-cleanup` 브랜치를 main에 병합한 것이다.
 - **먼저 읽을 기존 문서:**
@@ -48,8 +48,8 @@
 - **세이브 차단(`BlockSave`)은 결과 씬으로만 좁혀져 있다.** 부팅 중 저장까지 막으면 세이브 없는 부팅이 무한 반복된다(A1). 결과 씬에서는 곡 기록 4개 필드를 스냅샷으로 되돌려 AutoPlay 기록이 세이브에 남지 않게 한다(`RecordBlockPatch`).
 - **노트 변환은 원본 로더의 후처리를 전부 재현하지 않는다**(H15, 의도적으로 미수정). 홀드/페어리 노트는 끝 노트 짝이 없으면 주입하지 않는다 — 게임의 `cFairyModeNotesManager.createNote`가 null 검사 없이 접근해 `createAllNote`가 NRE로 곡 로딩을 통째로 깨기 때문이다(`BmsNoteConverter.cs` 주석).
 - **BGM은 48kHz만 가정한다.** 노트 시계를 BGM 샘플레이트에 맞추지 않고, 아니면 오류 로그만 남긴다(B1).
-- **패치는 `PatchAll` 한 번 + 실패 시 클래스별 재시도**(`SceneDetector.InitializeHarmony`). Harmony는 첫 실패에서 멈춰 뒤 클래스를 빠뜨리기 때문이다(H4).
-- **필드 이름 접근과 상수 전제는 `GameCompatibility`에 모은다.** 게임 업데이트 때 무엇이 깨졌는지 시작 로그(`[호환성]`)와 `GameCompatibilityTests`로 바로 알기 위해서다(2026-11-16, 2026-11-18 상수 계약 추가). 새 `FieldRefAccess<..>("이름")`를 쓰면 `FieldContracts` 표에도 한 줄 넣어야 테스트가 통과한다.
+- **패치는 `PatchAll` 한 번 + 실패 시 클래스별 재시도**(`SceneDetector.InitializeHarmony`). Harmony는 첫 실패에서 멈춰 뒤 클래스를 빠뜨리기 때문이다(H4). **MelonLoader 자동 패치는 `[assembly: MelonLoader.HarmonyDontPatchAll]`로 끈다** — 빠져 있던 2026-11-23까지는 모든 훅이 두 번 돌았다(알려진_문제 P4).
+- **필드 이름 접근과 상수 전제는 `GameCompatibility`에 모은다.** 게임 업데이트 때 무엇이 깨졌는지 시작 로그(`[호환성]`)와 `GameCompatibilityTests`로 바로 알기 위해서다(2026-11-16, 2026-11-18 상수 계약 추가). 게임 필드는 `new LazyFieldRef<T, F>("이름")`(`Helpers/LazyFieldRef.cs`, 처음 쓸 때 조회)로 접근하고 `FieldContracts` 표에도 한 줄 넣어야 테스트가 통과한다. `static readonly AccessTools.FieldRef<…> = FieldRefAccess(…)`는 필드 하나가 사라지면 그 클래스 전체를 멈추게 해 금지(`LazyFieldRefTests`가 막음). 노트·커서마다 불리는 경로는 `IsAvailable`을 먼저 본다.
 - **게임 enum·const 값은 반드시 이름으로 런타임에 읽어 비교한다**(2026-11-20). C#은 `NoteTypeId.Hold`, `MusicID.UNIQUE_TOP` 같은 값을 모드 DLL에 숫자로 박아 넣으므로, `(int)MusicID.UNIQUE_TOP`으로 점검하면 게임이 바뀌어도 배포된 DLL의 점검은 영원히 통과한다(실제로 2026-11-18~19 코드가 그랬다). `GameCompatibility.RuntimeEnumValue`/`RuntimeConstValue`를 쓴다. 노트 변환·판정이 쓰는 게임 enum 멤버(`NoteTypeId`·`NoteDirectionIndex`·`NoteSubLaneType`·`NoteLaneLeftRight`·`JudgeType`·`MusicID`)는 모두 `ConstantContracts`에 있어야 하고, 소스에 새 멤버를 쓰면 `ConstantContracts_CoverEveryGameEnumMemberInSource`가 실패한다. 값이 바뀌면 재빌드해야 노트 변환이 고쳐진다.
 - **게임 폰트에 없는 글자는 TMP 전역 fallback으로 그린다**(`Core/FontFallback.cs`, 2026-11-17). 게임은 언어별 Static TMP 아틀라스만 써서 커스텀 곡의 간체 한자 등이 □로 나왔다. 첫 씬 로드 때 `hwa/fonts/` → 윈도우 폰트(msyh·msjh·YuGothM·meiryo·malgun·seguisym) 순으로 Dynamic `TMP_FontAsset`을 만들어 `TMP_Settings.fallbackFontAssets`에 붙인다. 게임 폰트에 있는 글자는 바꾸지 않으므로 Harmony 훅이 필요 없고, 언어를 바꿔도 유지된다.
 - **커스텀 MusicID는 54~7999(이름 붙은 enum 값 제외), 외부 맵 파일 없이 메모리에서만 배정**(`Core/CustomMusicIdRegistry.cs`, `Helpers/CustomMusicIdAllocator.cs`, 2026-11-18). 예전 상한 511(458곡)은 세이브 `playerMusicData`가 512칸이라서였다. 세이브가 JsonUtility JSON이라 배열을 늘려도 그대로 저장·로드되고 게임 루프는 512까지만 돌거나 `getIsUsableMusicID`로 걸러서, 곡 목록을 만들 때 `EnsureSaveSlots`로 늘린다. 8000 이상은 튜토리얼·미리보기(`UNIQUE_TOP`) 전용이라 쓰지 않는다. 처음에는 폴더 → ID를 외부 파일(`UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`)이나 `MelonPreferences.cfg`의 `[GRC2_MusicID]`에 두었으나, 사용자가 외부 맵 데이터 자체를 원치 않아(2026-11-18) 모두 제거하고 메모리에서만 이름순으로 배정한다. 한 실행 안에서는 이미 배정된 ID를 기억해 게임을 켠 채 곡을 추가해도 방금 선택·플레이하던 곡의 ID가 흔들리지 않는다. 대신 실행 사이에는 ID를 기억하지 않으므로, 앞 이름의 폴더를 추가·삭제하거나 게임에 원본 곡이 추가되면 ID가 밀려 `BlockSave=0` 기록이 다른 곡에 붙어 보일 수 있다(알려진_문제 C4 남은 한계, 원본 곡 추가는 `[호환성]` 경고). 범위 끝 `UNIQUE_TOP`과 경계 `SAVEABLE_ID_END`는 런타임에 이름으로 읽는다(2026-11-20). 시작할 때 남아 있는 레거시 맵 파일과 `MelonPreferences.cfg`의 `[GRC2_MusicID]` 섹션은 자동으로 지운다.
@@ -85,7 +85,8 @@
 - **커스텀 MusicID 맵을 외부 파일이나 설정에 두기** → 모두 폐기(2026-11-18). `hwa/`에 두면 루트 앨범의 txt로 읽혀 가짜 곡이 생기고, `savecustomkey/`·`UserData/GRC2/musicid_map.txt`·`UserData/MelonPreferences.cfg`의 `[GRC2_MusicID]`는 사용자가 외부 맵 데이터 자체를 원치 않아 모두 없앴다. 시작할 때 남아 있는 레거시 맵 파일과 `[GRC2_MusicID]` 섹션은 자동으로 지우고, 메모리에서만 배정한다.
 - **커스텀 ID에 512나 8000 이상 쓰기** → 512는 `SAVEABLE_ID_END`라는 이름 붙은 값(`ToString`·`Enum.TryParse` 경로가 이름으로 바뀜), 8000~8999는 튜토리얼 판정(`id >= UNIQUE_TOP`). 배정기는 이름 붙은 enum 값을 전부 건너뛴다.
 - **게임의 `cUICommonScrollText`로 제목 스크롤** → 이 빌드에서는 `Update`가 비어 있는 미완성 컴포넌트라 쓸 수 없다. 직접 `TextMarquee`를 붙인다.
-- **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `AccessTools.FieldRefAccess`.
+- **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `LazyFieldRef`(내부적으로 `AccessTools.FieldRefAccess`).
+- **`HarmonyDontPatchAll` 없이 직접 `PatchAll`** → MelonLoader 자동 패치와 겹쳐 모든 훅이 두 번 돌았다(노트 변환 2회, 판정바 틱 2회, 노트 속도 카오스 배율 제곱, 원제목을 포함한 커스텀 제목 이중 치환). 로그에서 "같은 메서드가 두 번 불림"처럼 보여 P4는 오래 원인 미상이었다. 2026-11-23 수정.
 - **`GRC2.Tests`를 솔루션에 넣지 않기** → `test_debug.bat`이 테스트 0개로 "성공"했다(F). 지금은 솔루션에 포함.
 - **게임 enum·const를 코드로 읽어 상수 계약 점검하기**(`new ConstantContract(..., 512, (int)MusicID.SAVEABLE_ID_END)`) → 컴파일러가 둘 다 숫자로 박아 넣어 "기대 512, 현재 512"를 영원히 비교했다. 테스트도 다시 빌드할 때만 새 값을 보므로 배포된 DLL의 시작 점검은 업데이트를 못 잡았다(2026-11-20 수정, 이름으로 런타임 조회).
 
@@ -109,7 +110,9 @@
 ## 7. 다음 작업자에게
 
 - 작업 전 `tools\check_game_version.ps1`로(또는 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 직접) 비교한다. 2026-11-20 기준 Build ID·MVID 모두 같음. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 148개 모두 통과해야 한다(2026-11-20 기준).
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 모두 통과해야 한다(2026-11-20 기준 148개, 2026-11-23 `LazyFieldRefTests` 2개 추가로 150개 예상).
+- **2026-11-23 변경(v0.7.0)은 미빌드다.** 클라우드 세션에 게임 DLL·.NET SDK가 없어 빌드·테스트를 못 했다. 게임 PC에서 `tools\release.ps1`(버전 확인 → 빌드 → 테스트 → `dist\GRC2.dll`)부터 돌리고, 인게임에서 플레이 시작 로그 `[NoteArrayHooks] BMS 노트 교체 완료`가 **한 번만** 찍히는지(이중 패치 수정 확인), 판정바 틱이 한 번씩인지 본 뒤 `-Publish`로 게시한다.
+- 릴리즈: `GRC2/Properties/AssemblyInfo.cs`(AssemblyVersion·AssemblyFileVersion·MelonInfo)와 `CHANGELOG.md` 최상단 `## [버전]`을 같이 올리고 main에 머지한 뒤 `.\tools\release.ps1 -Publish`. 첨부는 `GRC2.dll` 하나.
 - 2026-11-20 상수 계약 런타임화는 빌드·단위 테스트로만 확인했다. **미확인:** 인게임 시작 로그의 `[호환성] 점검 통과 (필드 23개, 상수 26개 확인)` 줄.
 - 2026-11-18 제목 스크롤 인게임 확인: 곡 선택에서 `麦吉_Maggie x 盖盖Nyan - Summertime (Arrange ver.)`이 끝(`(Arrange ver.)`)까지 흘러 보임, 진단 로그 `[제목 스크롤] 대상 SongTitle: 넘침 모드 Overflow, … 가리는 부모 曲名`. **미확인:** 끝 대기 후 처음으로 돌아오는 반복과 짧은 제목 곡(변화 없어야 함)은 눈으로 보지 못했다(타이밍은 단위 테스트만).
 - 2026-11-18 외부 MusicID 맵 제거: `UserData/GRC2/musicid_map.txt`, `savecustomkey/musicid_map.txt`, `MelonPreferences.cfg`의 `[GRC2_MusicID]`를 모두 쓰지 않고 시작할 때 자동으로 지운다. 배정은 메모리(`_sessionMap`)에서만 수행한다.

@@ -14,3 +14,6 @@ __pycache__/
 
 # 디컴파일 요약본(게임 원본 구조 포함, 저작권상 커밋 대상 아님)
 /Decompiled-outline/
+
+# 릴리즈 산출물(tools/release.ps1)
+/dist/
