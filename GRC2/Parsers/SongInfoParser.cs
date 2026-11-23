@@ -100,10 +100,10 @@ namespace GRC2.Parsers
         private static string StripInlineComment(string line)
         {
             string trimmed = line.Trim();
-            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("//"))
+            if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("//", StringComparison.Ordinal))
                 return string.Empty;
 
-            int commentIndex = trimmed.IndexOf("//");
+            int commentIndex = trimmed.IndexOf("//", StringComparison.Ordinal);
             if (commentIndex >= 0)
                 trimmed = trimmed.Substring(0, commentIndex).Trim();
 

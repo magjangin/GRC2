@@ -109,7 +109,7 @@ namespace GRC2.Helpers
             foreach (var raw in lines)
             {
                 var line = raw?.Trim();
-                if (string.IsNullOrEmpty(line) || line.StartsWith("#"))
+                if (string.IsNullOrEmpty(line) || line.StartsWith("#", StringComparison.Ordinal))
                     continue;
 
                 int idx = line.IndexOf('=');
@@ -153,7 +153,7 @@ namespace GRC2.Helpers
             foreach (var line in lines)
             {
                 var trimmed = line?.Trim() ?? string.Empty;
-                if (trimmed.StartsWith("[") && trimmed.EndsWith("]"))
+                if (trimmed.StartsWith("[", StringComparison.Ordinal) && trimmed.EndsWith("]", StringComparison.Ordinal))
                 {
                     if (string.Equals(trimmed, header, StringComparison.OrdinalIgnoreCase))
                     {

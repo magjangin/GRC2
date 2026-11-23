@@ -30,6 +30,31 @@ namespace GRC2.Core
         public const int TestedCustomMusicIdStart = 54;
 
         /// <summary>
+        /// 마지막으로 검증한 MelonLoader 버전(주.부.수). 게임이 그대로여도 MelonLoader를 올리면 Harmony 동작
+        /// (예: <c>HarmonyDontPatchAll</c>, 자동 패치 규칙)과 Unity 바인딩이 바뀔 수 있어 따로 봅니다(2026-11-24).
+        /// </summary>
+        public const string TestedMelonLoaderVersion = "0.7.3";
+
+        /// <summary>마지막으로 검증한 Unity 엔진 버전(<c>Application.unityVersion</c>). 바뀌면 TMP·VideoPlayer·오디오 동작이 달라질 수 있습니다.</summary>
+        public const string TestedUnityVersion = "2021.3.31f1";
+
+        /// <summary>어셈블리 버전을 "주.부.수"로 줄입니다(0.7.3.0 → 0.7.3). null이면 null.</summary>
+        public static string ToThreePartVersion(Version version)
+        {
+            if (version == null)
+                return null;
+            int build = version.Build < 0 ? 0 : version.Build;
+            return $"{version.Major}.{version.Minor}.{build}";
+        }
+
+        /// <summary>지금 로드된 MelonLoader 어셈블리의 버전(주.부.수). const인 BuildInfo.Version은 빌드 때 박히므로 쓰지 않습니다.</summary>
+        public static string RuntimeMelonLoaderVersion()
+        {
+            try { return ToThreePartVersion(typeof(MelonLogger).Assembly.GetName().Version); }
+            catch { return null; }
+        }
+
+        /// <summary>
         /// 모드가 직접 기대하는 게임 enum 상수·const 값 계약. 게임 업데이트로 값이 바뀌면 시작 로그와 테스트가 잡습니다.
         ///
         /// 주의: C#은 enum 멤버와 <c>const</c> 필드를 <b>모드 DLL을 빌드할 때 숫자로 박아 넣습니다</b>(인라인).
@@ -266,6 +291,21 @@ namespace GRC2.Core
                 else
                 {
                     MelonLogger.Msg($"[호환성] Steam Build ID {buildId} - 검증된 빌드와 같습니다.");
+                }
+
+                // 게임 파일이 그대로여도 MelonLoader·Unity가 바뀌면 훅·TMP·영상 동작이 달라질 수 있습니다(2026-11-24).
+                string melonVersion = RuntimeMelonLoaderVersion();
+                if (melonVersion != null && melonVersion != TestedMelonLoaderVersion)
+                {
+                    problems++;
+                    MelonLogger.Warning($"[호환성] MelonLoader {melonVersion}가 검증 버전 {TestedMelonLoaderVersion}과 다릅니다. 훅이 두 번 걸리거나 빠지는지 로그로 확인하세요.");
+                }
+
+                string unityVersion = UnityEngine.Application.unityVersion;
+                if (!string.IsNullOrEmpty(unityVersion) && unityVersion != TestedUnityVersion)
+                {
+                    problems++;
+                    MelonLogger.Warning($"[호환성] Unity {unityVersion}가 검증 버전 {TestedUnityVersion}과 다릅니다(게임 엔진 업데이트).");
                 }
 
                 var mvid = typeof(cRythmGameManager).Assembly.ManifestModule.ModuleVersionId.ToString();
