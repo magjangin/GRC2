@@ -95,7 +95,7 @@ namespace GRC2.Parsers
                     continue;
 
                 var trimmed = line.TrimStart();
-                if (trimmed.StartsWith("//"))
+                if (trimmed.StartsWith("//", StringComparison.Ordinal))
                     continue;
 
                 var wavMatch = WavKeyRegex.Match(trimmed);
@@ -129,7 +129,7 @@ namespace GRC2.Parsers
 
             foreach (var line in lines)
             {
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//"))
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//", StringComparison.Ordinal))
                     continue;
 
                 // 기본 BPM 설정 (#BPM) 및 인덱스 테이블 (#BPMXX: value)
@@ -177,7 +177,7 @@ namespace GRC2.Parsers
 
             foreach (var line in lines)
             {
-                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//"))
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//", StringComparison.Ordinal))
                     continue;
 
                 // Measure 정의 (#XXXYY: ...)
@@ -256,12 +256,14 @@ namespace GRC2.Parsers
         /// </summary>
         private static void CalculateNoteTimes(List<BmsNote> notes, float baseBpm, float baseFreq, List<BpmChange> bpmChanges)
         {
-            // BPM 변화 리스트를 한 번 정렬 (성능 최적화)
+            // BPM 변화 리스트를 한 번 정렬(OrderBy는 안정 정렬이라 같은 Tick의 순서가 유지됨)하고,
+            // 변화마다의 누적 시간을 미리 계산해 노트마다 이분 탐색합니다(P8: 예전에는 노트마다 목록을 처음부터 훑음).
             var sortedBpmChanges = bpmChanges.OrderBy(b => b.Tick).ToList();
-            
+            var timeline = new BpmTimeline(baseFreq, sortedBpmChanges);
+
             foreach (var note in notes)
             {
-                note.Time = CalculateTime(note.Tick, baseBpm, baseFreq, sortedBpmChanges);
+                note.Time = timeline.ToSeconds(note.Tick);
 
                 // Duration이 Tick 단위로 저장되어 있다면 Time 단위로 변환
                 if (note.Duration > 0 && (note.Type == NoteType.Hold || note.Type == NoteType.Fairy))
@@ -269,14 +271,15 @@ namespace GRC2.Parsers
                     // Duration을 Time 단위로 변환
                     var startTime = note.Time;
                     var endTick = note.Tick + note.Duration;
-                    var endTime = CalculateTime(endTick, baseBpm, baseFreq, sortedBpmChanges);
+                    var endTime = timeline.ToSeconds(endTick);
                     note.Duration = endTime - startTime;
                 }
             }
         }
 
         /// <summary>
-        /// Tick을 시간(초)으로 변환
+        /// Tick을 시간(초)으로 변환합니다. 노트마다 변화 목록을 처음부터 훑는 기준 구현입니다.
+        /// 파서는 같은 결과를 내는 <see cref="BpmTimeline"/>을 쓰고, 이 메서드는 그 기준값(테스트)으로 남겨 둡니다.
         /// </summary>
         public static float CalculateTime(float tick, float baseBpm, float baseFreq, List<BpmChange> sortedBpmChanges)
         {

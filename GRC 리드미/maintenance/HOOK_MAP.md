@@ -785,6 +785,14 @@ of the current source baseline:
 
 ## Cleanup Log
 
+### 2026-11-24 (second audit, v0.7.1)
+
+- No hook was added, removed or changed.
+- Startup report also compares the loaded MelonLoader assembly version and `Application.unityVersion` with
+  `GameCompatibility.TestedMelonLoaderVersion` / `TestedUnityVersion` (알려진_문제 R4); `tools/check_game_version.ps1` does the same from the DLLs.
+- `PlaySceneArtworkInjector` logs once per scene when the name-based `"ArtWork"` image lookup finds nothing (R3).
+- Parser-side only: BPM-change timing via `BpmTimeline` (P8) and ordinal string comparisons (P14, enforced by `SourceRulesTests`).
+
 ### 2026-11-23 (full audit: update resilience and bottlenecks)
 
 - No hook target was added or removed. Patch bodies changed only to degrade instead of throwing:

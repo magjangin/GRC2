@@ -123,6 +123,14 @@ namespace GRC2.Core
                     _cachedArtWorkImage.sprite = customSprite;
                     MelonLogger.Msg($"[PlaySceneArtworkInjector] ✅ 플레이 씬에 커스텀 아트워크 주입 완료 (크기: {customSprite.texture.width}x{customSprite.texture.height})");
                 }
+                else
+                {
+                    // 이 오브젝트는 게임 타입이 아니라 이름("ArtWork")으로만 찾으므로 호환성 점검에 걸리지 않습니다.
+                    // 예전에는 못 찾으면 아무 로그도 없어 게임 UI 이름이 바뀌어도 알 수 없었습니다. 씬마다 한 번만 남깁니다(R3).
+                    string scene = ActiveSceneName.Current;
+                    ModLog.InfoOnChange("artwork-image-missing:" + scene,
+                        $"[PlaySceneArtworkInjector] {scene}에서 '{ArtworkImageFinder.DefaultArtworkObjectName}' 이미지를 찾지 못해 아트워크를 바꾸지 않았습니다(게임 UI 이름 변경 의심).");
+                }
             }
             catch (Exception ex)
             {

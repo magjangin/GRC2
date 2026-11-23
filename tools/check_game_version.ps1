@@ -17,6 +17,8 @@ if (-not (Test-Path $compatSource)) { Write-Host "GameCompatibility.cs 없음: $
 $source = Get-Content -Raw -Encoding UTF8 $compatSource
 $testedBuild = [regex]::Match($source, 'TestedBuildId\s*=\s*"(\d+)"').Groups[1].Value
 $testedMvid = [regex]::Match($source, 'TestedAssemblyMvid\s*=\s*"([0-9a-fA-F-]+)"').Groups[1].Value
+$testedMelon = [regex]::Match($source, 'TestedMelonLoaderVersion\s*=\s*"([0-9.]+)"').Groups[1].Value
+$testedUnity = [regex]::Match($source, 'TestedUnityVersion\s*=\s*"([^"]+)"').Groups[1].Value
 
 $ok = $true
 
@@ -44,6 +46,33 @@ if ($mvid -eq $testedMvid) {
 } else {
     Write-Host "[다름] Assembly-CSharp MVID $mvid (검증 $testedMvid)"
     $ok = $false
+}
+
+# 게임 파일이 그대로여도 MelonLoader나 Unity 엔진이 바뀌면 훅·TMP·영상 동작이 달라질 수 있습니다(2026-11-24).
+$melonDll = Join-Path $GamePath 'MelonLoader\net35\MelonLoader.dll'
+if (Test-Path $melonDll) {
+    $melon = ((Get-Item $melonDll).VersionInfo.ProductVersion -split '\+')[0]
+    if ($melon -eq $testedMelon) {
+        Write-Host "[같음] MelonLoader $melon"
+    } else {
+        Write-Host "[다름] MelonLoader $melon (검증 $testedMelon)"
+        $ok = $false
+    }
+} else {
+    Write-Host "[건너뜀] MelonLoader.dll 없음: $melonDll"
+}
+
+$unityPlayer = Join-Path $GamePath 'UnityPlayer.dll'
+if (Test-Path $unityPlayer) {
+    $unity = ((Get-Item $unityPlayer).VersionInfo.ProductVersion -split ' ')[0]
+    if ($unity -eq $testedUnity) {
+        Write-Host "[같음] Unity $unity"
+    } else {
+        Write-Host "[다름] Unity $unity (검증 $testedUnity)"
+        $ok = $false
+    }
+} else {
+    Write-Host "[건너뜀] UnityPlayer.dll 없음: $unityPlayer"
 }
 
 if ($ok) {

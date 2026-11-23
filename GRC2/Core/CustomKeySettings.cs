@@ -290,7 +290,7 @@ namespace GRC2.Core
             foreach (var line in File.ReadAllLines(filePath))
             {
                 var trimmed = line.Trim();
-                if (trimmed.Length == 0 || trimmed.StartsWith("#"))
+                if (trimmed.Length == 0 || trimmed.StartsWith("#", StringComparison.Ordinal))
                     continue;
 
                 var idx = trimmed.IndexOf('=');

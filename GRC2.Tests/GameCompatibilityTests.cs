@@ -39,6 +39,39 @@ namespace GRC2.Tests
             };
         }
 
+        private static string GamePath =>
+            Environment.GetEnvironmentVariable("GRC2_GAME_PATH") ?? @"H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle";
+
+        [Theory]
+        [InlineData("0.7.3.0", "0.7.3")]
+        [InlineData("1.2", "1.2.0")]
+        [InlineData(null, null)]
+        public void ToThreePartVersion_DropsRevision(string input, string expected)
+        {
+            Assert.Equal(expected, GameCompatibility.ToThreePartVersion(input == null ? null : new Version(input)));
+        }
+
+        /// <summary>설치된 MelonLoader를 올리면 게임 파일이 그대로여도 여기서 먼저 알 수 있습니다(시작 점검과 같은 기준).</summary>
+        [Fact]
+        public void InstalledMelonLoader_MatchesTestedVersion()
+        {
+            var dll = Path.Combine(GamePath, "MelonLoader", "net35", "MelonLoader.dll");
+            Assert.True(File.Exists(dll), $"MelonLoader.dll 없음: {dll}");
+            var installed = GameCompatibility.ToThreePartVersion(AssemblyName.GetAssemblyName(dll).Version);
+            Assert.Equal(GameCompatibility.TestedMelonLoaderVersion, installed);
+        }
+
+        /// <summary>UnityPlayer.dll의 제품 버전("2021.3.31f1 (해시)")이 검증 Unity 버전과 같은지 봅니다.</summary>
+        [Fact]
+        public void InstalledUnityPlayer_MatchesTestedVersion()
+        {
+            var dll = Path.Combine(GamePath, "UnityPlayer.dll");
+            Assert.True(File.Exists(dll), $"UnityPlayer.dll 없음: {dll}");
+            var product = System.Diagnostics.FileVersionInfo.GetVersionInfo(dll).ProductVersion ?? string.Empty;
+            var unityVersion = product.Split(' ')[0];
+            Assert.Equal(GameCompatibility.TestedUnityVersion, unityVersion);
+        }
+
         [Fact]
         public void RecordHookFailure_KeepsEachDescriptionOnce()
         {
