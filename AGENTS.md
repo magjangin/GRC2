@@ -56,6 +56,7 @@
 - **로그는 `ModLog`로 나눈다**(2026-11-18). 곡·노트·매핑마다 찍히는 것은 `ModLog.Verbose`(config `VerboseLog=1`일 때만), 같은 상태를 반복해 알리는 것은 `ModLog.InfoOnChange`. 곡 상한을 올리면 곡 수에 비례하는 로그가 수천 줄이 되기 때문이다. 경고·오류는 그대로 `MelonLogger`.
 - **곡 선택 화면에서 긴 제목은 옆으로 흘린다**(`Core/TextMarquee.cs`, `Harmony/SongTitleMarqueePatch.cs`, 2026-11-18). 선택한 곡 막대의 제목 `SongTitle`은 부모 마스크 `曲名`이 잘라 긴 제목이 끊겼다. 넘칠 때만 1.5초 대기 → 초당 80 이동 → 끝에서 1.5초 대기 → 처음으로를 반복한다. RectTransform이 아니라 TMP 왼쪽 `margin`을 음수로 바꿔 옮기므로 막대 열기·닫기 애니메이션과 부딪히지 않는다. 원본 곡에도 같이 적용된다.
 - **시작할 때는 현재 곡 BMS만 파싱**하고, 곡 선택 씬 진입 때 `hwa` 지문이 바뀌었으면 다시 스캔한다(2026-11-18). 한 실행 안에서는 세션 맵(`_sessionMap`)이 이미 배정된 ID를 유지하므로 게임을 켠 채 곡을 추가해도 방금 고른 곡의 ID가 바뀌지 않는다. 아트워크 캐시도 파일 수정 시각을 함께 비교해 같은 이름으로 덮어쓴 이미지를 다시 읽는다.
+- **상시 도는 코루틴은 `WaitForSeconds`를 한 번만 만들어 재사용한다**(2026-11-23 감사). `BgmBgaInjector`(2초)·`BgaBgmSyncManager`(0.1초) 루프가 매 반복 새로 할당하던 것을 바꿨다. 같은 감사에서 `OnUpdate`(설정 파일 폴링은 간격 제한)·`OnGUI`(Repaint만 그림)·`FindObjectOfType` 호출처(키 입력/곡 시작 시 1회뿐)를 점검했고 추가 병목은 없었다. 새 상시 루프를 만들 때도 같은 규칙을 지킨다.
 - 훅 소유 파일·제거 위험의 정본은 [HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md), 문제별 상세는 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md).
 
 ## 4. 핵심 훅 시그니처와 주입 파이프라인

@@ -186,10 +186,11 @@ namespace GRC2.Injectors
             const float syncInterval = 0.1f;
             bool hasSyncedOnce = false;
             bool wasPlaying = false;
+            var wait = new WaitForSeconds(syncInterval); // 재사용: 0.1초마다 할당하지 않도록
 
             while (_isSyncing)
             {
-                yield return new WaitForSeconds(syncInterval);
+                yield return wait;
 
                 if (_bgmAudioSource == null || _videoPlayers == null)
                 {

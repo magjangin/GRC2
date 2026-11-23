@@ -80,9 +80,11 @@ namespace GRC2.Injectors
 
         private static IEnumerator InjectBgmBgaCoroutine()
         {
+            // WaitForSeconds는 재사용해도 안전합니다. 루프마다 새로 만들면 모드가 도는 내내 2초마다 힙 할당이 생깁니다.
+            var checkInterval = new WaitForSeconds(2f); // 2초마다 체크
             while (true)
             {
-                yield return new WaitForSeconds(2f); // 2초마다 체크
+                yield return checkInterval;
 
                 // 커스텀 차트가 선택되지 않았거나, 주입 금지 씬(SoundPlayerScene/MoviePlayer_MovieSelect)이면 주입 건너뛰기
                 if (!CustomAssetManager.ShouldInjectCustomContent())
