@@ -43,6 +43,14 @@ namespace GRC2.Harmony
                     return;
                 }
 
+                // 게임 업데이트로 노트 배열 필드가 사라졌으면 변환해도 넣을 곳이 없습니다. 변환 전에 확인하고
+                // 플레이 화면에도 알립니다(예전에는 변환을 다 한 뒤 예외 로그만 남아 원본 차트가 나오는 이유를 알기 어려웠음).
+                if (!NoteArrayRef.IsAvailable)
+                {
+                    GameHud.ShowWarning("게임 업데이트로 BMS 차트를 넣지 못해 원본 차트가 나옵니다 (로그의 [호환성] 확인)", WarningSeconds);
+                    return;
+                }
+
                 // 모든 BMS 노트 변환
                 var noteCreateDataArray = BmsNoteConverter.ConvertBmsNotesToNoteCreateData(_bmsNotes);
                 if (noteCreateDataArray == null)

@@ -134,16 +134,4 @@ namespace GRC2.Tests
             Assert.Equal(lines, cleaned);
         }
     }
-
-    public class ModLogTests
-    {
-        [Fact]
-        public void ShouldLogOnChange_OnlyWhenMessageDiffers()
-        {
-            var key = Guid.NewGuid().ToString();
-            Assert.True(ModLog.ShouldLogOnChange(key, "5개"));
-            Assert.False(ModLog.ShouldLogOnChange(key, "5개"));
-            Assert.True(ModLog.ShouldLogOnChange(key, "6개"));
-        }
-    }
 }

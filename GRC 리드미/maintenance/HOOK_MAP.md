@@ -15,7 +15,9 @@ Main startup path. It:
   (MelonLoader's own auto-patch is disabled by `[assembly: HarmonyDontPatchAll]`; without it every hook ran twice
   until 2026-11-23 — see 알려진_문제 P4);
 - locates the game `hwa` folder;
-- logs startup compatibility (`GameCompatibility.LogStartupReport`: Build ID, `Assembly-CSharp` MVID, `FieldContracts`, `ConstantContracts`);
+- logs startup compatibility (`GameCompatibility.LogStartupReport`: Build ID, `Assembly-CSharp` MVID, `FieldContracts`, `ConstantContracts`,
+  and every hook that failed to apply — `GameCompatibility.RecordHookFailure`, filled by the per-class retry and by
+  `CreditTextPatch.TargetMethods`; since 2026-11-23 a missing hook target no longer prints `점검 통과`);
 - reads `savecustomkey/config.txt` first (it decides `VerboseLog`), then runs
   `CustomMusicIdRegistry.Initialize` (resets the in-memory session map and deletes
   any leftover `musicid_map.txt` or `[GRC2_MusicID]` section in `MelonPreferences.cfg`);
@@ -72,6 +74,10 @@ Locale font swaps need no hook because the global list survives them. If
 - A glyph the game font *does* have is never replaced. `吉` looked like a Hangul
   syllable in a screenshot but is the game's own rounded `PCDMainfont` glyph (log:
   `PCDMainfont: 吉…`), not a mis-mapping.
+- `LogCoverageDiagnostics` (first Music Select load) only counts how many non-ASCII glyphs of the custom song
+  metadata the game fonts already have (one `[폰트] 곡 정보의 비ASCII 글자 …` line). The per-glyph owner list,
+  which asks each fallback with `HasCharacter(..., tryAddCharacter: true)` and therefore rasterises every glyph into
+  the dynamic atlas, now runs only with `VerboseLog=1` (2026-11-23, 알려진_문제 P12).
 - Removal: safe to delete; text simply falls back to `□` again.
 
 The Music Select scene's actual Unity scene file name is `MusicSelectScene_Hasegawa`,
@@ -778,6 +784,21 @@ of the current source baseline:
   replaces it, so the manifest is currently writable)
 
 ## Cleanup Log
+
+### 2026-11-23 (full audit: update resilience and bottlenecks)
+
+- No hook target was added or removed. Patch bodies changed only to degrade instead of throwing:
+  `AutoPlayPatch` (`createAllNote` prefix, no try — a missing `mIsCurrentAutoPlay` would have broken song loading),
+  `ArtworkUpdater.FindArtworkInstance` (now reaches its `FindObjectOfType` fallback), `PreviewAudioManager.GetUpdaterSources`,
+  `NoteArrayHooks` (checks `mFairyNoteCreateDataArray` before converting and shows a HUD warning),
+  `ResultSceneUpdaterPatch.WaitAndApplyArtwork`. Rule: check `LazyFieldRef.IsAvailable` before the indexer in try-less
+  patch methods, per-frame/per-note paths, and wherever a fallback path follows (알려진_문제 R2).
+- Hook failures now count in the startup report (`[호환성] 훅 적용 실패: …`, 알려진_문제 R1).
+- `ModLog.Verbose($"...")` binds to an interpolated-string handler (`VerboseLogHandler`, `LangVersion` 10.0): when
+  `VerboseLog=0` the message is never built (P10). `CustomAssetManager.IsSceneWhereInjectionDisallowed` / `RecordBlockPatch`
+  read the active scene name through `ActiveSceneName` (cached per scene handle, P11).
+- `MelonLoader.HarmonyDontPatchAll` (same day, v0.7.0): MelonLoader no longer auto-applies the mod's patches, so each hook
+  runs once (P4).
 
 ### 2026-11-20 (constant contracts read at runtime)
 

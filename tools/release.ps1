@@ -5,7 +5,7 @@
 .DESCRIPTION
   1) 버전 일치 확인: AssemblyVersion(앞 3자리) = AssemblyFileVersion = MelonInfo = CHANGELOG.md 최상단 ## [버전]
   2) tools\check_game_version.ps1 (설치본이 검증 기준 빌드와 다르면 경고만)
-  3) dotnet build -c Release + dotnet test (148개 이상 모두 통과해야 함)
+  3) dotnet build -c Release + dotnet test (158개 이상 모두 통과해야 함)
   4) dist\GRC2.dll 복사 + SHA256 + 릴리즈 노트 초안(dist\release-notes-v<버전>.md)
   -Publish: main이 origin/main과 같고 작업 트리가 깨끗한지 확인 → 태그 v<버전> 푸시 → gh release create (첨부: GRC2.dll)
 

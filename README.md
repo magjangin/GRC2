@@ -47,7 +47,7 @@ GRC2는 GUNVOLT RECORDS Cychronicle에 커스텀 차트, BGM, BGA, 아트워크,
 dotnet test GRC2.sln --logger "console;verbosity=normal"
 ```
 
-또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-11-20 기준 148개 통과). 설치된 게임이 검증 빌드와 같은지는 `tools\check_game_version.ps1`로 게임을 켜지 않고 확인합니다.
+또는 `test_debug.bat`을 실행하거나 아래처럼 테스트 프로젝트를 직접 지정하세요(2026-11-23 기준 158개 통과). 설치된 게임이 검증 빌드와 같은지는 `tools\check_game_version.ps1`로 게임을 켜지 않고 확인합니다.
 
 ```powershell
 dotnet test GRC2.Tests\GRC2.Tests.csproj --no-restore --logger "console;verbosity=normal"

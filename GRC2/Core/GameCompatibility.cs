@@ -223,12 +223,35 @@ namespace GRC2.Core
             return broken;
         }
 
+        private static readonly List<string> _hookFailures = new List<string>();
+
+        /// <summary>Harmony 적용 중 빠진 훅(실패한 패치 클래스, 찾지 못한 대상 메서드). 시작 점검이 문제로 셉니다.</summary>
+        public static IReadOnlyList<string> HookFailures => _hookFailures;
+
+        /// <summary>
+        /// 적용하지 못한 훅을 기록합니다. Harmony 적용은 시작 점검보다 먼저 돌므로(SceneDetector.OnInitializeMelon)
+        /// 여기 쌓인 것이 <see cref="LogStartupReport"/>에 나옵니다. 예전에는 필드·상수만 맞으면 훅 대상 메서드가
+        /// 사라졌어도 "[호환성] 점검 통과"가 찍혔습니다.
+        /// </summary>
+        public static void RecordHookFailure(string description)
+        {
+            // PatchAll이 실패하면 클래스별로 다시 적용하며 TargetMethods가 두 번 불리므로 같은 항목은 한 번만 남깁니다.
+            if (!string.IsNullOrEmpty(description) && !_hookFailures.Contains(description))
+                _hookFailures.Add(description);
+        }
+
         /// <summary>시작 점검 결과를 로그로 남깁니다. 어떤 예외도 밖으로 내보내지 않습니다.</summary>
         public static void LogStartupReport(string gameFolder)
         {
             try
             {
                 int problems = 0;
+
+                foreach (var failure in _hookFailures)
+                {
+                    problems++;
+                    MelonLogger.Error($"[호환성] 훅 적용 실패: {failure} - 이 기능이 꺼졌습니다(대상 메서드 이름·시그니처 변경 의심, HOOK_MAP.md).");
+                }
 
                 var buildId = SteamBuildInfo.ReadInstalledBuildId(gameFolder);
                 if (buildId == null)
@@ -277,7 +300,7 @@ namespace GRC2.Core
                 }
 
                 if (problems == 0)
-                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개, 상수 {ConstantContracts.Length}개 확인).");
+                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개, 상수 {ConstantContracts.Length}개, 훅 클래스 전부 적용).");
                 else
                     MelonLogger.Warning($"[호환성] 문제 {problems}건. 곡 선택·결과 화면 등 일부 기능이 동작하지 않을 수 있습니다. " +
                         "HOOK_MAP.md와 AGENTS.md의 '업데이트 대응 절차'를 따라 훅 시그니처부터 다시 확인하세요.");

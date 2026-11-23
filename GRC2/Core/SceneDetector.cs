@@ -191,6 +191,7 @@ namespace GRC2.Core
                 catch (Exception ex)
                 {
                     failed++;
+                    GameCompatibility.RecordHookFailure($"패치 클래스 {type.FullName} ({ex.Message})");
                     MelonLogger.Error($"[SceneDetector] 패치 클래스 적용 실패: {type.FullName} - {ex.Message}");
                 }
             }

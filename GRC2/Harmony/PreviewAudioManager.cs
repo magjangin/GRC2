@@ -195,8 +195,9 @@ namespace GRC2.Harmony
                 return Array.Empty<AudioSource>();
             }
 
-            AudioSource preview = PreviewSourceRef[updater];
-            AudioSource ambient = AmbientSourceRef[updater];
+            // 필드가 사라진 업데이트에서는 그 소스만 빼고 진행합니다(예외로 프리뷰 처리 전체가 멈추지 않게).
+            AudioSource preview = PreviewSourceRef.IsAvailable ? PreviewSourceRef[updater] : null;
+            AudioSource ambient = AmbientSourceRef.IsAvailable ? AmbientSourceRef[updater] : null;
 
             if (preview == null)
             {

@@ -24,6 +24,13 @@ namespace GRC2.Core
         public List<string> BgmFiles { get; set; } = new List<string>();
         public string TxtFile { get; set; }
         public SongInfo SongInfo { get; set; }
+
+        /// <summary>
+        /// <see cref="AlbumManager.GetCurrentBgmFile"/>가 고른 BGM(없으면 null)과 고른 적이 있는지.
+        /// 주입 루프(2초마다)·곡 종료 훅·곡 선택마다 후보를 다시 정렬하지 않게 둡니다. 다시 스캔하면 AlbumInfo가 새로 만들어져 저절로 비워집니다.
+        /// </summary>
+        internal string ChosenBgmFile;
+        internal bool HasChosenBgm;
     }
 
     /// <summary>
@@ -127,17 +134,25 @@ namespace GRC2.Core
         /// </summary>
         public static string GetCurrentBgmFile()
         {
-            if (_currentAlbum == null || _currentAlbum.BgmFiles.Count == 0)
+            var album = _currentAlbum;
+            if (album == null || album.BgmFiles.Count == 0)
                 return null;
 
-            return ChooseBgmFile(_currentAlbum.BgmFiles);
+            if (!album.HasChosenBgm)
+            {
+                album.ChosenBgmFile = ChooseBgmFile(album.BgmFiles);
+                album.HasChosenBgm = true;
+            }
+
+            return album.ChosenBgmFile;
         }
 
         /// <summary>
         /// BGM 후보를 고릅니다. ogg, mp3 순으로 쓰고, wav는 파일명이 music/bgm/song으로 시작하는 것만 씁니다.
         /// 키음(Hold end.wav 등)이 BGM으로 뽑히지 않게 하려는 것입니다(C3). 맞는 파일이 없으면 null이라 원본 BGM이 나옵니다.
+        /// 같은 확장자가 여럿이면 파일 이름순으로 앞선 것을 씁니다.
         /// </summary>
-        private static string ChooseBgmFile(List<string> candidates)
+        internal static string ChooseBgmFile(IReadOnlyList<string> candidates)
         {
             var sorted = candidates.OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase).ToList();
 

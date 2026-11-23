@@ -162,7 +162,7 @@ namespace GRC2.Harmony
 
         private static bool IsResultScene()
         {
-            return UnityEngine.SceneManagement.SceneManager.GetActiveScene().name == ResultSceneName;
+            return ActiveSceneName.Is(ResultSceneName);
         }
     }
 }

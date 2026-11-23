@@ -199,6 +199,11 @@ namespace GRC2.Core
         /// <summary>
         /// 곡 선택 씬에 처음 들어갈 때 한 번, 커스텀 곡 문자열의 비ASCII 글자가 어느 폰트에서 그려지는지 기록합니다.
         /// 게임 폰트가 엉뚱한 글리프로 "가지고 있는" 글자(예: 吉이 다른 모양으로 보임)를 찾는 용도입니다.
+        ///
+        /// 기본(<c>VerboseLog=0</c>)에서는 게임 폰트 보유 여부만 세어 한 줄로 남깁니다. 글자별 목록은 fallback 폰트에
+        /// <c>tryAddCharacter</c>로 물어봐야 해서, 곡이 많으면 곡 선택 첫 진입 때 모든 곡의 한자·가나를 동적 아틀라스에
+        /// 한꺼번에 굽고(글자마다 SDF 렌더링) 아틀라스 텍스처가 여러 장 늘어났습니다(알려진_문제 P12). 화면에 나오는 글자는
+        /// TMP가 그릴 때 알아서 추가하므로 미리 구울 필요가 없습니다. 글자별 목록은 <c>VerboseLog=1</c>일 때만 만듭니다.
         /// </summary>
         public static void LogCoverageDiagnostics()
         {
@@ -215,32 +220,57 @@ namespace GRC2.Core
                 if (codePoints.Count == 0) return;
 
                 var gameFonts = GetLoadedGameFonts().ToList();
-                MelonLogger.Msg($"{LogPrefix} 로드된 게임 폰트 {gameFonts.Count}개: {string.Join(", ", gameFonts.Select(f => $"{f.name}({f.atlasPopulationMode}, {f.characterLookupTable?.Count ?? 0}자)"))}");
+                bool verbose = ModLog.IsVerbose;
+                if (verbose)
+                    MelonLogger.Msg($"{LogPrefix} 로드된 게임 폰트 {gameFonts.Count}개: {string.Join(", ", gameFonts.Select(f => $"{f.name}({f.atlasPopulationMode}, {f.characterLookupTable?.Count ?? 0}자)"))}");
 
-                var byFont = new Dictionary<string, List<string>>();
+                int byGameFont = 0;
+                var byFont = verbose ? new Dictionary<string, List<string>>() : null;
                 foreach (var cp in codePoints)
                 {
                     uint unicode = (uint)cp;
                     string owner = gameFonts.FirstOrDefault(f => f.characterLookupTable != null && f.characterLookupTable.ContainsKey(unicode))?.name;
+                    if (owner != null)
+                        byGameFont++;
+
+                    if (!verbose)
+                        continue;
+
                     if (owner == null)
-                    {
-                        // 게임 폰트에 없으면 fallback 폰트가 실제로 그릴 수 있는지 확인합니다(Dynamic이라 이때 아틀라스에 추가됨).
-                        owner = _fallbackFonts.FirstOrDefault(f => f.HasCharacter((char)Math.Min(cp, 0xFFFF), searchFallbacks: false, tryAddCharacter: true))?.name
-                                ?? "없음(□)";
-                    }
+                        owner = FindFallbackOwner(cp);
 
                     if (!byFont.TryGetValue(owner, out var list))
                         byFont[owner] = list = new List<string>();
                     list.Add(char.ConvertFromUtf32(cp));
                 }
 
-                foreach (var pair in byFont.OrderBy(p => p.Key))
-                    MelonLogger.Msg($"{LogPrefix} {pair.Key}: {string.Join("", pair.Value)}");
+                MelonLogger.Msg($"{LogPrefix} 곡 정보의 비ASCII 글자 {codePoints.Count}종: 게임 폰트 {byGameFont}종, 나머지 {codePoints.Count - byGameFont}종은 " +
+                    $"fallback 폰트 {_fallbackFonts.Count}개가 화면에 나올 때 그립니다" + (verbose ? "." : " (글자별 목록은 VerboseLog=1)."));
+
+                if (verbose)
+                {
+                    foreach (var pair in byFont.OrderBy(p => p.Key))
+                        MelonLogger.Msg($"{LogPrefix} {pair.Key}: {string.Join("", pair.Value)}");
+                }
             }
             catch (Exception ex)
             {
                 MelonLogger.Warning($"{LogPrefix} 글자 진단 실패: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// 게임 폰트에 없는 글자를 어느 fallback 폰트가 그리는지 찾습니다(Dynamic이라 이때 아틀라스에 추가됨, VerboseLog 전용).
+        /// TMP의 HasCharacter(char)는 BMP 글자만 받습니다. 예전에는 BMP 밖 글자(이모지 등)를 U+FFFF로 잘라 엉뚱한 글자를 확인했습니다.
+        /// </summary>
+        private static string FindFallbackOwner(int codePoint)
+        {
+            if (codePoint > 0xFFFF)
+                return "확인 안 함(BMP 밖)";
+
+            char ch = (char)codePoint;
+            return _fallbackFonts.FirstOrDefault(f => f.HasCharacter(ch, searchFallbacks: false, tryAddCharacter: true))?.name
+                ?? "없음(□)";
         }
     }
 }

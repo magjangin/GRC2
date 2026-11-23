@@ -90,8 +90,9 @@ namespace GRC2.Harmony
         private static cMusicSelectArtWork FindArtworkInstance(
             cMusicSelectSceneUIUpdater sceneUpdater)
         {
-            cMusicSelectArtWorkManager artworkManager = ArtworkManagerRef[sceneUpdater];
-            if (artworkManager != null)
+            // 필드가 사라진 업데이트에서는 예외 대신 아래 씬 검색으로 넘어갑니다(예전에는 예외라 대체 경로까지 못 갔음).
+            cMusicSelectArtWorkManager artworkManager = ArtworkManagerRef.IsAvailable ? ArtworkManagerRef[sceneUpdater] : null;
+            if (artworkManager != null && ArtWorkRef.IsAvailable)
             {
                 cMusicSelectArtWork artwork = ArtWorkRef[artworkManager];
                 if (artwork != null)

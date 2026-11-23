@@ -108,6 +108,7 @@ namespace GRC2.Harmony
                     {
                         // 게임 업데이트로 이름이 바뀌면 크레딧이 원본 값으로 돌아갑니다. 조용히 빠지지 않게 알립니다(I3).
                         MelonLogger.Error($"[CreditTextPatch] MusicData.{name}을(를) 찾지 못해 이 크레딧 칸은 바꾸지 못합니다.");
+                        GameCompatibility.RecordHookFailure($"크레딧 게터 MusicData.{name}");
                         continue;
                     }
 

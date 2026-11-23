@@ -12,6 +12,9 @@
     <FileAlignment>512</FileAlignment>
     <Deterministic>true</Deterministic>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- net472 기본은 C# 7.3입니다. ModLog.Verbose의 보간 문자열 처리기(VerboseLogHandler)에 C# 10이 필요합니다.
+         런타임 기능(기본 인터페이스 메서드 등)이 필요한 문법은 쓰지 않습니다 — Unity Mono에서 돌아야 합니다. -->
+    <LangVersion>10.0</LangVersion>
   </PropertyGroup>
   <PropertyGroup>
     <DebugSymbols>true</DebugSymbols>

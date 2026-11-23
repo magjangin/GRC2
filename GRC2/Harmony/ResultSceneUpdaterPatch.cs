@@ -187,7 +187,7 @@ namespace GRC2.Harmony
                 yield return null;
             }
 
-            if (updater == null)
+            if (updater == null || !ArtworkImageRef.IsAvailable)
                 yield break;
 
             var image = ArtworkImageRef[updater];

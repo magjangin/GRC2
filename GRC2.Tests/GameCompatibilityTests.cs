@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -37,6 +37,21 @@ namespace GRC2.Tests
                 }
                 return null;
             };
+        }
+
+        [Fact]
+        public void RecordHookFailure_KeepsEachDescriptionOnce()
+        {
+            // PatchAll 실패 뒤 클래스별 재적용에서 TargetMethods가 다시 불려도 같은 실패가 두 번 세어지지 않아야 합니다.
+            string description = "테스트 훅 " + Guid.NewGuid().ToString("N");
+            int before = GameCompatibility.HookFailures.Count;
+
+            GameCompatibility.RecordHookFailure(description);
+            GameCompatibility.RecordHookFailure(description);
+            GameCompatibility.RecordHookFailure(null);
+
+            Assert.Equal(before + 1, GameCompatibility.HookFailures.Count);
+            Assert.Contains(description, GameCompatibility.HookFailures);
         }
 
         [Fact]
