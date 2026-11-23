@@ -93,6 +93,7 @@
 - **리플렉션 기반 필드 접근 시스템** → 현재 코드와 맞지 않아 `GRC 리드미/archive/`로 옮김. 지금은 컴파일 타임 타입 참조 + `LazyFieldRef`(내부적으로 `AccessTools.FieldRefAccess`).
 - **`HarmonyDontPatchAll` 없이 직접 `PatchAll`** → MelonLoader 자동 패치와 겹쳐 모든 훅이 두 번 돌았다(노트 변환 2회, 판정바 틱 2회, 노트 속도 카오스 배율 제곱, 원제목을 포함한 커스텀 제목 이중 치환). 로그에서 "같은 메서드가 두 번 불림"처럼 보여 P4는 오래 원인 미상이었다. 2026-11-23 수정.
 - **`GRC2.Tests`를 솔루션에 넣지 않기** → `test_debug.bat`이 테스트 0개로 "성공"했다(F). 지금은 솔루션에 포함.
+- **게임 없는 환경에서 만든 `tools/release.ps1`을 그대로 믿기** → 2026-11-23 첫 실행에서 두 버그가 나왔다. `MelonInfo` 버전 정규식이 `typeof(...)`의 `)`에서 멈춰 항상 "버전 불일치", 릴리즈 노트를 PS 5.1 `Set-Content -Encoding utf8`로 써서 BOM 때문에 GitHub 본문 첫 `###`가 제목이 안 됨. 둘 다 고쳤다. 스크립트를 고치면 `-Publish` 없이 먼저 한 번 돌려 `dist\release-notes-*.md`를 확인한다.
 - **게임 enum·const를 코드로 읽어 상수 계약 점검하기**(`new ConstantContract(..., 512, (int)MusicID.SAVEABLE_ID_END)`) → 컴파일러가 둘 다 숫자로 박아 넣어 "기대 512, 현재 512"를 영원히 비교했다. 테스트도 다시 빌드할 때만 새 값을 보므로 배포된 DLL의 시작 점검은 업데이트를 못 잡았다(2026-11-20 수정, 이름으로 런타임 조회).
 
 ## 6. 빌드 명령 및 배포 경로
