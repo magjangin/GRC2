@@ -30,7 +30,9 @@ $changelog = Join-Path $root 'CHANGELOG.md'
 $asmText = Get-Content -Raw -Encoding UTF8 $asmInfo
 $asmVer = ([regex]::Match($asmText, 'AssemblyVersion\("([0-9]+\.[0-9]+\.[0-9]+)')).Groups[1].Value
 $fileVer = ([regex]::Match($asmText, 'AssemblyFileVersion\("([0-9]+\.[0-9]+\.[0-9]+)')).Groups[1].Value
-$melonVer = ([regex]::Match($asmText, 'MelonInfo\([^)]*?"([0-9]+\.[0-9]+\.[0-9]+)"')).Groups[1].Value
+# MelonInfo(typeof(…), "이름", "버전", "작성자") — typeof(…)의 닫는 괄호를 건너뛰고 세 번째 인자(첫 문자열 뒤의 버전)를 읽습니다.
+# 예전 정규식 'MelonInfo\([^)]*?"…"'는 typeof의 ')'에서 멈춰 항상 빈 값이었습니다(2026-11-23 첫 실행에서 발견).
+$melonVer = ([regex]::Match($asmText, 'MelonInfo\(\s*typeof\([^)]*\)\s*,\s*"[^"]*"\s*,\s*"([0-9]+\.[0-9]+\.[0-9]+)"')).Groups[1].Value
 $logVer = ([regex]::Match((Get-Content -Raw -Encoding UTF8 $changelog), '(?m)^## \[([0-9.]+)\]')).Groups[1].Value
 if (-not $asmVer -or $asmVer -ne $fileVer -or $asmVer -ne $melonVer -or $asmVer -ne $logVer) {
     throw "버전 불일치: AssemblyVersion=$asmVer, AssemblyFileVersion=$fileVer, MelonInfo=$melonVer, CHANGELOG=$logVer"
@@ -74,7 +76,9 @@ $section
 $compare
 "@
 $notesFile = Join-Path $dist "release-notes-$tag.md"
-Set-Content -Path $notesFile -Value $notes -Encoding utf8
+# Windows PowerShell 5.1의 Set-Content -Encoding utf8은 BOM을 붙입니다. BOM이 있으면 GitHub 릴리즈 본문 첫 줄의 '###'가
+# 제목으로 인식되지 않으므로 BOM 없는 UTF-8로 씁니다.
+[System.IO.File]::WriteAllText($notesFile, $notes, (New-Object System.Text.UTF8Encoding($false)))
 Write-Host "생성: $distDll"
 Write-Host "생성: $notesFile"
 
