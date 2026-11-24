@@ -4,10 +4,10 @@
 # 사용: powershell -ExecutionPolicy Bypass -File tools\check_game_version.ps1 [-GamePath "다른 설치 경로"]
 # 종료 코드: 0 = 기준 빌드와 같음, 1 = 다름(업데이트 대응 가이드 2단계로), 2 = 파일을 찾지 못함
 #
-# 기본 대상은 바탕화면 바로가기가 실행하는 독립 사본(H:\cychronicle hwa, 2026-11-24)입니다. 사본은 스팀이 업데이트하지 않으므로,
+# 기본 대상은 바탕화면 바로가기가 실행하는 독립 사본(H:\GUNVOLT RECORDS Cychronicle hwa, 2026-11-24)입니다. 사본은 스팀이 업데이트하지 않으므로,
 # 스팀 설치본(-SteamPath)의 Build ID도 참고로 보여 줍니다. 스팀판이 업데이트되면 여기서 알 수 있고, 사본은 그대로라 종료 코드에는 넣지 않습니다.
 param(
-    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\cychronicle hwa' }),
+    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\GUNVOLT RECORDS Cychronicle hwa' }),
     [string]$SteamPath = 'H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle'
 )
 
@@ -16,7 +16,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $compatSource = Join-Path $repoRoot 'GRC2\Core\GameCompatibility.cs'
 $assemblyPath = Join-Path $GamePath 'GUNVOLT_RECORDS_Cychronicle_Data\Managed\Assembly-CSharp.dll'
 
-# steamapps\common\<게임> 아래일 때만 .acf가 있습니다. 사본(H:\cychronicle hwa)은 두 단계 위가 없어 Join-Path가 실패하므로 먼저 확인합니다.
+# steamapps\common\<게임> 아래일 때만 .acf가 있습니다. 사본(H:\GUNVOLT RECORDS Cychronicle hwa)은 두 단계 위가 없어 Join-Path가 실패하므로 먼저 확인합니다.
 function Get-AcfPath([string]$installPath) {
     $common = Split-Path -Parent $installPath
     if (-not $common) { return $null }
