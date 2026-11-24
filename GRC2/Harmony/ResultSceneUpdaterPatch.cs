@@ -128,65 +128,12 @@ namespace GRC2.Harmony
                 textComponent.text = songInfo.Title;
                 MelonLogger.Msg($"[ResultSceneUpdaterPatch] ✅ 곡 제목 직접 적용: {songInfo.Title}");
 
-                // 결과 화면에서만 제목 한자가 □로 나온다는 보고(2026-11-24)가 있어, 실제로 어느 폰트로 그려졌는지 남깁니다.
-                // initializePreFade가 두 번 불리므로 한 번만 돌립니다.
-                if (!_titleDiagnosticsQueued)
-                {
-                    _titleDiagnosticsQueued = true;
-                    MelonCoroutines.Start(LogTitleGlyphDiagnostics(textComponent));
-                }
+                // 결과 화면 제목 한자 □ 조사용 진단(알려진_문제 L2). initializePreFade가 두 번 불려도 한 번만 돕니다.
+                ResultScreenDiagnostics.Run(textComponent);
             }
             catch (Exception ex)
             {
                 ErrorLogger.LogWarning(ex, "[ResultSceneUpdaterPatch]", "ApplyMusicNameText 오류");
-            }
-        }
-
-        private static bool _titleDiagnosticsQueued;
-
-        /// <summary>
-        /// 결과 화면 제목의 비ASCII 글자가 어느 폰트로 그려졌는지(또는 □로 바뀌었는지) 한 줄로 남깁니다.
-        /// 글자를 넣은 직후에는 메시가 아직 없으므로 몇 프레임 뒤에 읽습니다.
-        /// </summary>
-        private static IEnumerator LogTitleGlyphDiagnostics(TextMeshProUGUI text)
-        {
-            // 제목이 페이드 연출 뒤에 켜질 수 있어 최대 5초까지 활성화를 기다립니다(꺼진 채로는 메시가 만들어지지 않음).
-            float deadline = Time.realtimeSinceStartup + 5f;
-            do
-            {
-                yield return null;
-            }
-            while (text != null && !text.isActiveAndEnabled && Time.realtimeSinceStartup < deadline);
-            yield return null;
-            _titleDiagnosticsQueued = false;
-
-            try
-            {
-                if (text == null) yield break;
-
-                text.ForceMeshUpdate();
-                var info = text.textInfo;
-                var parts = new System.Collections.Generic.List<string>();
-                for (int i = 0; info != null && i < info.characterCount; i++)
-                {
-                    var ch = info.characterInfo[i];
-                    if (ch.character < 0x80) continue;
-                    string owner = ch.fontAsset != null ? ch.fontAsset.name : "없음";
-                    parts.Add($"{ch.character}(U+{(int)ch.character:X4})→{owner}");
-                }
-
-                var material = text.fontSharedMaterial;
-                int globalFallbacks = TMP_Settings.fallbackFontAssets?.Count ?? -1;
-                int ownFallbacks = text.font?.fallbackFontAssetTable?.Count ?? -1;
-                MelonLogger.Msg(
-                    $"[결과 제목 진단] 표시 문자열 '{text.text}', 폰트 {text.font?.name ?? "null"}({text.font?.atlasPopulationMode}), " +
-                    $"머티리얼 {material?.name ?? "null"} / 셰이더 {material?.shader?.name ?? "null"}, " +
-                    $"폰트 자체 fallback {ownFallbacks}개, 전역 fallback {globalFallbacks}개, 오브젝트 {text.gameObject.name}(활성 {text.isActiveAndEnabled})");
-                MelonLogger.Msg($"[결과 제목 진단] 비ASCII 글자별 폰트: {(parts.Count == 0 ? "없음" : string.Join(", ", parts))}");
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[결과 제목 진단] 실패: {ex.Message}");
             }
         }
 
