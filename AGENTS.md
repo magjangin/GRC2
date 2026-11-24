@@ -29,7 +29,11 @@
 | --- | --- | --- | --- | --- | --- |
 | GUNVOLT RECORDS Cychronicle | `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle` | 2585040 | **13530823** | 0 | 아니오 |
 
-- **고정 여부:** 고정 안 됨 — `AutoUpdateBehavior`가 `0`(항상 자동 업데이트)이고 `.acf`가 읽기 전용이 아니면 스팀이 게임을 업데이트할 수 있다. 업데이트되면 위 Build ID와 달라지므로 먼저 Build ID를 비교할 것.
+- **고정 여부:** 스팀 설치본은 고정 안 됨 — `AutoUpdateBehavior`가 `0`(항상 자동 업데이트)이고 `.acf`가 읽기 전용이 아니면 스팀이 게임을 업데이트할 수 있다. 업데이트되면 위 Build ID와 달라지므로 먼저 Build ID를 비교할 것.
+- **독립 사본(2026-11-24):** `H:\cychronicle hwa`에 스팀 설치본 전체를 robocopy로 복사했다(파일 1,608개·4,815,027,179바이트 일치, exe·`UnityPlayer.dll`·`Assembly-CSharp.dll`·`Mods\GRC2.dll`(v0.7.1)·`MelonLoader.dll` 해시 일치). 스팀이 모르는 폴더라 **Build 13530823으로 고정**된다. 바탕화면 `C:\Users\화평\Desktop\게임들\GUNVOLT_RECORDS_Cychronicle.exe - 바로 가기.lnk`는 이 사본을 실행한다(원래 대상은 스팀 설치본의 같은 exe). 주의:
+  - **세이브는 공유된다.** 게임은 `Application.persistentDataPath`(`%USERPROFILE%\AppData\LocalLow\INTI CREATES\…`)에 저장하므로 사본과 스팀 설치본이 같은 세이브를 쓴다. `hwa`·`savecustomkey`·`Mods`·`UserData`는 폴더별로 따로다.
+  - 사본 위에는 `.acf`가 없어 시작 점검이 `Steam Build ID를 읽지 못했습니다 … MVID로만 점검`을 찍는다(정상). 버전 비교는 MVID·MelonLoader·Unity로 한다.
+  - 빌드 스크립트 기본 `GamePath`와 `build_*.bat`의 Mods 복사 대상은 **아직 스팀 설치본**이다. 사본에 배포·테스트하려면 `-p:GamePath="H:\cychronicle hwa"`, `$env:GRC2_GAME_PATH`, `tools\release.ps1 -GamePath` / `check_game_version.ps1 -GamePath`를 쓰거나 `Mods\GRC2.dll`을 직접 복사한다.
 - **DepotDownloader 다운그레이드:** 이 폴더에서 다운그레이드 기록은 찾지 못했다(**미확인**). 버전을 고정하려면 DepotDownloader로 위 Build ID의 매니페스트를 받아 두고, `.acf`를 읽기 전용으로 바꿔 업데이트를 막는다.
 
 ## 2. 런타임 백엔드 및 디컴파일 경로
@@ -114,7 +118,7 @@
 - 빌드/배포 스크립트: `build_debug.bat`, `build_release.bat`, `test_debug.bat`(테스트 전에 `tools\check_game_version.ps1`로 설치본 버전을 먼저 비교, 다르면 경고만)
 - 게임 버전 점검만: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\check_game_version.ps1` (기준 값은 `GameCompatibility.cs`에서 읽음, 다르면 종료 코드 1)
 - 배포는 스크립트가 처리한다: `build_debug.bat`, `build_release.bat` (내용에 Mods 경로 복사 포함)
-- 배포 위치: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\Mods\`
+- 배포 위치: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\Mods\`(스크립트 기본값). 바탕화면 바로가기로 실행하는 독립 사본은 `H:\cychronicle hwa\Mods\`라 따로 복사해야 반영된다(1절).
 
 ## 7. 다음 작업자에게
 
