@@ -27,7 +27,7 @@
   </PropertyGroup>
   <PropertyGroup>
     <!-- 게임 설치 폴더. build_*.bat가 /p:GamePath로 넘깁니다. 넘기지 않으면 기본 경로를 씁니다(F, H11). -->
-    <GamePath Condition=" '$(GamePath)' == '' ">H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle</GamePath>
+    <GamePath Condition=" '$(GamePath)' == '' ">H:\cychronicle hwa</GamePath>
     <GameManaged>$(GamePath)\GUNVOLT_RECORDS_Cychronicle_Data\Managed</GameManaged>
   </PropertyGroup>
   <ItemGroup>

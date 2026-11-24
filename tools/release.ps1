@@ -16,7 +16,7 @@
 #>
 param(
     [switch]$Publish,
-    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle' })
+    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\cychronicle hwa' })
 )
 
 $ErrorActionPreference = 'Stop'
