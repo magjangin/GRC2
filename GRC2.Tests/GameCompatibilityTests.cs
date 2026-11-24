@@ -19,7 +19,7 @@ namespace GRC2.Tests
         {
             // 게임 어셈블리는 빌드 출력에 복사되지 않으므로 설치 폴더에서 직접 찾습니다(GRC2_GAME_PATH 또는 기본 설치 경로).
             var gamePath = Environment.GetEnvironmentVariable("GRC2_GAME_PATH")
-                ?? @"H:\cychronicle hwa";
+                ?? @"H:\GUNVOLT RECORDS Cychronicle hwa";
             var dirs = new[]
             {
                 Path.Combine(gamePath, "GUNVOLT_RECORDS_Cychronicle_Data", "Managed"),
@@ -40,7 +40,7 @@ namespace GRC2.Tests
         }
 
         private static string GamePath =>
-            Environment.GetEnvironmentVariable("GRC2_GAME_PATH") ?? @"H:\cychronicle hwa";
+            Environment.GetEnvironmentVariable("GRC2_GAME_PATH") ?? @"H:\GUNVOLT RECORDS Cychronicle hwa";
 
         [Theory]
         [InlineData("0.7.3.0", "0.7.3")]

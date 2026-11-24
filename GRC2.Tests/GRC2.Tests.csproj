@@ -18,7 +18,7 @@
   </ItemGroup>
   <PropertyGroup>
     <!-- GRC2.csproj와 같은 규칙: build_*.bat가 /p:GamePath를 넘기지 않으면 기본 설치 경로를 씁니다. -->
-    <GamePath Condition=" '$(GamePath)' == '' ">H:\cychronicle hwa</GamePath>
+    <GamePath Condition=" '$(GamePath)' == '' ">H:\GUNVOLT RECORDS Cychronicle hwa</GamePath>
   </PropertyGroup>
   <ItemGroup>
     <!-- GameCompatibilityTests가 Harmony 패치 적용 가능 여부를 직접 확인하는 데 씁니다. -->
