@@ -33,14 +33,14 @@
 - **독립 사본(2026-11-24):** `H:\cychronicle hwa`에 스팀 설치본 전체를 robocopy로 복사했다(파일 1,608개·4,815,027,179바이트 일치, exe·`UnityPlayer.dll`·`Assembly-CSharp.dll`·`Mods\GRC2.dll`(v0.7.1)·`MelonLoader.dll` 해시 일치). 스팀이 모르는 폴더라 **Build 13530823으로 고정**된다. 바탕화면 `C:\Users\화평\Desktop\게임들\GUNVOLT_RECORDS_Cychronicle.exe - 바로 가기.lnk`는 이 사본을 실행한다(원래 대상은 스팀 설치본의 같은 exe). 주의:
   - **세이브는 공유된다.** 게임은 `Application.persistentDataPath`(`%USERPROFILE%\AppData\LocalLow\INTI CREATES\…`)에 저장하므로 사본과 스팀 설치본이 같은 세이브를 쓴다. `hwa`·`savecustomkey`·`Mods`·`UserData`는 폴더별로 따로다.
   - 사본 위에는 `.acf`가 없어 시작 점검이 `Steam Build ID를 읽지 못했습니다 … MVID로만 점검`을 찍는다(정상). 버전 비교는 MVID·MelonLoader·Unity로 한다.
-  - 빌드 스크립트 기본 `GamePath`와 `build_*.bat`의 Mods 복사 대상은 **아직 스팀 설치본**이다. 사본에 배포·테스트하려면 `-p:GamePath="H:\cychronicle hwa"`, `$env:GRC2_GAME_PATH`, `tools\release.ps1 -GamePath` / `check_game_version.ps1 -GamePath`를 쓰거나 `Mods\GRC2.dll`을 직접 복사한다.
+  - **빌드·테스트·배포 기본 경로는 이 사본이다**(2026-11-24 변경). `GRC2.csproj`·`GRC2.Tests.csproj`의 `GamePath`, `GameCompatibilityTests`, `build_*.bat`의 `GAME_PATH`, `tools\release.ps1`·`check_game_version.ps1`의 `-GamePath` 기본값이 모두 `H:\cychronicle hwa`다. 스팀 설치본에 빌드·배포하려면 `-p:GamePath=…`, `$env:GRC2_GAME_PATH`, `-GamePath`로 덮어쓴다. `check_game_version.ps1`은 사본에 `.acf`가 없어 Build ID를 건너뛰고, 대신 `-SteamPath`(기본 스팀 설치본)의 Build ID를 `[참고]`로 보여 준다(종료 코드에는 안 넣음) — 스팀판이 업데이트되면 여기서 안다.
 - **DepotDownloader 다운그레이드:** 이 폴더에서 다운그레이드 기록은 찾지 못했다(**미확인**). 버전을 고정하려면 DepotDownloader로 위 Build ID의 매니페스트를 받아 두고, `.acf`를 읽기 전용으로 바꿔 업데이트를 막는다.
 
 ## 2. 런타임 백엔드 및 디컴파일 경로
 
 - **GUNVOLT RECORDS Cychronicle:** Unity / **Mono** / Unity `2021.3.31f1` / x64 (실측)
   - 설치된 MelonLoader: `0.7.3.0 (net6)` (실측)
-  - 참조 어셈블리: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\GUNVOLT_RECORDS_Cychronicle_Data\Managed\`
+  - 참조 어셈블리: `H:\cychronicle hwa\GUNVOLT_RECORDS_Cychronicle_Data\Managed\`(독립 사본, 1절. 스팀 설치본과 같은 빌드)
 - 모드/앱 프로젝트 `GRC2\GRC2.csproj` 타깃 프레임워크: `net472` (SDK 스타일), `LangVersion` 10.0(보간 문자열 처리기용, 3절)
 - 모드/앱 프로젝트 `GRC2.Tests\GRC2.Tests.csproj` 타깃 프레임워크: `net472` (SDK 스타일)
 - **이 폴더 안의 디컴파일/덤프 자료:** `Decompiled/`, `Decompiled-outline/`
@@ -110,7 +110,7 @@
   ```powershell
   dotnet build "GRC2\GRC2.csproj" -c Release
   ```
-  - 게임 경로 속성: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle` (`-p:` 로 덮어쓸 수 있으면 다른 설치 경로로 빌드 가능)
+  - 게임 경로 속성: `H:\cychronicle hwa`(독립 사본, 2026-11-24부터 기본). `-p:GamePath=…`로 다른 설치 경로(예: 스팀 설치본)를 지정할 수 있다.
 - `GRC2.Tests\GRC2.Tests.csproj`:
   ```powershell
   dotnet build "GRC2.Tests\GRC2.Tests.csproj" -c Release
@@ -118,7 +118,7 @@
 - 빌드/배포 스크립트: `build_debug.bat`, `build_release.bat`, `test_debug.bat`(테스트 전에 `tools\check_game_version.ps1`로 설치본 버전을 먼저 비교, 다르면 경고만)
 - 게임 버전 점검만: `powershell -NoProfile -ExecutionPolicy Bypass -File tools\check_game_version.ps1` (기준 값은 `GameCompatibility.cs`에서 읽음, 다르면 종료 코드 1)
 - 배포는 스크립트가 처리한다: `build_debug.bat`, `build_release.bat` (내용에 Mods 경로 복사 포함)
-- 배포 위치: `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\Mods\`(스크립트 기본값). 바탕화면 바로가기로 실행하는 독립 사본은 `H:\cychronicle hwa\Mods\`라 따로 복사해야 반영된다(1절).
+- 배포 위치: `H:\cychronicle hwa\Mods\`(스크립트 기본값, 바탕화면 바로가기가 실행하는 독립 사본). 스팀 설치본 `H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle\Mods\`에는 v0.7.1이 그대로 있고 이후로는 자동으로 갱신되지 않는다.
 
 ## 7. 다음 작업자에게
 

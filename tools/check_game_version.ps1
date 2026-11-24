@@ -3,15 +3,28 @@
 #
 # 사용: powershell -ExecutionPolicy Bypass -File tools\check_game_version.ps1 [-GamePath "다른 설치 경로"]
 # 종료 코드: 0 = 기준 빌드와 같음, 1 = 다름(업데이트 대응 가이드 2단계로), 2 = 파일을 찾지 못함
+#
+# 기본 대상은 바탕화면 바로가기가 실행하는 독립 사본(H:\cychronicle hwa, 2026-11-24)입니다. 사본은 스팀이 업데이트하지 않으므로,
+# 스팀 설치본(-SteamPath)의 Build ID도 참고로 보여 줍니다. 스팀판이 업데이트되면 여기서 알 수 있고, 사본은 그대로라 종료 코드에는 넣지 않습니다.
 param(
-    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle' })
+    [string]$GamePath = $(if ($env:GRC2_GAME_PATH) { $env:GRC2_GAME_PATH } else { 'H:\cychronicle hwa' }),
+    [string]$SteamPath = 'H:\steam\steamapps\common\GUNVOLT RECORDS Cychronicle'
 )
 
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $compatSource = Join-Path $repoRoot 'GRC2\Core\GameCompatibility.cs'
 $assemblyPath = Join-Path $GamePath 'GUNVOLT_RECORDS_Cychronicle_Data\Managed\Assembly-CSharp.dll'
-$acfPath = Join-Path (Split-Path -Parent (Split-Path -Parent $GamePath)) 'appmanifest_2585040.acf'
+
+# steamapps\common\<게임> 아래일 때만 .acf가 있습니다. 사본(H:\cychronicle hwa)은 두 단계 위가 없어 Join-Path가 실패하므로 먼저 확인합니다.
+function Get-AcfPath([string]$installPath) {
+    $common = Split-Path -Parent $installPath
+    if (-not $common) { return $null }
+    $steamApps = Split-Path -Parent $common
+    if (-not $steamApps) { return $null }
+    return Join-Path $steamApps 'appmanifest_2585040.acf'
+}
+$acfPath = Get-AcfPath $GamePath
 
 if (-not (Test-Path $compatSource)) { Write-Host "GameCompatibility.cs 없음: $compatSource"; exit 2 }
 $source = Get-Content -Raw -Encoding UTF8 $compatSource
@@ -22,7 +35,7 @@ $testedUnity = [regex]::Match($source, 'TestedUnityVersion\s*=\s*"([^"]+)"').Gro
 
 $ok = $true
 
-if (Test-Path $acfPath) {
+if ($acfPath -and (Test-Path $acfPath)) {
     $acf = Get-Content -Raw $acfPath
     $build = [regex]::Match($acf, '"buildid"\s+"(\d+)"', 'IgnoreCase').Groups[1].Value
     $autoUpdate = [regex]::Match($acf, '"AutoUpdateBehavior"\s+"(\d+)"', 'IgnoreCase').Groups[1].Value
@@ -35,7 +48,17 @@ if (Test-Path $acfPath) {
     }
     Write-Host "       AutoUpdateBehavior=$autoUpdate, .acf 읽기 전용=$readOnly"
 } else {
-    Write-Host "[건너뜀] .acf 없음(비 Steam 설치?): $acfPath"
+    Write-Host "[건너뜀] .acf 없음(독립 사본이거나 비 Steam 설치): $GamePath"
+    # 사본을 점검할 때는 스팀 설치본이 업데이트됐는지만 참고로 알립니다(사본 버전에는 영향 없음).
+    $steamAcf = Get-AcfPath $SteamPath
+    if ($steamAcf -and (Test-Path $steamAcf)) {
+        $steamBuild = [regex]::Match((Get-Content -Raw $steamAcf), '"buildid"\s+"(\d+)"', 'IgnoreCase').Groups[1].Value
+        if ($steamBuild -eq $testedBuild) {
+            Write-Host "[참고] 스팀 설치본 Build ID $steamBuild - 검증 빌드와 같음"
+        } else {
+            Write-Host "[참고] 스팀 설치본이 Build ID $steamBuild로 업데이트됨(검증 $testedBuild). 사본은 그대로입니다. 새 빌드에 맞추려면 업데이트_대응_가이드.md를 따르세요."
+        }
+    }
 }
 
 if (-not (Test-Path $assemblyPath)) { Write-Host "Assembly-CSharp.dll 없음: $assemblyPath"; exit 2 }
