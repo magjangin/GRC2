@@ -73,7 +73,7 @@ namespace GRC2.Injectors
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"[BGMPlayerHook] GetCurrentAudioSource 오류: {ex.Message}");
+                ModLog.WarningThrottled("bga-sync-audio-source", $"[BGMPlayerHook] GetCurrentAudioSource 오류: {ex.Message}");
                 return null;
             }
         }
@@ -143,7 +143,7 @@ namespace GRC2.Injectors
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning($"[BGMPlayerHook] GetBgmAudioSourceFromManager 오류: {ex.Message}");
+                ModLog.WarningThrottled("bga-sync-manager-source", $"[BGMPlayerHook] GetBgmAudioSourceFromManager 오류: {ex.Message}");
             }
 
             return null;
@@ -189,7 +189,7 @@ namespace GRC2.Injectors
             }
             catch (Exception ex)
             {
-                MelonLogger.Warning(
+                ModLog.WarningThrottled("bga-sync-bgm-time",
                     $"[BGAPlayerHook] GetBgmTimeFromManager 오류: {ex.Message}");
             }
 
@@ -260,7 +260,8 @@ namespace GRC2.Injectors
                 }
                 catch (Exception ex)
                 {
-                    MelonLogger.Warning($"[BGAPlayerHook] 동기화 모니터링 오류: {ex.Message}");
+                    // 0.1초마다 도는 루프라 같은 예외가 반복되면 초당 10줄이 됩니다(P16).
+                    ModLog.WarningThrottled("bga-sync-loop", $"[BGAPlayerHook] 동기화 모니터링 오류: {ex.Message}");
                 }
             }
         }

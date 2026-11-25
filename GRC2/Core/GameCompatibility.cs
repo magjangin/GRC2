@@ -265,6 +265,27 @@ namespace GRC2.Core
                 _hookFailures.Add(description);
         }
 
+        /// <summary>빌드 설정(Build Settings)에 들어 있는 씬 이름 목록. 읽지 못하면 빈 목록.</summary>
+        private static List<string> ReadBuildSceneNames()
+        {
+            var names = new List<string>();
+            try
+            {
+                int count = UnityEngine.SceneManagement.SceneManager.sceneCountInBuildSettings;
+                for (int i = 0; i < count; i++)
+                {
+                    string path = UnityEngine.SceneManagement.SceneUtility.GetScenePathByBuildIndex(i);
+                    if (!string.IsNullOrEmpty(path))
+                        names.Add(System.IO.Path.GetFileNameWithoutExtension(path));
+                }
+            }
+            catch (Exception ex)
+            {
+                MelonLogger.Warning($"[호환성] 씬 목록 읽기 실패: {ex.Message}");
+            }
+            return names;
+        }
+
         /// <summary>시작 점검 결과를 로그로 남깁니다. 어떤 예외도 밖으로 내보내지 않습니다.</summary>
         public static void LogStartupReport(string gameFolder)
         {
@@ -339,8 +360,23 @@ namespace GRC2.Core
                         $"세이브 칸 {TestedCustomMusicIdStart}~{customStart - 1}에 예전 커스텀 곡 기록이 남아 있으면 새 원본 곡 기록처럼 보일 수 있습니다.");
                 }
 
+                // 씬 이름은 분기 조건이라 바뀌면 BGM/BGA 주입·기록 차단·제목 치환이 조용히 꺼집니다(2026-11-25, R6).
+                var buildScenes = ReadBuildSceneNames();
+                if (buildScenes.Count == 0)
+                {
+                    MelonLogger.Msg("[호환성] 빌드 설정의 씬 목록을 읽지 못해 씬 이름 점검을 건너뜁니다.");
+                }
+                else
+                {
+                    foreach (var missing in GameSceneNames.FindMissing(buildScenes))
+                    {
+                        problems++;
+                        MelonLogger.Error($"[호환성] 게임 씬 '{missing}'이(가) 없습니다(이름 변경 의심). 이 씬에 걸린 분기가 꺼집니다. 현재 씬: {string.Join(", ", buildScenes)}");
+                    }
+                }
+
                 if (problems == 0)
-                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개, 상수 {ConstantContracts.Length}개, 훅 클래스 전부 적용).");
+                    MelonLogger.Msg($"[호환성] 점검 통과 (필드 {FieldContracts.Length}개, 상수 {ConstantContracts.Length}개, 씬 {GameSceneNames.ExactNames.Length + 1}개, 훅 클래스 전부 적용).");
                 else
                     MelonLogger.Warning($"[호환성] 문제 {problems}건. 곡 선택·결과 화면 등 일부 기능이 동작하지 않을 수 있습니다. " +
                         "HOOK_MAP.md와 AGENTS.md의 '업데이트 대응 절차'를 따라 훅 시그니처부터 다시 확인하세요.");

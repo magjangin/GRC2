@@ -81,7 +81,7 @@ namespace GRC2.Core
             }
             catch (System.Exception ex)
             {
-                MelonLoader.MelonLogger.Warning("[GameHud] OnGUI 드로우 오류: " + ex.Message);
+                GRC2.Helpers.ModLog.WarningThrottled("game-hud-draw", "[GameHud] OnGUI 드로우 오류: " + ex.Message);
             }
         }
 

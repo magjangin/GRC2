@@ -44,10 +44,10 @@ namespace GRC2.Harmony
         public static void OnSceneLoaded(string sceneName)
         {
             _isReplacementSceneByName =
-                sceneName == "FairyModeScene" ||
-                sceneName == "PlayMovieScene" ||
-                sceneName == "RenderCutinScene" ||
-                sceneName == "RythmGameResultScene";
+                sceneName == GameSceneNames.FairyMode ||
+                sceneName == GameSceneNames.PlayMovie ||
+                sceneName == GameSceneNames.RenderCutin ||
+                sceneName == GameSceneNames.Result;
         }
 
         private static bool IsPlayOrLoadingScene()
@@ -92,7 +92,8 @@ namespace GRC2.Harmony
             }
             catch (Exception ex)
             {
-                MelonLogger.Error($"[TextPatch] 치명적 오류: {ex.Message}");
+                // set_text마다 불리므로 같은 예외가 반복되면 로그가 폭주합니다(P16).
+                Helpers.ModLog.WarningThrottled("text-patch", $"[TextPatch] 제목 치환 오류: {ex.Message}");
             }
         }
 
