@@ -21,7 +21,7 @@ namespace GRC2.Core
         /// 원복/세이브 차단)에 나타나므로, 여기서 값이 바뀌면 방금 끝난 판에 새 값이 적용됩니다.
         /// 제외해두면 BlockSave가 플레이 진입 시점 값으로 플레이~결과~저장 한 사이클 내내 고정됩니다.
         /// </summary>
-        private const string ResultSceneName = "RythmGameResultScene";
+        private const string ResultSceneName = GameSceneNames.Result;
 
         /// <summary>설정 파일 수정 감지 폴링 주기(초). 값 반영이 아니라 로그 알림용입니다.</summary>
         private const float SettingsPollIntervalSeconds = 1f;
@@ -35,6 +35,30 @@ namespace GRC2.Core
         // 파일 경로(전체 경로) 기준 캐시: 동일 파일명(hwa2.bms)이라도 폴더가 다르면 충돌하지 않음
         public static Dictionary<string, List<Parsers.BmsNote>> ParsedBmsNotesByFile { get; private set; }
             = new Dictionary<string, List<Parsers.BmsNote>>(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>BMS 파싱 캐시에 남겨 둘 최근 곡 수. 넘치면 가장 오래 안 쓴 곡의 노트를 버립니다(P17).</summary>
+        internal const int MaxCachedBmsFiles = 8;
+        private static readonly Helpers.RecentKeys _bmsRecent = new Helpers.RecentKeys(MaxCachedBmsFiles, StringComparer.OrdinalIgnoreCase);
+
+        private static void CacheBms(string file, List<Parsers.BmsNote> notes, DateTime writeTimeUtc)
+        {
+            ParsedBmsNotesByFile[file] = notes;
+            _bmsParsedWriteTimeUtc[file] = writeTimeUtc;
+            string evicted = _bmsRecent.Touch(file);
+            if (evicted != null)
+            {
+                ParsedBmsNotesByFile.Remove(evicted);
+                _bmsParsedWriteTimeUtc.Remove(evicted);
+                ModLog.Verbose($"[SceneDetector] BMS 캐시 상한 {MaxCachedBmsFiles}곡 - 오래된 차트 해제: {Path.GetFileName(evicted)}");
+            }
+        }
+
+        private static void ClearBmsCache()
+        {
+            ParsedBmsNotesByFile.Clear();
+            _bmsParsedWriteTimeUtc.Clear();
+            _bmsRecent.Clear();
+        }
         public static Parsers.SongInfo SongInfo { get; private set; } = new Parsers.SongInfo();
 
         public override void OnInitializeMelon()
@@ -315,7 +339,7 @@ namespace GRC2.Core
                 int totalBmsFiles = albums.Values.Sum(a => a?.BmsFiles?.Count ?? 0);
                 MelonLogger.Msg($"[SceneDetector] BMS 파일 {totalBmsFiles}개(앨범 {albumsWithBms}개) 발견 - 현재 곡만 지금 파싱하고 나머지는 플레이할 때 파싱합니다.");
 
-                ParsedBmsNotesByFile.Clear();
+                ClearBmsCache();
 
                 var currentBmsFile = AlbumManager.GetCurrentBmsFile();
                 if (string.IsNullOrEmpty(currentBmsFile))
@@ -327,8 +351,7 @@ namespace GRC2.Core
                 }
 
                 var currentNotes = BmsParser.ParseBmsFile(currentBmsFile, printSummary: false) ?? new List<BmsNote>();
-                ParsedBmsNotesByFile[currentBmsFile] = currentNotes;
-                _bmsParsedWriteTimeUtc[currentBmsFile] = GetWriteTimeUtcOrMin(currentBmsFile);
+                CacheBms(currentBmsFile, currentNotes, GetWriteTimeUtcOrMin(currentBmsFile));
                 ParsedBmsNotes = currentNotes;
                 _lastParsedBmsFile = currentBmsFile;
                 ModLog.Verbose($"[SceneDetector] 현재 선택 BMS 노트 로드 완료: {Path.GetFileName(currentBmsFile)} / {ParsedBmsNotes.Count}개");
@@ -398,12 +421,14 @@ namespace GRC2.Core
         private static List<BmsNote> GetOrParseBms(string file)
         {
             if (ParsedBmsNotesByFile.TryGetValue(file, out var cached) && !IsBmsCacheStale(file))
+            {
+                _bmsRecent.Touch(file);
                 return cached;
+            }
 
             var writeTime = GetWriteTimeUtcOrMin(file);
             var notes = BmsParser.ParseBmsFile(file) ?? new List<BmsNote>();
-            ParsedBmsNotesByFile[file] = notes;
-            _bmsParsedWriteTimeUtc[file] = writeTime;
+            CacheBms(file, notes, writeTime);
             return notes;
         }
 
@@ -426,8 +451,7 @@ namespace GRC2.Core
 
             AlbumManager.ScanAlbums(_hwaFolderPath);
             _albumSignature = signature;
-            ParsedBmsNotesByFile.Clear();
-            _bmsParsedWriteTimeUtc.Clear();
+            ClearBmsCache();
             ParsedBmsNotes = new List<BmsNote>();
             _lastParsedBmsFile = null;
             SongInfo = AlbumManager.GetCurrentSongInfo() ?? new SongInfo();
@@ -497,7 +521,7 @@ namespace GRC2.Core
 
         private void RouteSceneLoaded(string sceneName)
         {
-            if (sceneName == "FairyModeScene" || sceneName == "PlayMovieScene")
+            if (sceneName == GameSceneNames.FairyMode || sceneName == GameSceneNames.PlayMovie)
             {
                 HandlePlayScene(sceneName);
                 BgmBgaInjector.StartInjection(isPlayScene: true);
@@ -505,7 +529,7 @@ namespace GRC2.Core
                 return;
             }
 
-            if (sceneName == "RenderCutinScene")
+            if (sceneName == GameSceneNames.RenderCutin)
             {
                 ModLog.Verbose("[SceneDetector] RenderCutinScene 로드 처리 시작 (플레이 씬 로딩)");
                 CustomBgmPlayer.Cleanup();
@@ -523,7 +547,7 @@ namespace GRC2.Core
                 return;
             }
 
-            if (sceneName.StartsWith("MusicSelectScene", StringComparison.Ordinal))
+            if (GameSceneNames.IsMusicSelect(sceneName))
             {
                 // 실제 씬 파일명은 "MusicSelectScene_Hasegawa"처럼 접미사가 붙어있어
                 // 정확히 일치하는 이름("MusicSelectScene")만 확인하면 이 분기가 절대
@@ -539,7 +563,7 @@ namespace GRC2.Core
                 return;
             }
 
-            if (sceneName == "SoundPlayerScene" || sceneName == "MoviePlayer_MovieSelect")
+            if (GameSceneNames.IsInjectionDisallowed(sceneName))
             {
                 MelonLogger.Msg($"[SceneDetector] 씬 감지: {sceneName} - 커스텀 주입 비활성화 (플레이 씬 아님)");
                 BgmBgaInjector.StopInjection();

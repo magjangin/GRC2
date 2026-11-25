@@ -50,6 +50,33 @@ namespace GRC2.Helpers
                 MelonLogger.Msg(message);
         }
 
+        private static readonly Dictionary<string, int> _warningCountByKey = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        /// <summary>
+        /// 매 프레임·매 판정·매 텍스트 설정처럼 자주 불리는 경로의 경고. 같은 key의 1·10·100·1000…번째만 남기고
+        /// 나머지는 셉니다(2026-11-25, 알려진_문제 P16). 예전에는 OnGUI(프레임당 여러 번)나 <c>set_text</c> 훅에서
+        /// 같은 예외가 반복되면 경고가 초당 수백 줄 찍혀, 콘솔 출력 자체가 게임을 느리게 만들었습니다.
+        /// </summary>
+        public static void WarningThrottled(string key, string message)
+        {
+            if (ShouldLogThrottled(key, out int count))
+                MelonLogger.Warning(count == 1 ? message : $"{message} (같은 경고 {count}회째, 사이 생략)");
+        }
+
+        /// <summary><see cref="WarningThrottled"/>의 판정. 횟수를 올리고, 1 또는 10의 거듭제곱 번째면 true.</summary>
+        internal static bool ShouldLogThrottled(string key, out int count)
+        {
+            _warningCountByKey.TryGetValue(key, out count);
+            if (count < int.MaxValue)
+                count++;
+            _warningCountByKey[key] = count;
+
+            int n = count;
+            while (n >= 10 && n % 10 == 0)
+                n /= 10;
+            return n == 1;
+        }
+
         /// <summary><see cref="InfoOnChange"/>의 판정(마지막 내용 갱신 포함).</summary>
         internal static bool ShouldLogOnChange(string key, string message)
         {

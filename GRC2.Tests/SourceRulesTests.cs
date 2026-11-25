@@ -26,6 +26,21 @@ namespace GRC2.Tests
         // BmsParser는 예외가 나면 그 파일의 노트를 전부 버립니다. 숫자는 [0-9]로 씁니다(2026-11-25).
         private static readonly Regex UnicodeDigitClass = new Regex(@"\bRegex\b.*\\d", RegexOptions.Compiled);
 
+        // 게임 씬 이름은 GameSceneNames에만 둡니다. 다른 곳에 문자열로 쓰면 시작 점검(빌드 설정 씬 대조)이 그 이름을 모릅니다(2026-11-25, R6).
+        private static readonly Regex SceneNameLiteral = new Regex(
+            @"""(FairyModeScene|PlayMovieScene|RenderCutinScene|RythmGameResultScene|SoundPlayerScene|MoviePlayer_MovieSelect|MusicSelectScene[A-Za-z_]*|[A-Za-z]+Scene)""",
+            RegexOptions.Compiled);
+
+        [Fact]
+        public void ModSource_SceneNamesLiveInGameSceneNames()
+        {
+            var violations = ScanModSource(SceneNameLiteral)
+                .Where(v => !v.Contains("GameSceneNames.cs:"))
+                .ToArray();
+            Assert.True(violations.Length == 0,
+                "씬 이름 문자열이 GameSceneNames 밖에 있습니다. GameSceneNames에 상수를 두고 ExactNames에 넣으세요:\n" + string.Join("\n", violations));
+        }
+
         [Fact]
         public void ModSource_RegexDigitsAreAsciiOnly()
         {
@@ -60,6 +75,9 @@ namespace GRC2.Tests
             Assert.DoesNotMatch(CultureSensitiveCall, "ext.ToLowerInvariant()");
             Assert.Matches(VerboseWithSideEffect, "ModLog.Verbose($\"n={count++}\");");
             Assert.DoesNotMatch(VerboseWithSideEffect, "ModLog.Verbose($\"n={count}, ok={a == b}\");");
+            Assert.Matches(SceneNameLiteral, "if (name == \"RythmGameResultScene\")");
+            Assert.Matches(SceneNameLiteral, "StartsWith(\"MusicSelectScene\", StringComparison.Ordinal)");
+            Assert.DoesNotMatch(SceneNameLiteral, "new LazyFieldRef<A, B>(\"mSceneInitializeParam\")");
             Assert.Matches(UnicodeDigitClass, @"new Regex(@""^#(\d{3}):"")");
             Assert.DoesNotMatch(UnicodeDigitClass, @"new Regex(@""^#([0-9]{3}):"")");
             // 규칙의 전제: \d는 전각 숫자 １(U+FF11)도 잡고, [0-9]는 잡지 않습니다.

@@ -15,7 +15,7 @@ namespace GRC2.Harmony
     /// </summary>
     public static class RecordBlockPatch
     {
-        private const string ResultSceneName = "RythmGameResultScene";
+        private const string ResultSceneName = GameSceneNames.Result;
 
         public static bool ShouldBlock => CustomKeySettings.BlockSave;
 

@@ -98,7 +98,7 @@ namespace GRC2.Harmony
             }
             catch (System.Exception ex)
             {
-                MelonLogger.Warning("[JudgmentBarPatch] 판정바 갱신 오류: " + ex.Message);
+                GRC2.Helpers.ModLog.WarningThrottled("judgment-bar", "[JudgmentBarPatch] 판정바 갱신 오류: " + ex.Message);
             }
         }
 

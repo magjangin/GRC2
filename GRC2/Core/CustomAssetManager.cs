@@ -328,8 +328,7 @@ namespace GRC2.Core
             {
                 // 이름은 씬 핸들이 바뀔 때만 다시 읽습니다(매 프레임 불리는 경로라 문자열 할당을 피함, P11).
                 string name = ActiveSceneName.Current;
-                return name == "SoundPlayerScene" ||
-                       name == "MoviePlayer_MovieSelect";
+                return GameSceneNames.IsInjectionDisallowed(name);
             }
             catch
             {
