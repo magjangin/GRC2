@@ -1,13 +1,13 @@
 # GRC2 — 인수인계 문서 (AGENTS.md)
 
-> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`), 2026-11-23 갱신(Harmony 이중 패치 수정 `HarmonyDontPatchAll`, 게임 필드 접근 `LazyFieldRef` 격리, BGA 동기화 재탐색 간격, `CHANGELOG.md`·`tools/release.ps1`, v0.7.0), 2026-11-23 2차 갱신(게임 PC 전체 감사: 상세 로그 보간 처리기·씬 이름 캐시·폰트 진단 축소·훅 실패 점검 반영·try 없는 훅의 `IsAvailable` 확인, v0.7.0 빌드·테스트·게시), 2026-11-24 갱신(2차 감사: BPM 변속 시간 이분 탐색 `BpmTimeline`, 서수 문자열 비교와 `SourceRulesTests`, MelonLoader·Unity 버전 점검, 아트워크 이미지 미발견 로그, v0.7.1). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
+> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`), 2026-11-23 갱신(Harmony 이중 패치 수정 `HarmonyDontPatchAll`, 게임 필드 접근 `LazyFieldRef` 격리, BGA 동기화 재탐색 간격, `CHANGELOG.md`·`tools/release.ps1`, v0.7.0), 2026-11-23 2차 갱신(게임 PC 전체 감사: 상세 로그 보간 처리기·씬 이름 캐시·폰트 진단 축소·훅 실패 점검 반영·try 없는 훅의 `IsAvailable` 확인, v0.7.0 빌드·테스트·게시), 2026-11-24 갱신(2차 감사: BPM 변속 시간 이분 탐색 `BpmTimeline`, 서수 문자열 비교와 `SourceRulesTests`, MelonLoader·Unity 버전 점검, 아트워크 이미지 미발견 로그, v0.7.1), 2026-11-25 갱신(3차 감사: BGA 동기화 `BgaSyncPolicy` main 병합, 정규식 숫자 `[0-9]` 규칙, 결과 화면 □ 진단 실행당 1회화, v0.7.2). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
 > 2026-11-17~18 변경은 곡 선택 화면까지 인게임으로 확인했다(7절에 범위 명시). **"실측"** 표시는 디스크에서 직접 읽은 값, **"미확인"**은 다음 세션에서 확인할 항목이다.
 
 ## 0. 프로젝트 개요
 
-- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.7.1, 2026-11-24 GitHub 릴리즈 게시. v0.7.0은 2026-11-23). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
+- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.7.2, 2026-11-25 GitHub 릴리즈 게시. v0.7.1은 2026-11-24, v0.7.0은 2026-11-23). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
 - **종류:** 게임 모드
-- **최근 수정일(파일 기준):** 2026-11-23
+- **최근 수정일(파일 기준):** 2026-11-25
 - **git 원격:** `origin`(GitHub magjangin/GRC2), `local`(`H:\local-repos\GRC2.git`) — 둘 다 main을 밀어 둔다
 - **최근 커밋:** `git log --oneline -8`로 본다(여기 복사해 두면 금방 낡는다). 2026-11-18 작업은 `feat/font-fallback-and-cleanup` 브랜치를 main에 병합한 것이다.
 - **먼저 읽을 기존 문서:**
@@ -69,11 +69,14 @@
 - **BMS 변속 시간은 `Parsers/BpmTimeline`으로 계산한다**(2026-11-24, P8). `BmsParser.CalculateTime`은 노트마다 변화 목록을 처음부터 훑는 기준 구현으로 남겨 두고, `BpmTimelineTests`가 두 결과가 비트 단위로 같은지 확인한다. 시간 계산 식을 바꾸면 둘 다 바꿔야 한다.
 - **MelonLoader·Unity 버전도 검증 기준이다**(2026-11-24, R4). `GameCompatibility.TestedMelonLoaderVersion`/`TestedUnityVersion`을 시작 점검·`check_game_version.ps1`·`GameCompatibilityTests`가 함께 본다. MelonLoader를 올리면 이 값과 1절 표를 같이 고친다. 버전은 const `BuildInfo.Version`이 아니라 어셈블리 버전을 런타임에 읽는다.
 - **폰트 글자 진단(`FontFallback.LogCoverageDiagnostics`)의 글자별 목록은 `VerboseLog=1` 전용**(2026-11-23, P12). 글자별로 fallback에 `tryAddCharacter: true`로 물으면 모든 곡 글자가 Dynamic 아틀라스에 구워져 곡 선택 첫 진입이 느려지고 아틀라스가 늘어난다. 기본은 개수 한 줄만 남긴다.
+- **BGA는 BGM에 "탐색"이 아니라 "멈춤·배속"으로 맞춘다**(2026-11-24, 알려진_문제 L1). mp4 탐색은 키프레임부터 다시 디코딩해 0.1~0.2초 밀리므로, 작은 차이마다 탐색하면 탐색이 탐색을 부른다. 판단은 Unity 없이 테스트되는 `Helpers/BgaSyncPolicy.Decide`(BGM이 흐르기 전 `Hold`, 0.04~0.5초는 `AdjustSpeed` 0.9~1.1배, 0.5초 이상만 `Seek` 후 1초 대기)에 두고 `BgaBgmSyncManager`는 적용만 한다. 게임은 BGM을 `isPlaying`인 채 약 2초 늦게 흘리므로 `isPlaying`이 아니라 **BGM 시각이 실제로 느는지**로 판단한다.
+- **정규식 숫자는 `[0-9]`로 쓴다**(2026-11-25, R5). .NET `\d`는 전각·아랍 숫자도 잡아 `int.Parse`가 던지고, BMS 파서는 예외 시 그 파일의 노트를 전부 버린다. `SourceRulesTests.ModSource_RegexDigitsAreAsciiOnly`가 막는다.
+- **임시 진단 코드는 릴리즈에 넣을 수 있게 "실행당 1회·고정 파일"로 만든다**(2026-11-25). 결과 화면 □(L2) 진단 `Core/ResultScreenDiagnostics`가 그렇다(첫 커스텀 곡 결과 화면에서 한 번, `UserData/GRC2/result_screen_last.png` 덮어쓰기). 원인을 고치면 지운다.
 - 훅 소유 파일·제거 위험의 정본은 [HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md), 문제별 상세는 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md).
 
 ## 4. 핵심 훅 시그니처와 주입 파이프라인
 
-- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.1", "화영왕")]`, `[assembly: MelonLoader.HarmonyDontPatchAll]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
+- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.2", "화영왕")]`, `[assembly: MelonLoader.HarmonyDontPatchAll]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
 - **시작 순서(`SceneDetector.OnInitializeMelon`):** Harmony 패치 적용(실패 클래스는 `RecordHookFailure`) → 게임 폴더 계산 → `GameCompatibility.LogStartupReport`(훅 실패·빌드·MelonLoader·Unity·MVID·필드·상수) → `CustomKeySettings.Initialize`(VerboseLog 결정) → `CustomMusicIdRegistry.Initialize` → 앨범 스캔(+hwa 지문) → 곡 정보 → 아트워크 → 현재 곡 BMS만 파싱 → `NoteArrayHooks.UpdateBmsNotes`. 끝에 단계별 ms를 한 줄로 남긴다.
 - **씬 로드마다:** `FontFallback.EnsureInstalled`(첫 회에 폰트 생성). 곡 선택 씬이면 `RescanAlbumsIfChanged` → (약 200ms 뒤) 곡 목록 postfix가 ID 배정·세이브 칸 확장·주입.
 - **노트 주입:** `cFairyModeNotesManager.createAllNote` 훅(`NoteArrayHooks`)이 `mFairyNoteCreateDataArray`를 `BmsNoteConverter` 결과로 교체한다. 곡 선택 씬에서는 주입하지 않는다(H1).
@@ -124,7 +127,11 @@
 ## 7. 다음 작업자에게
 
 - 작업 전 `tools\check_game_version.ps1`로(또는 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 직접) 비교한다. 2026-11-24 기준 Build ID·MVID·MelonLoader 0.7.3·Unity 2021.3.31f1 모두 같음. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 모두 통과해야 한다(2026-11-24 게임 PC 기준 169개).
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 모두 통과해야 한다(2026-11-25 게임 PC 기준 184개).
+- **사용자가 알고 있는 버그는 바로 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md)에 적는다.** 2026-11-24에 "결과 화면 한자 □"와 "플레이 시작 렉"이 오래전부터 있던 버그인데 어느 문서에도 없어 다음 세션이 몰랐다(L절).
+- **2026-11-25 v0.7.2(3차 감사):** `fix/bga-sync-stutter`(L1 BGA 렉 수정, **인게임 확인됨**)를 main에 병합하고 브랜치를 지웠다. 같은 릴리즈에 정규식 숫자 수정(R5)·동기화 중지 로그 정리(P15)·L2 진단 1회화를 넣었다(이 셋은 빌드·테스트만). 빌드·테스트(184개)·게시·`hwa` 사본 `Mods\GRC2.dll` 배포까지 했다. 스팀 설치본 `Mods`는 v0.7.1 그대로다.
+- **다음 할 일(L2, 결과 화면 □):** TMP는 `麦`·`盖`를 fallback(msyh)으로 그렸다고 답하는데 화면은 속이 빈 □. 패딩 비율 불일치는 번들 대조로 배제했다(알려진_문제 L2). v0.7.2로 커스텀 곡을 결과 화면까지 플레이하면 `[결과 화면 진단]` 줄과 `UserData/GRC2/result_screen_last.png`가 남는다 → 원인을 고치고 `ResultScreenDiagnostics`와 `ResultSceneUpdaterPatch`의 호출 한 줄을 지운다. 게임 자동 조작은 사용자가 PC를 쓰지 않을 때만(`um win drive … idle`로 확인) 한다 — 2026-11-25 세션은 사용자가 PC 사용 중이라 하지 않았다.
+- **게임 번들 읽기:** 파이썬 `UnityPy`(1.25)가 설치돼 있다. `GUNVOLT_RECORDS_Cychronicle_Data/StreamingAssets/aa/StandaloneWindows64/*.bundle`(이름은 해시, `aa/catalog.json`에 에셋 경로)에서 머티리얼·TMP 폰트 값을 읽을 수 있다. 폰트·머티리얼은 `81978c783b97bfbe671ae062636ab25b.bundle`에 있었다(2026-11-25).
 - **2026-11-23 v0.7.0은 게임 PC에서 빌드·테스트(158개)·게시까지 했고 `Mods\GRC2.dll`에도 배포했지만 인게임 실행은 아직 안 했다.** 다음에 게임을 켜면 ① 시작 로그 `[호환성] 점검 통과 (필드 23개, 상수 26개, 훅 클래스 전부 적용).` ② 플레이 시작 로그 `[NoteArrayHooks] BMS 노트 교체 완료`가 **한 번만**(이중 패치 수정) ③ 판정바 틱이 판정당 한 번 ④ 곡 선택 첫 진입 `[폰트] 곡 정보의 비ASCII 글자 N종: …` 한 줄(글자별 목록 없음)과 간체 한자 정상 표시 ⑤ `VerboseLog=1`로 바꾸면 상세 로그가 예전처럼 나오는지(보간 처리기)를 본다. 문제가 있으면 `v0.6.0..v0.7.0` 사이 커밋부터 의심한다.
 - **2026-11-24 v0.7.1(2차 감사)도 빌드·테스트(169개)·게시·`Mods\GRC2.dll` 배포까지 했고 인게임 실행은 아직 안 했다.** 위 ①~⑤에 더해 ⑥ 시작 로그에 `[호환성] MelonLoader …`/`Unity …` 경고가 없는지 ⑦ 변속이 있는 BMS를 넣었다면 노트 타이밍이 0.7.0과 같은지(값은 테스트로 비트 동일 확인)를 본다.
 - **2026-11-24 인게임 부분 확인(독립 사본, v0.7.1):** 시작 로그 `[호환성] 점검 통과 (필드 23개, 상수 26개, 훅 클래스 전부 적용).`(MelonLoader·Unity 경고 없음, `.acf` 없음 안내는 정상), `패치된 게임 메서드 42개`, `[SteamApiHijacker] cDlcDirector.Initialize Postfix` 줄이 **한 번만**(11-18 로그에서는 두 번 — 이중 패치 수정 P4 확인), 디스크 포화가 끝난 뒤(14:14) 다시 실행해 곡 선택까지 정상 진행: 초기화 207ms, 부트→로고 0.9초(11-18과 같은 속도), 곡 선택 진입 때 `[폰트] 곡 정보의 비ASCII 글자 19종: 게임 폰트 17종, 나머지 2종은 …` **한 줄만**(④ 확인, P12), `커스텀 곡 주입 완료: 5개 (총 59개)`, 제목 스크롤 진단 줄. 플레이·결과 화면(②③⑤⑥⑦)은 아직 안 봤다.

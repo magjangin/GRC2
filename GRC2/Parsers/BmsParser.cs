@@ -20,7 +20,9 @@ namespace GRC2.Parsers
         private static readonly Regex BpmRegex = new Regex(@"^#BPM\s+([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         // #BPMxx 뒤의 콜론은 있어도 되고 없어도 됩니다(표준은 공백 구분, E1).
         private static readonly Regex BpmIndexRegex = new Regex(@"^#BPM([0-9A-Fa-f]{2})(?::|\s)\s*([0-9.]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
-        private static readonly Regex MeasureRegex = new Regex(@"^#(\d{3})(\d{2}):", RegexOptions.Compiled);
+        // [0-9]인 이유: .NET의 \d는 전각·아랍 숫자 같은 유니코드 숫자도 잡아 int.Parse가 던지고, 그러면 파일의 노트를
+        // 전부 버립니다(2026-11-25, SourceRulesTests가 \d를 막음).
+        private static readonly Regex MeasureRegex = new Regex(@"^#([0-9]{3})([0-9]{2}):", RegexOptions.Compiled);
         private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         /// <summary>

@@ -127,6 +127,9 @@ namespace GRC2.Harmony
 
                 textComponent.text = songInfo.Title;
                 MelonLogger.Msg($"[ResultSceneUpdaterPatch] ✅ 곡 제목 직접 적용: {songInfo.Title}");
+
+                // 결과 화면 제목 한자 □ 조사용 진단(알려진_문제 L2). initializePreFade가 두 번 불려도 한 번만 돕니다.
+                ResultScreenDiagnostics.Run(textComponent);
             }
             catch (Exception ex)
             {

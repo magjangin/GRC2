@@ -37,7 +37,7 @@ namespace GRC2.Parsers
         private static readonly Regex CharacterRegex =
             new Regex(@"^#?(캐릭터|character|artistid)\s*[:=：\s]\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
         private static readonly Regex DifficultyNumberRegex =
-            new Regex(@"^#?(easy|normal|hard|expert)\s*[:=：\s]\s*(\d+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+            new Regex(@"^#?(easy|normal|hard|expert)\s*[:=：\s]\s*([0-9]+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static Regex CreditPattern(string keys)
         {

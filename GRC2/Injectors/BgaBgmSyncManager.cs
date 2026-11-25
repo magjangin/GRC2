@@ -43,8 +43,11 @@ namespace GRC2.Injectors
                 return;
             }
 
-            // BGA 재생 시작 시 BGM 시간에 맞춰 동기화
-            SyncBgaToBgm();
+            // 여기서 바로 탐색하지 않습니다. BGM은 isPlaying인 채로 약 2초 늦게 흐르기 시작하므로(2026-11-24 로그)
+            // 첫 틱에서 BGM이 흐르는지 본 뒤 멈춰 두거나 그 시각에서 재생합니다(BgaSyncPolicy).
+            _lastSeekRealtime = new float[_videoPlayers.Length];
+            for (int i = 0; i < _lastSeekRealtime.Length; i++)
+                _lastSeekRealtime[i] = float.NegativeInfinity;
 
             // 지속적인 동기화 모니터링 시작
             _isSyncing = true;
@@ -193,14 +196,16 @@ namespace GRC2.Injectors
             return 0f;
         }
 
+        // 동기화 판단은 BgaSyncPolicy(단위 테스트 있음)가 하고, 여기서는 VideoPlayer에 적용만 합니다.
+        private const float SyncIntervalSeconds = 0.1f;
+        private static float[] _lastSeekRealtime;
+
         private static IEnumerator SyncCoroutine()
         {
-            float lastSyncTime = 0f;
-            const float syncInterval = 0.1f;
-            bool hasSyncedOnce = false;
-            bool wasPlaying = false;
-            var wait = new WaitForSeconds(syncInterval); // 재사용: 0.1초마다 할당하지 않도록
+            var wait = new WaitForSeconds(SyncIntervalSeconds); // 재사용: 0.1초마다 할당하지 않도록
             float nextSourceSearchTime = 0f;
+            double? previousBgmTime = null;
+            bool holding = false;
 
             while (_isSyncing)
             {
@@ -220,37 +225,83 @@ namespace GRC2.Injectors
 
                 try
                 {
-                    float bgmTime = ReadCurrentBgmTime(out bool isPlaying);
+                    double bgmTime = ReadCurrentBgmTime(out _);
+                    bool anyHeld = false;
 
-                    if (isPlaying && !wasPlaying)
-                        hasSyncedOnce = false;
-                    wasPlaying = isPlaying;
-
-                    if (isPlaying && !hasSyncedOnce && bgmTime > 0f)
+                    for (int i = 0; i < _videoPlayers.Length; i++)
                     {
-                        SyncBgaToBgm();
-                        hasSyncedOnce = true;
-                        lastSyncTime = bgmTime;
-                        continue;
+                        var videoPlayer = _videoPlayers[i];
+                        if (videoPlayer == null || !videoPlayer.isPrepared)
+                            continue;
+
+                        var decision = BgaSyncPolicy.Decide(
+                            bgmTime,
+                            previousBgmTime,
+                            videoPlayer.time,
+                            videoPlayer.length,
+                            videoPlayer.isPlaying,
+                            Time.realtimeSinceStartup - _lastSeekRealtime[i],
+                            videoPlayer.canSetPlaybackSpeed);
+
+                        if (decision.Action == BgaSyncAction.Hold)
+                            anyHeld = true;
+                        Apply(videoPlayer, i, decision, bgmTime);
                     }
 
-                    if (bgmTime <= 0f)
-                        continue;
-
-                    if (TryFindResyncNeed(bgmTime, out float bgaTime, out float maxTimeDiff) &&
-                        Mathf.Abs(bgmTime - lastSyncTime) > 1f)
+                    if (anyHeld != holding)
                     {
-                        MelonLogger.Msg($"[BGABGMSyncHook] 재동기화 완료: BGA {bgaTime:F3}초 -> BGM {bgmTime:F3}초 (차이 {maxTimeDiff:F3}초)");
-                        SyncBgaToBgm();
-                        lastSyncTime = bgmTime;
-                        hasSyncedOnce = true;
+                        holding = anyHeld;
+                        MelonLogger.Msg(holding
+                            ? $"[BGAPlayerHook] BGM이 흐르지 않아 BGA를 멈춰 둡니다 (BGM {bgmTime:F3}초)"
+                            : $"[BGAPlayerHook] BGM이 흐르기 시작해 BGA를 이어서 재생합니다 (BGM {bgmTime:F3}초)");
                     }
+
+                    previousBgmTime = bgmTime;
                 }
                 catch (Exception ex)
                 {
                     MelonLogger.Warning($"[BGAPlayerHook] 동기화 모니터링 오류: {ex.Message}");
                 }
             }
+        }
+
+        private static void Apply(VideoPlayer videoPlayer, int index, BgaSyncDecision decision, double bgmTime)
+        {
+            switch (decision.Action)
+            {
+                case BgaSyncAction.Hold:
+                    if (videoPlayer.isPlaying)
+                        videoPlayer.Pause();
+                    SetSpeed(videoPlayer, 1f);
+                    break;
+
+                case BgaSyncAction.Seek:
+                    bool wasPlaying = videoPlayer.isPlaying;
+                    SetSpeed(videoPlayer, 1f);
+                    videoPlayer.time = decision.SeekTime;
+                    if (!wasPlaying)
+                        videoPlayer.Play();
+                    _lastSeekRealtime[index] = Time.realtimeSinceStartup;
+                    // 영상이 계속 재생 중이었다면 큰 차이를 바로잡은 것이니 남기고, 멈췄다 다시 시작한 것은 위의 상태 로그로 충분합니다.
+                    if (wasPlaying)
+                        MelonLogger.Msg($"[BGABGMSyncHook] 재동기화(탐색): {videoPlayer.gameObject.name} BGA가 {decision.Drift:+0.000;-0.000}초 어긋나 {decision.SeekTime:F3}초로 이동 (BGM {bgmTime:F3}초)");
+                    break;
+
+                case BgaSyncAction.AdjustSpeed:
+                    SetSpeed(videoPlayer, decision.PlaybackSpeed);
+                    ModLog.Verbose($"[BGABGMSyncHook] 배속 보정: {videoPlayer.gameObject.name} 차이 {decision.Drift:+0.000;-0.000}초 → 배속 {decision.PlaybackSpeed:F3}");
+                    break;
+
+                default:
+                    SetSpeed(videoPlayer, 1f);
+                    break;
+            }
+        }
+
+        private static void SetSpeed(VideoPlayer videoPlayer, float speed)
+        {
+            if (videoPlayer.canSetPlaybackSpeed && Math.Abs(videoPlayer.playbackSpeed - speed) > 0.0005f)
+                videoPlayer.playbackSpeed = speed;
         }
 
         private static float ReadCurrentBgmTime(out bool isPlaying)
@@ -265,34 +316,11 @@ namespace GRC2.Injectors
             return GetBgmTimeFromManager();
         }
 
-        private static bool TryFindResyncNeed(float bgmTime, out float bgaTime, out float maxTimeDiff)
-        {
-            bool needsSync = false;
-            maxTimeDiff = 0f;
-            bgaTime = 0f;
-
-            foreach (var videoPlayer in _videoPlayers)
-            {
-                if (videoPlayer == null || !videoPlayer.isPlaying || !videoPlayer.isPrepared)
-                    continue;
-
-                float currentBgaTime = (float)videoPlayer.time;
-                if (bgaTime == 0f)
-                    bgaTime = currentBgaTime;
-
-                float expectedVideoTime = (float)(bgmTime % videoPlayer.length);
-                float timeDiff = Mathf.Abs((float)(videoPlayer.time - expectedVideoTime));
-                maxTimeDiff = Mathf.Max(maxTimeDiff, timeDiff);
-
-                if (timeDiff > 0.1f)
-                    needsSync = true;
-            }
-
-            return needsSync;
-        }
-
         private static void StopSync()
         {
+            // 씬이 바뀔 때마다 불립니다. 실제로 동기화하던 때만 남겨 부팅·메뉴 씬마다 같은 줄이 찍히지 않게 합니다.
+            bool wasSyncing = _isSyncing;
+
             if (_syncCoroutine != null)
             {
                 MelonCoroutines.Stop(_syncCoroutine);
@@ -300,12 +328,15 @@ namespace GRC2.Injectors
             }
 
             _isSyncing = false;
+            RestoreNormalSpeed();
             _bgmAudioSource = null;
             _videoPlayers = null;
+            _lastSeekRealtime = null;
             _cachedBgmManager = null;
             _nextManagerSearchTime = 0f;
 
-            MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
+            if (wasSyncing)
+                MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
         }
 
         public static void Reset()
@@ -313,104 +344,24 @@ namespace GRC2.Injectors
             StopSync();
         }
 
-        /// <summary>
-        /// BGA를 BGM 시간에 맞춰 동기화
-        /// </summary>
-        private static void SyncBgaToBgm()
+        /// <summary>배속 보정 중에 멈췄다면 VideoPlayer를 1배속으로 되돌립니다(씬에 남아 다시 쓰일 수 있음).</summary>
+        private static void RestoreNormalSpeed()
         {
-            if (_bgmAudioSource == null || _videoPlayers == null)
-            {
-                MelonLogger.Warning($"[BGAPlayerHook] SyncBgaToBgm: 오디오 소스 또는 VideoPlayer가 null입니다. (AudioSource: {_bgmAudioSource != null}, VideoPlayers: {_videoPlayers != null})");
+            if (_videoPlayers == null)
                 return;
-            }
 
-            try
-            {
-                float bgmTime = ResolveBgmTimeForSync();
-                if (bgmTime <= 0f)
-                {
-                    ModLog.Verbose($"[BGAPlayerHook] SyncBgaToBgm: BGM 시간이 0이어서 동기화 건너뜀 (AudioSource.isPlaying={_bgmAudioSource?.isPlaying}, clip={_bgmAudioSource?.clip?.name})");
-                    return;
-                }
-
-                int syncedCount = SyncPreparedVideoPlayers(bgmTime);
-                LogSyncResult(bgmTime, syncedCount);
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[BGAPlayerHook] BGA-BGM 동기화 오류: {ex.Message}");
-            }
-        }
-
-        private static float ResolveBgmTimeForSync()
-        {
-            if (_bgmAudioSource.isPlaying && _bgmAudioSource.clip != null)
-            {
-                return _bgmAudioSource.time;
-            }
-
-            if (_bgmAudioSource.clip != null && _bgmAudioSource.time > 0f)
-            {
-                return _bgmAudioSource.time;
-            }
-
-            return GetBgmTimeFromManager();
-        }
-
-        private static int SyncPreparedVideoPlayers(float bgmTime)
-        {
-            int syncedCount = 0;
             foreach (var videoPlayer in _videoPlayers)
             {
-                if (videoPlayer == null || !videoPlayer.isPrepared)
+                try
                 {
-                    continue;
+                    if (videoPlayer != null)
+                        SetSpeed(videoPlayer, 1f);
                 }
-
-                if (TrySyncVideoPlayer(videoPlayer, bgmTime))
+                catch (Exception ex)
                 {
-                    syncedCount++;
-                }
-            }
-
-            return syncedCount;
-        }
-
-        private static bool TrySyncVideoPlayer(VideoPlayer videoPlayer, float bgmTime)
-        {
-            try
-            {
-                float syncTime = (float)(bgmTime % videoPlayer.length);
-                float oldTime = (float)videoPlayer.time;
-                videoPlayer.time = syncTime;
-                ModLog.Verbose($"[BGAPlayerHook] 동기화: {videoPlayer.gameObject.name} - BGM={bgmTime:F3}초, BGA={oldTime:F3}초 → {syncTime:F3}초");
-                return true;
-            }
-            catch (Exception ex)
-            {
-                MelonLogger.Warning($"[BGAPlayerHook] {videoPlayer.gameObject.name} 동기화 실패: {ex.Message}");
-                return false;
-            }
-        }
-
-        private static void LogSyncResult(float bgmTime, int syncedCount)
-        {
-            if (syncedCount > 0)
-            {
-                MelonLogger.Msg($"[BGAPlayerHook] ✅ BGA-BGM 동기화 완료: {syncedCount}개 VideoPlayer (BGM 시간: {bgmTime:F3}초)");
-                return;
-            }
-
-            int preparedCount = 0;
-            for (int i = 0; i < _videoPlayers.Length; i++)
-            {
-                VideoPlayer videoPlayer = _videoPlayers[i];
-                if (videoPlayer != null && videoPlayer.isPrepared)
-                {
-                    preparedCount++;
+                    ModLog.Verbose($"[BGAPlayerHook] 배속 복원 실패: {ex.Message}");
                 }
             }
-            MelonLogger.Warning($"[BGAPlayerHook] ⚠️ 동기화된 VideoPlayer가 없습니다 (준비된 VideoPlayer: {preparedCount}/{_videoPlayers.Length})");
         }
     }
 }
