@@ -13,16 +13,23 @@ namespace GRC2.Core
     /// 결과 화면에서 커스텀 곡 제목 한자가 □로 보인다는 보고(2026-11-24, 알려진_문제 L2)를 조사하는 임시 진단입니다.
     /// TMP는 글자를 fallback 폰트(msyh)로 그렸다고 답하는데 화면에는 □가 보여서, 화면에 있는 모든 글자 칸의
     /// 글자별 폰트·머티리얼·아틀라스 상태를 남기고 결과 화면을 캡처합니다. 원인을 고치면 지웁니다.
+    ///
+    /// 릴리즈에 들어가도 부담이 없도록 게임 실행당 한 번(첫 커스텀 곡 결과 화면)만 돌고, 캡처는 같은 파일
+    /// (<c>UserData/GRC2/result_screen_last.png</c>)에 덮어씁니다(2026-11-25). 예전에는 결과 화면마다 새 PNG가 쌓였습니다.
+    /// 게임 자료로 확인한 사실: 결과 제목 머티리얼 <c>FOTK-YDBackjaeM SDF_ResultMusicName</c>은 UNDERLAY_ON
+    /// (_UnderlayDilate -1, _UnderlaySoftness 1, 오프셋 -0.47), 게임 폰트 _GradientScale 5(패딩 4)이고
+    /// 우리 fallback은 샘플 72·패딩 9(_GradientScale 10)입니다(알려진_문제 L2).
     /// </summary>
     internal static class ResultScreenDiagnostics
     {
         private const string Prefix = "[결과 화면 진단]";
-        private static bool _running;
+        private const string CaptureFileName = "result_screen_last.png";
+        private static bool _started;
 
         public static void Run(TextMeshProUGUI title)
         {
-            if (_running) return;
-            _running = true;
+            if (_started) return;
+            _started = true;
             MelonCoroutines.Start(RunCoroutine(title));
         }
 
@@ -37,6 +44,13 @@ namespace GRC2.Core
             while (Time.realtimeSinceStartup < captureAt)
                 yield return null;
 
+            if (title == null)
+            {
+                // 기다리는 사이 결과 화면을 벗어났습니다(제목 오브젝트가 파괴됨). 다른 화면을 기록하지 않고 다음 결과 화면에서 다시 합니다.
+                _started = false;
+                yield break;
+            }
+
             try
             {
                 LogAllTexts();
@@ -45,10 +59,6 @@ namespace GRC2.Core
             catch (Exception ex)
             {
                 MelonLogger.Warning($"{Prefix} 실패: {ex.Message}");
-            }
-            finally
-            {
-                _running = false;
             }
         }
 
@@ -152,7 +162,7 @@ namespace GRC2.Core
         {
             string folder = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "GRC2");
             Directory.CreateDirectory(folder);
-            string path = Path.Combine(folder, $"result_screen_{DateTime.Now:yyyyMMdd_HHmmss}.png");
+            string path = Path.Combine(folder, CaptureFileName);
             ScreenCapture.CaptureScreenshot(path);
             MelonLogger.Msg($"{Prefix} 결과 화면 캡처: {path}");
         }

@@ -318,6 +318,9 @@ namespace GRC2.Injectors
 
         private static void StopSync()
         {
+            // 씬이 바뀔 때마다 불립니다. 실제로 동기화하던 때만 남겨 부팅·메뉴 씬마다 같은 줄이 찍히지 않게 합니다.
+            bool wasSyncing = _isSyncing;
+
             if (_syncCoroutine != null)
             {
                 MelonCoroutines.Stop(_syncCoroutine);
@@ -332,7 +335,8 @@ namespace GRC2.Injectors
             _cachedBgmManager = null;
             _nextManagerSearchTime = 0f;
 
-            MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
+            if (wasSyncing)
+                MelonLogger.Msg("[BGAPlayerHook] 오디오 동기화 모니터링 중지");
         }
 
         public static void Reset()

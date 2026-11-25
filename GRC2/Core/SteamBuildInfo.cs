@@ -15,7 +15,7 @@ namespace GRC2.Core
             if (string.IsNullOrEmpty(acfText))
                 return null;
 
-            var match = Regex.Match(acfText, @"""buildid""\s+""(\d+)""", RegexOptions.IgnoreCase);
+            var match = Regex.Match(acfText, @"""buildid""\s+""([0-9]+)""", RegexOptions.IgnoreCase);
             return match.Success ? match.Groups[1].Value : null;
         }
 

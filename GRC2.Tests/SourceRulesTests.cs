@@ -22,6 +22,18 @@ namespace GRC2.Tests
             @"ModLog\.Verbose\(\$""[^\n]*\{[^}\n]*(\+\+|--|[^=!<>]=[^=>])[^}\n]*\}",
             RegexOptions.Compiled);
 
+        // .NET 정규식의 \d는 전각(０-９)·아랍 숫자 같은 유니코드 숫자도 잡습니다. 잡힌 값을 int.Parse에 넘기면 FormatException이 나고,
+        // BmsParser는 예외가 나면 그 파일의 노트를 전부 버립니다. 숫자는 [0-9]로 씁니다(2026-11-25).
+        private static readonly Regex UnicodeDigitClass = new Regex(@"\bRegex\b.*\\d", RegexOptions.Compiled);
+
+        [Fact]
+        public void ModSource_RegexDigitsAreAsciiOnly()
+        {
+            var violations = ScanModSource(UnicodeDigitClass);
+            Assert.True(violations.Length == 0,
+                "정규식에 \\d가 있습니다. 유니코드 숫자까지 잡지 않도록 [0-9]를 쓰세요:\n" + string.Join("\n", violations));
+        }
+
         [Fact]
         public void ModSource_UsesOrdinalStringComparisons()
         {
@@ -48,6 +60,11 @@ namespace GRC2.Tests
             Assert.DoesNotMatch(CultureSensitiveCall, "ext.ToLowerInvariant()");
             Assert.Matches(VerboseWithSideEffect, "ModLog.Verbose($\"n={count++}\");");
             Assert.DoesNotMatch(VerboseWithSideEffect, "ModLog.Verbose($\"n={count}, ok={a == b}\");");
+            Assert.Matches(UnicodeDigitClass, @"new Regex(@""^#(\d{3}):"")");
+            Assert.DoesNotMatch(UnicodeDigitClass, @"new Regex(@""^#([0-9]{3}):"")");
+            // 규칙의 전제: \d는 전각 숫자 １(U+FF11)도 잡고, [0-9]는 잡지 않습니다.
+            Assert.Matches(@"^\d$", "１");
+            Assert.DoesNotMatch(@"^[0-9]$", "１");
         }
 
         /// <summary>GRC2/ 아래 .cs의 코드 줄(주석 줄 제외)에서 정규식에 걸리는 곳을 "파일:줄: 내용"으로 돌려줍니다.</summary>
