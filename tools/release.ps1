@@ -85,14 +85,24 @@ Write-Host "생성: $notesFile"
 if (-not $Publish) { return }
 
 # ── 5. 게시 ──
-git fetch origin main | Out-Null
+# Windows PowerShell 5.1은 $ErrorActionPreference='Stop'일 때 네이티브 명령의 stderr 한 줄(git의 "From …", "To …" 진행 메시지)도
+# 예외로 바꿉니다. git·gh는 정상 진행 메시지를 stderr로 쓰므로, 이 구간에서만 Continue로 두고 종료 코드로 판단합니다(2026-11-25).
+function Invoke-Native([string]$What, [scriptblock]$Command) {
+    $saved = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { & $Command 2>&1 | ForEach-Object { Write-Host "  $_" } }
+    finally { $ErrorActionPreference = $saved }
+    if ($LASTEXITCODE -ne 0) { throw "$What 실패 (종료 코드 $LASTEXITCODE)" }
+}
+
+Invoke-Native 'git fetch' { git fetch origin main }
 $branch = (git rev-parse --abbrev-ref HEAD).Trim()
 if ($branch -ne 'main') { throw "main 브랜치에서 실행하세요 (현재 $branch)" }
 if ((git rev-parse HEAD).Trim() -ne (git rev-parse origin/main).Trim()) { throw 'main이 origin/main과 다릅니다. pull/push 후 다시 실행하세요.' }
 if (git status --porcelain --untracked-files=no) { throw '작업 트리가 깨끗하지 않습니다.' }
 if (git tag --list $tag) { throw "태그 $tag 가 이미 있습니다. 버전을 먼저 올리세요." }
 
-git tag -a $tag -m "GRC2 $tag"
-git push origin $tag
-gh release create $tag $distDll --title "GRC2 $tag" --notes-file $notesFile
+Invoke-Native 'git tag' { git tag -a $tag -m "GRC2 $tag" }
+Invoke-Native 'git push (태그)' { git push origin $tag }
+Invoke-Native 'gh release create' { gh release create $tag $distDll --title "GRC2 $tag" --notes-file $notesFile }
 Write-Host "게시 완료: $tag"
