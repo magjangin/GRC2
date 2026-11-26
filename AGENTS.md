@@ -1,13 +1,13 @@
 # GRC2 — 인수인계 문서 (AGENTS.md)
 
-> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`), 2026-11-23 갱신(Harmony 이중 패치 수정 `HarmonyDontPatchAll`, 게임 필드 접근 `LazyFieldRef` 격리, BGA 동기화 재탐색 간격, `CHANGELOG.md`·`tools/release.ps1`, v0.7.0), 2026-11-23 2차 갱신(게임 PC 전체 감사: 상세 로그 보간 처리기·씬 이름 캐시·폰트 진단 축소·훅 실패 점검 반영·try 없는 훅의 `IsAvailable` 확인, v0.7.0 빌드·테스트·게시), 2026-11-24 갱신(2차 감사: BPM 변속 시간 이분 탐색 `BpmTimeline`, 서수 문자열 비교와 `SourceRulesTests`, MelonLoader·Unity 버전 점검, 아트워크 이미지 미발견 로그, v0.7.1), 2026-11-25 갱신(3차 감사: BGA 동기화 `BgaSyncPolicy` main 병합, 정규식 숫자 `[0-9]` 규칙, 결과 화면 □ 진단 실행당 1회화, v0.7.2), 2026-11-25 2차 갱신(4차 감사: 게임 씬 이름 시작 점검 `GameSceneNames`, 반복 경고 `ModLog.WarningThrottled`, BMS 캐시 최근 8곡 상한 `RecentKeys`, 문서 역슬래시 손상 복구, v0.7.3). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
+> 작성일 2026-11-15, 2026-11-16 갱신(업데이트 내성 추가, 3~5·7절 정리), 2026-11-18 갱신(폰트 fallback, 곡 상한 확대, 로그 감소, hwa 재스캔, 긴 곡 제목 스크롤, 외부 MusicID 맵 파일/설정 완전 제거 및 메모리 배정, 세이브 슬롯 하이스코어·클리어 뱃지 연결, 아트워크 수정 시각 캐시 무효화, 게임 상수 계약 추가), 2026-11-19 갱신(전수 리팩토링·병목 개선: SongInfoParser 컴파일 정규식 캐싱, HoldNoteProcessor 값 튜플 키, AlbumManager 아티스트 조회 O(1)화, BmsSummaryPrinter 단일 패스 집계, BgaInjector/BgaBgmSyncManager/BmsNoteConverter/SceneDetector 장문 메서드 분할, TextMarquee 코너 버퍼 재사용, 재스캔 시 BMS 캐시 초기화, TMP_Settings fallback 필드 테스트 추가), 2026-11-20 갱신(상수 계약을 런타임 이름 조회로 바로잡고 노트 enum까지 확대, MusicID 범위 런타임화, 원본 곡 추가 경고, `tools/check_game_version.ps1`), 2026-11-23 갱신(Harmony 이중 패치 수정 `HarmonyDontPatchAll`, 게임 필드 접근 `LazyFieldRef` 격리, BGA 동기화 재탐색 간격, `CHANGELOG.md`·`tools/release.ps1`, v0.7.0), 2026-11-23 2차 갱신(게임 PC 전체 감사: 상세 로그 보간 처리기·씬 이름 캐시·폰트 진단 축소·훅 실패 점검 반영·try 없는 훅의 `IsAvailable` 확인, v0.7.0 빌드·테스트·게시), 2026-11-24 갱신(2차 감사: BPM 변속 시간 이분 탐색 `BpmTimeline`, 서수 문자열 비교와 `SourceRulesTests`, MelonLoader·Unity 버전 점검, 아트워크 이미지 미발견 로그, v0.7.1), 2026-11-25 갱신(3차 감사: BGA 동기화 `BgaSyncPolicy` main 병합, 정규식 숫자 `[0-9]` 규칙, 결과 화면 □ 진단 실행당 1회화, v0.7.2), 2026-11-25 2차 갱신(4차 감사: 게임 씬 이름 시작 점검 `GameSceneNames`, 반복 경고 `ModLog.WarningThrottled`, BMS 캐시 최근 8곡 상한 `RecentKeys`, 문서 역슬래시 손상 복구, v0.7.3), 2026-11-26 갱신(5차 감사: 오프라인 언어 이름 `koreana` 수정 `SteamLanguage`, 곡 목록 정렬·ID 배정 재사용 `AlbumsVersion`, 프리뷰 캐시 LRU, info.txt UTF-8 아님 경고 `TextFileDecoder`, v0.7.4). 폴더의 코드·프로젝트 파일·기존 문서와 실제 게임 설치 폴더(Steam `.acf`, `UnityPlayer.dll`, `MelonLoader.dll`)를 읽어 정리했다.
 > 2026-11-17~18 변경은 곡 선택 화면까지 인게임으로 확인했다(7절에 범위 명시). **"실측"** 표시는 디스크에서 직접 읽은 값, **"미확인"**은 다음 세션에서 확인할 항목이다.
 
 ## 0. 프로젝트 개요
 
-- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.7.3, 2026-11-25 GitHub 릴리즈 게시. v0.7.2도 같은 날, v0.7.1은 2026-11-24, v0.7.0은 2026-11-23). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
+- **무엇인가:** GUNVOLT RECORDS Cychronicle 커스텀 차트 모드(v0.7.4, 2026-11-26 GitHub 릴리즈 게시. v0.7.3·v0.7.2는 2026-11-25, v0.7.1은 2026-11-24, v0.7.0은 2026-11-23). BMS 차트·BGM·BGA·아트워크·메타데이터를 주입하고, 스팀/DLC 체크(`SteamAPI.Init`, `SteamApps.BIsDlcInstalled`, `IntiCreates.Application.isDLCEnable`)를 우회. 테스트 프로젝트 `GRC2.Tests`, 심볼 도구 `tools/CsSymbolTool`.
 - **종류:** 게임 모드
-- **최근 수정일(파일 기준):** 2026-11-25
+- **최근 수정일(파일 기준):** 2026-11-26
 - **git 원격:** `origin`(GitHub magjangin/GRC2), `local`(`H:\local-repos\GRC2.git`) — 둘 다 main을 밀어 둔다
 - **최근 커밋:** `git log --oneline -8`로 본다(여기 복사해 두면 금방 낡는다). 2026-11-18 작업은 `feat/font-fallback-and-cleanup` 브랜치를 main에 병합한 것이다.
 - **먼저 읽을 기존 문서:**
@@ -75,11 +75,14 @@
 - **게임 씬 이름은 `Core/GameSceneNames`에만 둔다**(2026-11-25, 알려진_문제 R6). 씬 이름은 BGM/BGA 주입·기록 차단·제목 치환의 분기 조건인데 필드·상수·훅과 달리 점검에 없어, 이름이 바뀌면 "점검 통과"인 채 기능만 꺼졌다. 시작 점검이 빌드 설정 씬 목록(`SceneUtility.GetScenePathByBuildIndex`)과 대조하고, `SourceRulesTests`가 다른 파일의 씬 이름 문자열을 막는다. 새 씬 분기를 만들면 상수와 `ExactNames`에 넣는다.
 - **매 프레임·매 판정·매 `set_text` 경로의 catch는 `ModLog.WarningThrottled(key, …)`로 남긴다**(2026-11-25, P16). 같은 예외가 반복되면 `MelonLogger.Warning`이 초당 수백 줄이 되어 로그 쓰기 자체가 렉이 된다. 1·10·100…번째만 남는다.
 - **실행 내내 커지는 캐시는 상한을 둔다**(2026-11-25, P17). BMS 파싱 캐시는 `Helpers/RecentKeys`(LRU)로 최근 8곡(`SceneDetector.MaxCachedBmsFiles`)만 남긴다. 곡 상한이 7900여 곡이라 플레이한 곡을 전부 들고 있으면 메모리가 계속 는다.
+- **오프라인 대체값은 "게임이 아는 값"인지까지 확인한다**(2026-11-26, 알려진_문제 A4b). A4 수정은 예외만 막고 `"korean"`을 돌려줘 게임이 영어를 골랐다(Steam 이름은 `"koreana"`). 게임 분기 문자열은 소스에 상수로 있지 않아 컴파일로 못 잡으므로, `GameCompatibilityTests.SteamLanguageNames_ExistInGameLocaleSwitch`처럼 설치된 게임 메서드 IL의 `ldstr`을 읽어 대조한다. 다른 우회도 결과값을 게임이 문자열로 분기하면 같은 방식으로 테스트한다.
+- **곡 목록 postfix의 무거운 계산은 `AlbumManager.AlbumsVersion`으로 캐시한다**(2026-11-26, P18). `initializeMusicDataByDefault` postfix는 곡 선택 씬 한 번에 4번쯤 불린다. `_albums`를 바꾸는 코드를 새로 만들면 반드시 `AlbumsVersion++`을 같이 넣는다(안 넣으면 새 앨범이 목록·ID에 반영되지 않는다).
+- **텍스트 파일은 UTF-8만 읽을 수 있다**(2026-11-26, G2). 게임 `Managed`에 `I18N.CJK.dll`이 없어 `Encoding.GetEncoding(949/932)`이 런타임에서 실패한다. 디코더를 이식하는 대신 `TextFileDecoder`로 UTF-8 아님을 경고한다.
 - 훅 소유 파일·제거 위험의 정본은 [HOOK_MAP.md](GRC%20리드미/maintenance/HOOK_MAP.md), 문제별 상세는 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md).
 
 ## 4. 핵심 훅 시그니처와 주입 파이프라인
 
-- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.3", "화영왕")]`, `[assembly: MelonLoader.HarmonyDontPatchAll]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
+- **Melon 특성:** `[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.4", "화영왕")]`, `[assembly: MelonLoader.HarmonyDontPatchAll]`, `MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")`
 - **시작 순서(`SceneDetector.OnInitializeMelon`):** Harmony 패치 적용(실패 클래스는 `RecordHookFailure`) → 게임 폴더 계산 → `GameCompatibility.LogStartupReport`(훅 실패·빌드·MelonLoader·Unity·MVID·필드·상수) → `CustomKeySettings.Initialize`(VerboseLog 결정) → `CustomMusicIdRegistry.Initialize` → 앨범 스캔(+hwa 지문) → 곡 정보 → 아트워크 → 현재 곡 BMS만 파싱 → `NoteArrayHooks.UpdateBmsNotes`. 끝에 단계별 ms를 한 줄로 남긴다.
 - **씬 로드마다:** `FontFallback.EnsureInstalled`(첫 회에 폰트 생성). 곡 선택 씬이면 `RescanAlbumsIfChanged` → (약 200ms 뒤) 곡 목록 postfix가 ID 배정·세이브 칸 확장·주입.
 - **노트 주입:** `cFairyModeNotesManager.createAllNote` 훅(`NoteArrayHooks`)이 `mFairyNoteCreateDataArray`를 `BmsNoteConverter` 결과로 교체한다. 곡 선택 씬에서는 주입하지 않는다(H1).
@@ -131,7 +134,8 @@
 ## 7. 다음 작업자에게
 
 - 작업 전 `tools\check_game_version.ps1`로(또는 1절의 Build ID와 현재 설치본 `.acf`의 `buildid`를 직접) 비교한다. 2026-11-24 기준 Build ID·MVID·MelonLoader 0.7.3·Unity 2021.3.31f1 모두 같음. 다르면 **[업데이트_대응_가이드.md](GRC%20리드미/maintenance/업데이트_대응_가이드.md)** 순서를 따른다(테스트 → 훅 시그니처 확인 → 기준 빌드 갱신).
-- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 모두 통과해야 한다(2026-11-25 4차 감사 후 게임 PC 기준 194개).
+- `dotnet test GRC2.Tests\GRC2.Tests.csproj`가 모두 통과해야 한다(2026-11-26 5차 감사 후 게임 PC 기준 214개).
+- **2026-11-26 v0.7.4(5차 감사):** 오프라인 첫 부팅 언어(A4b)·곡 목록 재사용(P18)·프리뷰 캐시 LRU(P19)·info.txt 인코딩 경고(G2). 빌드(경고 0)·테스트(214개)·게시·`hwa` 사본 `Mods\GRC2.dll` 배포까지 했고 **인게임 실행은 안 했다.** 다음에 게임을 켜면 곡 선택 진입 로그의 `커스텀 곡 주입 완료` 줄이 여전히 한 번이고 곡 수가 같은지(P18 재사용이 새 곡을 빠뜨리지 않는지), 게임을 켠 채 hwa에 곡 폴더를 추가하고 곡 선택에 다시 들어가면 그 곡이 보이는지 확인한다. A4b는 스팀을 끄고 세이브 없이 실행해야 보이므로 세이브를 백업한 뒤에만 시험한다.
 - **2026-11-25 v0.7.3(4차 감사):** 씬 이름 시작 점검(R6)·반복 경고 제한(P16)·BMS 캐시 상한(P17)·문서 역슬래시 복구. 빌드(경고 0)·테스트(194개)·게시·`hwa` 사본 `Mods\GRC2.dll` 배포까지 했고 **인게임 실행은 안 했다.** 다음에 게임을 켜면 시작 로그가 `[호환성] 점검 통과 (필드 23개, 상수 26개, 씬 7개, 훅 클래스 전부 적용).`인지 본다. `게임 씬 'SoundPlayerScene'`/`'MoviePlayer_MovieSelect'` 없음 오류가 나오면 그 둘은 실측 로그에 없던 씬이므로(알려진_문제 R6 남은 한계) 같은 줄의 "현재 씬" 목록을 보고 `GameSceneNames`를 고친다.
 - **사용자가 알고 있는 버그는 바로 [알려진_문제.md](GRC%20리드미/maintenance/알려진_문제.md)에 적는다.** 2026-11-24에 "결과 화면 한자 □"와 "플레이 시작 렉"이 오래전부터 있던 버그인데 어느 문서에도 없어 다음 세션이 몰랐다(L절).
 - **2026-11-25 v0.7.2(3차 감사):** `fix/bga-sync-stutter`(L1 BGA 렉 수정, **인게임 확인됨**)를 main에 병합하고 브랜치를 지웠다. 같은 릴리즈에 정규식 숫자 수정(R5)·동기화 중지 로그 정리(P15)·L2 진단 1회화를 넣었다(이 셋은 빌드·테스트만). 빌드·테스트(184개)·게시·`hwa` 사본 `Mods\GRC2.dll` 배포까지 했다. 스팀 설치본 `Mods`는 v0.7.1 그대로다.

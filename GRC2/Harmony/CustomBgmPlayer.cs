@@ -20,7 +20,7 @@ namespace GRC2.Harmony
 
         private static readonly Dictionary<string, AudioClip> ClipCache =
             new Dictionary<string, AudioClip>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Queue<string> CacheOrder = new Queue<string>();
+        private static readonly Helpers.RecentKeys CacheOrder = new Helpers.RecentKeys(MaxCachedClips, StringComparer.OrdinalIgnoreCase);
 
         private static AudioSource _customBgmAudioSource;
         private static GameObject _customBgmGameObject;
@@ -201,14 +201,20 @@ namespace GRC2.Harmony
         {
             if (ClipCache.TryGetValue(path, out clip) && clip != null)
             {
+                CacheOrder.Touch(path); // 다시 고른 곡은 가장 최근으로(예전에는 먼저 넣은 순서로만 버림)
                 return true;
             }
 
+            // 클립이 밖에서 파괴됐으면 항목을 지웁니다. 순서 목록에는 남겨 두어도 다시 넣을 때 Touch가 위치만 옮깁니다.
             ClipCache.Remove(path);
             clip = null;
             return false;
         }
 
+        /// <summary>
+        /// 예전 Queue 방식은 파괴된 클립을 다시 넣으면 경로가 큐에 두 번 들어가, 나중에 옛 항목을 꺼낼 때
+        /// 방금 넣은 클립을 캐시에서 빼 버렸습니다(2026-11-26, 알려진_문제 P19). RecentKeys는 키당 한 칸만 씁니다.
+        /// </summary>
         private static void AddToCache(string path, AudioClip clip)
         {
             if (ClipCache.ContainsKey(path))
@@ -217,21 +223,16 @@ namespace GRC2.Harmony
             }
 
             ClipCache[path] = clip;
-            CacheOrder.Enqueue(path);
-
-            while (ClipCache.Count > MaxCachedClips && CacheOrder.Count > 0)
+            string evictedPath = CacheOrder.Touch(path);
+            if (evictedPath == null || !ClipCache.TryGetValue(evictedPath, out AudioClip evictedClip))
             {
-                string oldestPath = CacheOrder.Dequeue();
-                if (!ClipCache.TryGetValue(oldestPath, out AudioClip oldestClip))
-                {
-                    continue;
-                }
+                return;
+            }
 
-                ClipCache.Remove(oldestPath);
-                if (oldestClip != null && oldestClip != clip)
-                {
-                    UnityEngine.Object.Destroy(oldestClip);
-                }
+            ClipCache.Remove(evictedPath);
+            if (evictedClip != null && evictedClip != clip)
+            {
+                UnityEngine.Object.Destroy(evictedClip);
             }
         }
 

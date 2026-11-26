@@ -55,7 +55,8 @@ namespace GRC2.Harmony
         /// </summary>
         public static string FallbackGameLanguage()
         {
-            return System.Globalization.CultureInfo.CurrentUICulture.TwoLetterISOLanguageName == "ko" ? "korean" : "english";
+            // 한국어는 Steam API 이름이 "koreana"입니다("korean"이면 게임이 영어를 고름, 알려진_문제 A4b). 매핑은 Helpers/SteamLanguage.
+            return SteamLanguage.FromCulture(System.Globalization.CultureInfo.CurrentUICulture);
         }
 
         public static bool BIsDlcInstalledPrefix(ref bool __result)
