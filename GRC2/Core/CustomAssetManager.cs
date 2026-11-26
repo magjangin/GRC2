@@ -21,7 +21,8 @@ namespace GRC2.Core
             new Dictionary<string, Sprite>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, DateTime> ArtworkCacheWriteTimeUtc =
             new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Queue<string> ArtworkCacheOrder = new Queue<string>();
+        private static readonly RecentKeys ArtworkCacheOrder =
+            new RecentKeys(MaxCachedArtwork, StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, List<Action<Sprite>>> PendingArtworkCallbacks =
             new Dictionary<string, List<Action<Sprite>>>(StringComparer.OrdinalIgnoreCase);
 
@@ -128,6 +129,7 @@ namespace GRC2.Core
                 return false;
             }
 
+            ArtworkCacheOrder.Touch(normalizedPath);
             SelectArtwork(sprite);
             return true;
         }
@@ -146,6 +148,7 @@ namespace GRC2.Core
 
         private static void EvictCachedArtwork(string normalizedPath)
         {
+            ArtworkCacheOrder.Remove(normalizedPath);
             if (ArtworkCache.TryGetValue(normalizedPath, out Sprite staleSprite))
             {
                 ArtworkCache.Remove(normalizedPath);
@@ -237,49 +240,13 @@ namespace GRC2.Core
                 return;
             }
 
-            if (!ArtworkCache.ContainsKey(path))
-            {
-                ArtworkCacheOrder.Enqueue(path);
-            }
-
             ArtworkCache[path] = sprite;
             ArtworkCacheWriteTimeUtc[path] = GetWriteTimeUtcOrMin(path);
-            TrimArtworkCache();
-        }
-
-        private static void TrimArtworkCache()
-        {
-            int attempts = ArtworkCacheOrder.Count;
-            while (ArtworkCache.Count > MaxCachedArtwork &&
-                   ArtworkCacheOrder.Count > 0 &&
-                   attempts-- > 0)
+            string evicted = ArtworkCacheOrder.Touch(path);
+            if (evicted != null)
             {
-                string oldestPath = ArtworkCacheOrder.Dequeue();
-                if (string.Equals(
-                    oldestPath,
-                    requestedArtworkPath,
-                    StringComparison.OrdinalIgnoreCase))
-                {
-                    ArtworkCacheOrder.Enqueue(oldestPath);
-                    continue;
-                }
-
-                if (!ArtworkCache.TryGetValue(oldestPath, out Sprite oldestSprite))
-                {
-                    continue;
-                }
-
-                ArtworkCache.Remove(oldestPath);
-                ArtworkCacheWriteTimeUtc.Remove(oldestPath);
-                if (oldestSprite != null)
-                {
-                    Texture2D texture = oldestSprite.texture;
-                    UnityEngine.Object.Destroy(oldestSprite);
-                    if (texture != null)
-                    {
-                        UnityEngine.Object.Destroy(texture);
-                    }
-                }
+                EvictCachedArtwork(evicted);
+                ModLog.Verbose($"[CustomAssetManager] 아트워크 캐시 상한 {MaxCachedArtwork}장 - 오래된 이미지 해제: {Path.GetFileName(evicted)}");
             }
         }
 

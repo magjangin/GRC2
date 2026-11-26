@@ -79,7 +79,7 @@ namespace GRC2.Harmony
                 {
                     value = songTitle;
                 }
-                else if (!string.IsNullOrEmpty(currentOriginalTitle) && value.Contains(currentOriginalTitle))
+                else if (!string.IsNullOrEmpty(currentOriginalTitle) && value.IndexOf(currentOriginalTitle, StringComparison.Ordinal) >= 0)
                 {
                     value = value.Replace(currentOriginalTitle, songTitle);
                 }

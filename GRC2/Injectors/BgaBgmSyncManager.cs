@@ -108,12 +108,18 @@ namespace GRC2.Injectors
             string name = audioSource.name ?? "";
             string clipName = audioSource.clip?.name ?? "";
 
-            if (clipName.Contains("SE_") || clipName.Contains("_SE") || name.Contains("SFX") || name.Contains("Effect") || name.Contains("UI"))
+            if (ContainsOrdinalIgnoreCase(clipName, "SE_") ||
+                ContainsOrdinalIgnoreCase(clipName, "_SE") ||
+                ContainsOrdinalIgnoreCase(name, "SFX") ||
+                ContainsOrdinalIgnoreCase(name, "Effect") ||
+                ContainsOrdinalIgnoreCase(name, "UI"))
             {
                 score -= 10;
             }
 
-            if (name.Contains("Audio") || name.Contains("BGM") || name.Contains("Music"))
+            if (ContainsOrdinalIgnoreCase(name, "Audio") ||
+                ContainsOrdinalIgnoreCase(name, "BGM") ||
+                ContainsOrdinalIgnoreCase(name, "Music"))
             {
                 score += 5;
             }
@@ -129,6 +135,11 @@ namespace GRC2.Injectors
             }
 
             return score;
+        }
+
+        private static bool ContainsOrdinalIgnoreCase(string source, string value)
+        {
+            return source.IndexOf(value, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         /// <summary>

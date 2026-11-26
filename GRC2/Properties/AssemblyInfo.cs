@@ -30,11 +30,11 @@ using MelonLoader;
 //      빌드 번호
 //      수정 버전
 //
-[assembly: AssemblyVersion("0.7.4.0")]
-[assembly: AssemblyFileVersion("0.7.4.0")]
+[assembly: AssemblyVersion("0.7.5.0")]
+[assembly: AssemblyFileVersion("0.7.5.0")]
 
 // MelonLoader 모드 정보
-[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.4", "화영왕")]
+[assembly: MelonInfo(typeof(GRC2.Core.SceneDetector), "GUNVOLT RECORDS Cychronicle", "0.7.5", "화영왕")]
 [assembly: MelonGame("INTI CREATES", "GUNVOLT RECORDS Cychronicle")]
 [assembly: MelonColor(0, 255, 255, 255)] // Cyan (R, G, B, A)
 

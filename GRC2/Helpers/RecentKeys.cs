@@ -50,6 +50,22 @@ namespace GRC2.Helpers
             return oldest.Value;
         }
 
+        /// <summary>키를 목록에서 제거합니다. 있으면 true, 없으면 false.</summary>
+        public bool Remove(string key)
+        {
+            if (key == null)
+                return false;
+
+            if (_nodes.TryGetValue(key, out var node))
+            {
+                _order.Remove(node);
+                _nodes.Remove(key);
+                return true;
+            }
+
+            return false;
+        }
+
         public void Clear()
         {
             _order.Clear();

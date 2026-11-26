@@ -4,6 +4,23 @@
 `GRC2/Properties/AssemblyInfo.cs`의 `AssemblyVersion`·`AssemblyFileVersion`·`MelonInfo`, 그리고 이 파일.
 0.6.0 이전 내역은 [GitHub 릴리즈](https://github.com/magjangin/GRC2/releases)를 보세요.
 
+## [0.7.5] - 2026-11-26
+
+### 성능
+
+- **아트워크 캐시 순서를 LRU(`RecentKeys`)로 전환하고 stale 경로를 즉시 제거했습니다.** 예전의 큐 방식은 다시 선택한 곡의 캐시 순서가 갱신되지 않았고 파일 수정으로 무효화될 때 큐에 찌꺼기가 남았습니다. 이제 BMS·프리뷰 캐시와 동일한 LRU로 일관화되어 가장 오래 쓰지 않은 텍스처를 안전하게 해제합니다.
+- **BGA 준비 대기 루프에서 매 프레임 LINQ 람다 할당을 없앴습니다.** 비디오가 준비될 때까지 60fps로 `All(vp => vp.isPrepared)` 람다를 생성하던 것을 인덱서 루프로 바꿨고, URL 인코딩 여부 판단에 쓰던 `#%?` 문자 배열도 재사용하도록 캐시했습니다.
+- **BGM 파일 선택을 단일 패스(Single Pass) 탐색으로 최적화했습니다.** 후보 목록을 `OrderBy`로 새로 정렬하고 `FirstOrDefault`를 3번 돌던 대신 한 번의 루프로 ogg, mp3, wav 우선순위와 파일명 순서를 판별해 불필요한 힙 할당을 제거했습니다.
+
+### 업데이트 내성 및 견고성
+
+- **문자열 서수 비교를 일관화했습니다.** `TextPatch`와 `BgaBgmSyncManager`에서 문화권에 영향받을 수 있는 문자열 포함 여부 검사를 `StringComparison.Ordinal[IgnoreCase]` 기반으로 바꿨습니다.
+- **`FairyNoteEditorLoader.NoteCreateData` 핵심 필드를 계약 테스트로 보호합니다.** `perfectSample`, `laneLeftRightID`, `directionIndex`, 게임 오타인 `turnDireciton` 등 9개 필드의 존재를 단위 테스트에서 검증합니다.
+
+### 검증
+
+- 게임 PC에서 빌드(경고 0)·단위 테스트 220개 통과(BGM 선택 단일 패스, RecentKeys 제거 및 용량 관리, NoteCreateData 필드 계약 등 6개 추가). **게임에서 실행해 확인하지는 않았습니다.**
+
 ## [0.7.4] - 2026-11-26
 
 ### 고침

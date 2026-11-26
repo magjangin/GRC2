@@ -190,8 +190,8 @@ namespace GRC2.Parsers
                     var channel = int.Parse(measureMatch.Groups[2].Value);
                     var data = line.Substring(measureMatch.Length).Trim();
 
-                    // BPM 변화 처리 (채널 03-08: 데이터는 BPM 인덱스 목록, bpmIndexTable로 실제 값 조회)
-                    if (channel >= 0x03 && channel <= 0x08)
+                    // BPM 변화 처리 (채널 03은 직접 BPM 값, 채널 08은 #BPMxx 인덱스. 04~07 BGA 채널은 건너뜁니다)
+                    if (channel == 0x03 || channel == 0x08)
                     {
                         ProcessBpmChange(channel, data, currentMeasure, baseBpm, bpmIndexTable, bpmChanges);
                     }

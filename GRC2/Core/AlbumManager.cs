@@ -174,11 +174,38 @@ namespace GRC2.Core
         /// </summary>
         internal static string ChooseBgmFile(IReadOnlyList<string> candidates)
         {
-            var sorted = candidates.OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase).ToList();
+            if (candidates == null || candidates.Count == 0)
+                return null;
 
-            return sorted.FirstOrDefault(f => HasExtension(f, ".ogg"))
-                ?? sorted.FirstOrDefault(f => HasExtension(f, ".mp3"))
-                ?? sorted.FirstOrDefault(f => HasExtension(f, ".wav") && IsBgmFileName(f));
+            // LINQ OrderBy + ToList + FirstOrDefault 3회의 힙 할당을 단일 패스(O(N)) 탐색으로 최적화(P22).
+            string bestOgg = null;
+            string bestMp3 = null;
+            string bestWav = null;
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                string file = candidates[i];
+                if (string.IsNullOrEmpty(file))
+                    continue;
+
+                if (HasExtension(file, ".ogg"))
+                {
+                    if (bestOgg == null || StringComparer.OrdinalIgnoreCase.Compare(Path.GetFileName(file), Path.GetFileName(bestOgg)) < 0)
+                        bestOgg = file;
+                }
+                else if (HasExtension(file, ".mp3"))
+                {
+                    if (bestMp3 == null || StringComparer.OrdinalIgnoreCase.Compare(Path.GetFileName(file), Path.GetFileName(bestMp3)) < 0)
+                        bestMp3 = file;
+                }
+                else if (HasExtension(file, ".wav") && IsBgmFileName(file))
+                {
+                    if (bestWav == null || StringComparer.OrdinalIgnoreCase.Compare(Path.GetFileName(file), Path.GetFileName(bestWav)) < 0)
+                        bestWav = file;
+                }
+            }
+
+            return bestOgg ?? bestMp3 ?? bestWav;
         }
 
         private static bool HasExtension(string path, string extension)

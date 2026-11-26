@@ -407,6 +407,38 @@ namespace GRC2.Tests
             }
         }
 
+        [Fact]
+        public void NoteCreateData_KeyFieldsExistInGameAssembly()
+        {
+            var gameAsm = typeof(GameCompatibility).Assembly.GetReferencedAssemblies()
+                .Select(n => Assembly.Load(n))
+                .FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp")
+                ?? AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "Assembly-CSharp");
+
+            Assert.NotNull(gameAsm);
+            var targetType = gameAsm.GetType("IntiCreates.FairyNoteEditorLoader+NoteCreateData");
+            Assert.NotNull(targetType);
+
+            var expectedFields = new[]
+            {
+                "perfectSample",
+                "laneLeftRightID",
+                "subLaneID",
+                "noteTypeID",
+                "noteSize",
+                "slideEndFlickDirection",
+                "directionIndex",
+                "turnDireciton", // 게임 원본 오타(turnDireciton) 유지 여부 확인
+                "connectNodeDataArray"
+            };
+
+            foreach (var fieldName in expectedFields)
+            {
+                var field = targetType.GetField(fieldName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+                Assert.True(field != null, $"FairyNoteEditorLoader.NoteCreateData에 '{fieldName}' 필드가 없습니다 (필드명 변경 또는 삭제 의심).");
+            }
+        }
+
         private static string FindRepoRoot()
         {
             var dir = new DirectoryInfo(AppDomain.CurrentDomain.BaseDirectory);

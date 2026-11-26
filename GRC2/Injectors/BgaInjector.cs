@@ -14,6 +14,7 @@ namespace GRC2.Injectors
     internal static class BgaInjector
     {
         private static bool _bgaInjected = false;
+        private static readonly char[] BgaSpecialChars = { '#', '%', '?' };
 
         public static bool IsInjected => _bgaInjected;
 
@@ -89,7 +90,7 @@ namespace GRC2.Injectors
             // '#', '%', '?'가 든 경로는 문자열을 이어 붙인 URL이 잘못 해석됩니다(I1). 그런 경로만 인코딩된 URI를 쓰고,
             // 나머지는 예전 방식을 그대로 둡니다(인게임에서 재생이 확인된 형태).
             var fileUrl = "file://" + bgaFilePath.Replace("\\", "/");
-            if (bgaFilePath.IndexOfAny(new[] { '#', '%', '?' }) >= 0)
+            if (bgaFilePath.IndexOfAny(BgaSpecialChars) >= 0)
             {
                 try { fileUrl = new Uri(Path.GetFullPath(bgaFilePath)).AbsoluteUri; }
                 catch (Exception ex) { MelonLogger.Warning($"[BgaInjector] 경로 URI 변환 실패, 기본 방식 사용: {ex.Message}"); }
@@ -156,12 +157,13 @@ namespace GRC2.Injectors
 
             while (!allPrepared && Time.realtimeSinceStartup - waitStart < maxWaitSeconds)
             {
-                allPrepared = activeVideoPlayers.All(vp => vp.isPrepared);
+                // 매 프레임 LINQ All(vp => ...) 람다 할당을 피하기 위해 인덱서 루프로 검사(P21).
+                allPrepared = AreAllVideoPlayersPrepared(activeVideoPlayers);
 
                 if (!allPrepared && Time.realtimeSinceStartup >= nextLogAt)
                 {
                     var elapsed = Time.realtimeSinceStartup - waitStart;
-                    int preparedCount = activeVideoPlayers.Count(vp => vp.isPrepared);
+                    int preparedCount = CountPreparedVideoPlayers(activeVideoPlayers);
                     ModLog.Verbose($"[BgaInjector] BGA Prepare 대기 중... ({elapsed:F1}초 경과, {preparedCount}/{activeVideoPlayers.Count} 준비 완료)");
                     nextLogAt += 1f;
                 }
@@ -173,6 +175,29 @@ namespace GRC2.Injectors
                 var elapsedSeconds = Time.realtimeSinceStartup - waitStart;
                 MelonLogger.Warning($"[BgaInjector] 일부 BGA 준비 시간 초과 ({elapsedSeconds:F1}초 경과, 최대 {maxWaitSeconds:F1}초)");
             }
+        }
+
+        private static bool AreAllVideoPlayersPrepared(System.Collections.Generic.List<VideoPlayer> players)
+        {
+            for (int i = 0; i < players.Count; i++)
+            {
+                var vp = players[i];
+                if (vp != null && !vp.isPrepared)
+                    return false;
+            }
+            return true;
+        }
+
+        private static int CountPreparedVideoPlayers(System.Collections.Generic.List<VideoPlayer> players)
+        {
+            int count = 0;
+            for (int i = 0; i < players.Count; i++)
+            {
+                var vp = players[i];
+                if (vp != null && vp.isPrepared)
+                    count++;
+            }
+            return count;
         }
 
         private static void StartPreparedVideoPlayers(System.Collections.Generic.List<VideoPlayer> activeVideoPlayers)
