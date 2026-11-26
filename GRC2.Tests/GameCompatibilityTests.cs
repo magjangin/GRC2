@@ -1,4 +1,5 @@
-﻿using System;
+﻿using System.Collections.Generic;
+using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -37,6 +38,35 @@ namespace GRC2.Tests
                 }
                 return null;
             };
+        }
+
+        /// <summary>
+        /// 스팀 없이 실행할 때 모드가 대신 답하는 언어 이름이 게임의 언어 판정(sLocalizeDirector.getCurrentLocale)에
+        /// 실제로 있는 문자열인지, 메서드 IL의 ldstr을 읽어 확인합니다(2026-11-26, 알려진_문제 A4b: "korean"은 없고 "koreana"만 있음).
+        /// </summary>
+        [Fact]
+        public void SteamLanguageNames_ExistInGameLocaleSwitch()
+        {
+            var type = Assembly.Load("Assembly-CSharp").GetType("IntiCreates.sLocalizeDirector");
+            Assert.NotNull(type);
+            var method = type.GetMethod("getCurrentLocale", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance);
+            Assert.NotNull(method);
+
+            var il = method.GetMethodBody().GetILAsByteArray();
+            var strings = new HashSet<string>(StringComparer.Ordinal);
+            for (int i = 0; i + 4 < il.Length; i++)
+            {
+                if (il[i] != 0x72) // ldstr
+                    continue;
+                int token = BitConverter.ToInt32(il, i + 1);
+                if ((token >> 24) != 0x70)
+                    continue;
+                try { strings.Add(method.Module.ResolveString(token)); } catch (ArgumentException) { }
+            }
+
+            foreach (var name in GRC2.Helpers.SteamLanguage.GameKnownNames)
+                Assert.True(strings.Contains(name), $"게임 언어 판정에 '{name}'이 없습니다. 게임 문자열: {string.Join(", ", strings)}");
+            Assert.DoesNotContain("korean", strings);
         }
 
         private static string GamePath =>

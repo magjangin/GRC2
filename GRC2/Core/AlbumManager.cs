@@ -46,6 +46,26 @@ namespace GRC2.Core
         private const string RootAlbumKey = "root";
 
         private static Dictionary<string, AlbumInfo> _albums = new Dictionary<string, AlbumInfo>();
+
+        /// <summary>
+        /// 앨범 목록이 바뀔 때마다 올라가는 번호. 곡 목록 postfix는 곡 선택 씬 한 번에 4번쯤 불리는데, 그때마다 앨범 전체를
+        /// 정렬하고 ID 배정기(정렬 3번)를 돌리면 곡이 수천 개일 때 씬 진입이 무거워집니다. 이 번호가 같으면 결과를 재사용합니다(P18).
+        /// </summary>
+        public static int AlbumsVersion { get; private set; }
+
+        private static int _sortedAlbumsVersion = -1;
+        private static List<KeyValuePair<string, AlbumInfo>> _sortedAlbums = new List<KeyValuePair<string, AlbumInfo>>();
+
+        /// <summary>앨범을 키 이름순(서수, 대소문자 무시)으로. 목록이 바뀌지 않았으면 같은 목록을 돌려줍니다. 바꾸지 말 것.</summary>
+        public static IReadOnlyList<KeyValuePair<string, AlbumInfo>> GetAlbumsSortedByKey()
+        {
+            if (_sortedAlbumsVersion != AlbumsVersion)
+            {
+                _sortedAlbums = _albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase).ToList();
+                _sortedAlbumsVersion = AlbumsVersion;
+            }
+            return _sortedAlbums;
+        }
         private static AlbumInfo _currentAlbum = null;
         private static Dictionary<MusicID, AlbumInfo> _musicIdToAlbumMap = new Dictionary<MusicID, AlbumInfo>();
         private static Dictionary<MusicID, string> _musicIdToOriginalTitleMap = new Dictionary<MusicID, string>();
@@ -326,6 +346,7 @@ namespace GRC2.Core
             try
             {
                 _albums.Clear();
+                AlbumsVersion++;
                 _currentAlbum = null;
                 _musicIdToAlbumMap.Clear();
                 _musicIdToOriginalTitleMap.Clear();
@@ -442,6 +463,7 @@ namespace GRC2.Core
 
             string albumKey = GetAlbumKey(albumFolder, hwaFolderPath);
             _albums[albumKey] = albumInfo;
+            AlbumsVersion++;
             ModLog.Verbose($"[AlbumManager] 앨범 등록: {albumKey} ({albumInfo.BmsFiles.Count}개 BMS, {albumInfo.ImageFiles.Count}개 이미지, {albumInfo.BgaFiles.Count}개 BGA, {albumInfo.BgmFiles.Count}개 BGM)");
         }
 
@@ -625,6 +647,7 @@ namespace GRC2.Core
             if (album != null)
             {
                 _albums[GetAlbumKey(albumFolderPath)] = album;
+                AlbumsVersion++;
             }
 
             return album;

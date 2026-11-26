@@ -103,14 +103,15 @@ namespace GRC2.Harmony
             MusicSelectData templateData = cellList[0].mMusicSelectData;
 
             // 메모리에서 앨범 키마다 ID를 배정합니다(외부 맵 파일 없음). 한 실행 안에서는 이미 받은 ID가 유지됩니다.
-            var ids = CustomMusicIdRegistry.Allocate(albums.Keys);
+            // 이 postfix는 씬 진입 한 번에 4번쯤 불리므로, 앨범 목록이 그대로면 직전 배정 결과를 씁니다(P18).
+            var ids = GetOrAllocateIds(albums);
             if (ids.Assigned.Count > 0)
-                CustomMusicIdRegistry.EnsureSaveSlots(ids.Assigned.Values.Max());
+                CustomMusicIdRegistry.EnsureSaveSlots(_lastMaxAssignedId);
 
             var saveData = SingletonMonoBehaviour<sSaveDataDirector>.Instance?.getCurrentActiveGameData()?.playerMusicData;
 
             int injectedCount = 0;
-            foreach (var pair in albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase))
+            foreach (var pair in AlbumManager.GetAlbumsSortedByKey())
             {
                 if (!ids.Assigned.TryGetValue(pair.Key, out int customIdValue))
                     continue;
@@ -129,6 +130,22 @@ namespace GRC2.Harmony
             // 곡 선택 씬 한 번에 이 postfix가 4번쯤 불리므로 결과가 달라질 때만 남깁니다.
             ModLog.InfoOnChange("MusicScrollViewHooks.inject",
                 $"[MusicScrollViewHooks] 커스텀 곡 주입 완료: {injectedCount}개 (총 {cellList.Count}개)");
+        }
+
+        private static int _lastAllocatedAlbumsVersion = -1;
+        private static CustomMusicIdAllocator.Result _lastAllocation;
+        private static int _lastMaxAssignedId;
+
+        private static CustomMusicIdAllocator.Result GetOrAllocateIds(IReadOnlyDictionary<string, AlbumInfo> albums)
+        {
+            int version = AlbumManager.AlbumsVersion;
+            if (_lastAllocation == null || _lastAllocatedAlbumsVersion != version)
+            {
+                _lastAllocation = CustomMusicIdRegistry.Allocate(albums.Keys);
+                _lastAllocatedAlbumsVersion = version;
+                _lastMaxAssignedId = _lastAllocation.Assigned.Count > 0 ? _lastAllocation.Assigned.Values.Max() : -1;
+            }
+            return _lastAllocation;
         }
 
         private static bool TryCreateCustomItem(

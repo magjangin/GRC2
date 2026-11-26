@@ -89,12 +89,14 @@ namespace GRC2.Parsers
         {
             // BOM이 있으면 그 인코딩을 따르고, 없으면 UTF-8로 읽습니다.
             // 예전 주석은 CP949라고 했지만 Unity Mono에서 Encoding.Default는 UTF-8입니다(알려진 문제 G). 그래서 명시합니다.
-            using (var reader = new StreamReader(filePath, System.Text.Encoding.UTF8, true))
+            string text = Helpers.TextFileDecoder.Decode(File.ReadAllBytes(filePath), out bool isValidUtf8);
+            if (!isValidUtf8)
             {
-                string text = reader.ReadToEnd();
-                ModLog.Verbose($"[SongInfoParser] 인코딩 결정: {reader.CurrentEncoding.EncodingName}");
-                return text;
+                // 게임에는 CP949·Shift-JIS 디코더(I18N.CJK)가 없어 고쳐 읽을 수 없습니다. 원인을 알 수 있게 알립니다(G2).
+                MelonLogger.Warning($"[SongInfoParser] {Path.GetFileName(Path.GetDirectoryName(filePath))}/{Path.GetFileName(filePath)}이(가) UTF-8이 아닙니다(ANSI/CP949·Shift-JIS로 저장된 듯). " +
+                    "제목·작곡가가 깨져 보이면 메모장에서 '다른 이름으로 저장 → 인코딩 UTF-8'로 다시 저장하세요.");
             }
+            return text;
         }
 
         private static string StripInlineComment(string line)
