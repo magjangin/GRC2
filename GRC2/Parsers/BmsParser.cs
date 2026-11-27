@@ -30,19 +30,44 @@ namespace GRC2.Parsers
         /// </summary>
         public static List<BmsNote> ParseBmsFile(string filePath, bool printSummary = true)
         {
-            var notes = new List<BmsNote>();
-            
             if (!File.Exists(filePath))
             {
                 MelonLogger.Error($"[BmsParser] 파일을 찾을 수 없습니다: {filePath}");
-                return notes;
+                return new List<BmsNote>();
             }
 
             try
             {
                 ModLog.Verbose($"[BmsParser] BMS 파일 파싱 시작: {filePath}");
-                
-                var lines = File.ReadAllLines(filePath);
+
+                byte[] bytes = File.ReadAllBytes(filePath);
+                string text = TextFileDecoder.Decode(bytes, out bool isValidUtf8);
+                if (!isValidUtf8)
+                {
+                    MelonLogger.Warning($"[BmsParser] {Path.GetFileName(filePath)}이(가) UTF-8이 아닙니다. 특수문자나 주석이 손상될 수 있습니다.");
+                }
+
+                return ParseBmsText(text, filePath, printSummary);
+            }
+            catch (Exception ex)
+            {
+                Helpers.ErrorLogger.LogException(ex, "[BmsParser]", "파싱 오류 (이 파일의 노트를 모두 버립니다)");
+                return new List<BmsNote>();
+            }
+        }
+
+        /// <summary>
+        /// 텍스트 내용에서 BMS 노트를 파싱합니다.
+        /// </summary>
+        public static List<BmsNote> ParseBmsText(string text, string sourceName = "text", bool printSummary = false)
+        {
+            var notes = new List<BmsNote>();
+            if (string.IsNullOrWhiteSpace(text))
+                return notes;
+
+            try
+            {
+                var lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
                 var bpmChanges = new List<BpmChange>();
                 var bpmIndexTable = new Dictionary<int, float>(); // #BPM01: 140 등 인덱스→BPM 값
                 float baseBpm = 120f;  // 기본 BPM
@@ -70,16 +95,19 @@ namespace GRC2.Parsers
                 // 파싱 결과 요약 출력 (옵션)
                 if (printSummary)
                 {
-                    BmsSummaryPrinter.PrintParseSummary(notes, filePath);
+                    BmsSummaryPrinter.PrintParseSummary(notes, sourceName);
                 }
-                
-                MelonLogger.Msg($"[BmsParser] 파싱 완료: {notes.Count}개 노트");
+
+                try
+                {
+                    MelonLogger.Msg($"[BmsParser] 파싱 완료: {notes.Count}개 노트");
+                }
+                catch { }
                 return notes;
             }
             catch (Exception ex)
             {
-                // 노트 수집 이후 단계가 실패하면 Time이 계산되지 않은 노트가 남습니다. 주입되지 않도록 이 파일의 노트를 모두 버립니다(H5).
-                MelonLogger.Error($"[BmsParser] 파싱 오류 (이 파일의 노트를 모두 버립니다): {ex.Message}\n{ex.StackTrace}");
+                Helpers.ErrorLogger.LogException(ex, "[BmsParser]", "텍스트 파싱 오류");
                 return new List<BmsNote>();
             }
         }

@@ -63,7 +63,7 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
-        /// 16진수 데이터 파싱 (Substring 할당 없이 직접 파싱)
+        /// 16진수 데이터 파싱 (Substring 할당 없이 직접 파싱, 홀수 자릿수 패딩 안전성 보장)
         /// </summary>
         public static List<int> ParseHexData(string data, int valueWidth = 2)
         {
@@ -72,7 +72,9 @@ namespace GRC2.Parsers
                 return values;
 
             var trimmed = data.Trim();
-            int capacity = trimmed.Length / valueWidth;
+            int remainder = trimmed.Length % valueWidth;
+            int fullTokens = trimmed.Length / valueWidth;
+            int capacity = fullTokens + (remainder > 0 ? 1 : 0);
             if (capacity > 0)
                 values.Capacity = capacity;
 
@@ -81,6 +83,21 @@ namespace GRC2.Parsers
             for (int i = 0; i + valueWidth <= trimmed.Length; i += valueWidth)
             {
                 values.Add(ParseHexTokenOrZero(trimmed, i, valueWidth));
+            }
+
+            if (remainder > 0)
+            {
+                // 홀수 자릿수/불완전한 마지막 토큰은 0을 패딩해 슬롯 정렬을 유지합니다(P28).
+                int start = fullTokens * valueWidth;
+                int acc = 0;
+                for (int j = 0; j < remainder; j++)
+                {
+                    int digit = HexCharToInt(trimmed[start + j]);
+                    if (digit >= 0)
+                        acc = (acc << 4) | digit;
+                }
+                acc <<= (4 * (valueWidth - remainder));
+                values.Add(acc);
             }
 
             return values;

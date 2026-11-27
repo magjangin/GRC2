@@ -18,26 +18,7 @@ namespace GRC2.Tests
     {
         static GameCompatibilityTests()
         {
-            // 게임 어셈블리는 빌드 출력에 복사되지 않으므로 설치 폴더에서 직접 찾습니다(GRC2_GAME_PATH 또는 기본 설치 경로).
-            var gamePath = Environment.GetEnvironmentVariable("GRC2_GAME_PATH")
-                ?? @"H:\GUNVOLT RECORDS Cychronicle hwa";
-            var dirs = new[]
-            {
-                Path.Combine(gamePath, "GUNVOLT_RECORDS_Cychronicle_Data", "Managed"),
-                Path.Combine(gamePath, "MelonLoader", "net35"),
-                Path.Combine(gamePath, "MelonLoader", "net6"),
-            };
-            AppDomain.CurrentDomain.AssemblyResolve += (_, args) =>
-            {
-                var name = new AssemblyName(args.Name).Name + ".dll";
-                foreach (var dir in dirs)
-                {
-                    var path = Path.Combine(dir, name);
-                    if (File.Exists(path))
-                        return Assembly.LoadFrom(path);
-                }
-                return null;
-            };
+            TestAssemblyResolver.Ensure();
         }
 
         /// <summary>

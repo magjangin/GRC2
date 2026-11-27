@@ -90,9 +90,11 @@ namespace GRC2.Converters
             List<BmsNote> holdEndNotes,
             List<BmsNote> fairyEndNotes)
         {
-            // 성능 최적화: 한 번만 정렬 (Time 기준)
-            foreach (var bmsNote in bmsNotes.OrderBy(n => n.Time))
+            // 성능 최적화: OrderBy 람다/버퍼 할당 없이 인플레이스 정렬 후 인덱서로 순회 (P26)
+            bmsNotes.Sort((a, b) => a.Time.CompareTo(b.Time));
+            for (int i = 0; i < bmsNotes.Count; i++)
             {
+                var bmsNote = bmsNotes[i];
                 try
                 {
                     if (bmsNote.Type == NoteType.HoldEnd)

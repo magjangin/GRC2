@@ -227,6 +227,12 @@ namespace GRC2.Core
             new FieldContract(typeof(cRythmGameResultSceneUpdater), "mMusicNameText", typeof(TextMeshProUGUI)),
             new FieldContract(typeof(cRythmGameResultSceneUpdater), "mArtWorkImage", typeof(Image)),
             new FieldContract(typeof(cMusicSelectSceneSelectingMusicUI), "mMusicNameText", typeof(TextMeshProUGUI)),
+            // 세이브 슬롯 확장(CustomMusicIdRegistry.EnsureSaveSlots): 커스텀 MusicID 저장 필드 보호 (R9)
+            new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "highScoreArray", typeof(int[])),
+            new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "maxComboArray", typeof(int[])),
+            new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "playCountArray", typeof(int[])),
+            new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "playFlagArray", typeof(ResultClearBadge[])),
+            new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "isNew", typeof(bool)),
         };
 
         /// <summary>필드 계약 중 지금 게임 어셈블리에서 깨진 것(없거나 타입이 다름)을 설명 문자열로 돌려줍니다. 부작용이 없어 테스트에서도 씁니다.</summary>

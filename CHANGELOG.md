@@ -4,6 +4,25 @@
 `GRC2/Properties/AssemblyInfo.cs`의 `AssemblyVersion`·`AssemblyFileVersion`·`MelonInfo`, 그리고 이 파일.
 0.6.0 이전 내역은 [GitHub 릴리즈](https://github.com/magjangin/GRC2/releases)를 보세요.
 
+## [0.7.7] - 2026-11-27
+
+### 성능 및 최적화
+
+- **`BmsNoteConverter` 인플레이스 정렬 및 `OrderBy` 람다 할당 제거 (P26).** `ClassifyAndConvertNotes`에서 `bmsNotes.OrderBy(...)`로 매 변환마다 발생하던 람다 인스턴스, 정렬 버퍼, 열거자 할당을 `List.Sort` 인플레이스 정렬과 인덱서 루프로 전환하여 힙 가비지를 $O(1)$ 수준으로 제거했습니다.
+
+### 견고성 및 파서 안전성
+
+- **`BmsParser` 인코딩 안전성 및 `TextFileDecoder` 적용 (P27).** BMS 파일을 `File.ReadAllBytes`와 `TextFileDecoder.Decode`를 통해 읽도록 개선하여 BOM 및 다양한 환경에서의 인코딩 무결성을 보장하고, 메모리 기반 파싱 메서드 `ParseBmsText`를 추가했습니다.
+- **`BmsNoteDataParser` 홀수 자릿수 패딩 안전성 강화 (P28).** 마디 데이터가 `valueWidth`의 정수배가 아닐 때 남은 자투리 토큰을 조용히 버리지 않고 상위 비트 0 패딩을 수행하여 슬롯 정렬 오프셋을 안전하게 유지합니다.
+
+### 업데이트 내성 및 계약 강화
+
+- **`PlayerMusicPlayData` 세이브 핵심 필드 계약 등록 (R9).** 세이브 슬롯 확장 시 사용되는 `sSaveDataDirector.PlayerMusicPlayData`의 핵심 필드 5개(`highScoreArray`, `maxComboArray`, `playCountArray`, `playFlagArray`, `isNew`)를 `FieldContracts`에 등록하여 게임 업데이트 시 세이브 직렬화 구조 변경을 즉시 감지합니다.
+
+### 검증
+
+- 게임 PC에서 빌드(경고 0)·단위 테스트 226개 통과(BmsParser 메모리 텍스트 파싱, ParseHexData 홀수 자릿수 패딩, PlayerMusicPlayData 필드 계약 등 3개 추가).
+
 ## [0.7.6] - 2026-11-27
 
 ### 성능 및 최적화

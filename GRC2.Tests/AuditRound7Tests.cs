@@ -7,6 +7,10 @@ namespace GRC2.Tests
 {
     public class AuditRound7Tests
     {
+        static AuditRound7Tests()
+        {
+            TestAssemblyResolver.Ensure();
+        }
         [Fact]
         public void SongInfoParser_ParsesViaStreamWithoutErrors()
         {

@@ -46,12 +46,21 @@ namespace GRC2.Helpers
                 messageBuilder.Append($" (내부 예외: {ex.InnerException.Message})");
             }
             
-            MelonLogger.Error(messageBuilder.ToString());
-            
-            // 스택 트레이스
-            if (!string.IsNullOrEmpty(ex.StackTrace))
+            try
             {
-                MelonLogger.Error(ex.StackTrace);
+                MelonLogger.Error(messageBuilder.ToString());
+                if (!string.IsNullOrEmpty(ex.StackTrace))
+                {
+                    MelonLogger.Error(ex.StackTrace);
+                }
+            }
+            catch
+            {
+                Console.Error.WriteLine(messageBuilder.ToString());
+                if (!string.IsNullOrEmpty(ex.StackTrace))
+                {
+                    Console.Error.WriteLine(ex.StackTrace);
+                }
             }
         }
 
@@ -92,7 +101,14 @@ namespace GRC2.Helpers
                 messageBuilder.Append($" (내부 예외: {ex.InnerException.Message})");
             }
             
-            MelonLogger.Warning(messageBuilder.ToString());
+            try
+            {
+                MelonLogger.Warning(messageBuilder.ToString());
+            }
+            catch
+            {
+                Console.Error.WriteLine(messageBuilder.ToString());
+            }
         }
     }
 }
