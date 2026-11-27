@@ -602,12 +602,7 @@ namespace GRC2.Core
             {
                 CustomBgmPlayer.Cleanup();
                 ModLog.Verbose("[SceneDetector] ✅ 플레이 씬 진입 - 커스텀 프리뷰 BGM 중지");
-
-                if (CustomAssetManager.IsCustomChartSelected())
-                {
-                    ReloadCurrentAlbumAssets();
-                    PlaySceneArtworkInjector.StartArtworkInjection();
-                }
+                InjectCurrentAlbumIfCustomSelected();
             }
             catch (Exception ex)
             {

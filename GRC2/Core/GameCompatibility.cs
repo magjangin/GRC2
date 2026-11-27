@@ -133,6 +133,9 @@ namespace GRC2.Core
             EnumContract<NoteSubLaneType>("Lane_3", 2),
             EnumContract<NoteLaneLeftRight>("Left", 0),
             EnumContract<NoteLaneLeftRight>("Right", 1),
+            EnumContract<IntiCreates.RythmGame.TurnDirection>("Right", 0),
+            EnumContract<IntiCreates.RythmGame.TurnDirection>("Left", 1),
+            EnumContract<IntiCreates.RythmGame.NoteSize>("Scale1", 0),
             // 판정(JudgePerfectPatch·AutoPlayPatch 등).
             EnumContract<JudgeType>("PERFECT", 0),
             EnumContract<JudgeType>("MISS", 4),

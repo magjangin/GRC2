@@ -4,6 +4,22 @@
 `GRC2/Properties/AssemblyInfo.cs`의 `AssemblyVersion`·`AssemblyFileVersion`·`MelonInfo`, 그리고 이 파일.
 0.6.0 이전 내역은 [GitHub 릴리즈](https://github.com/magjangin/GRC2/releases)를 보세요.
 
+## [0.7.6] - 2026-11-27
+
+### 성능 및 최적화
+
+- **`SongInfoParser` 텍스트 분할 메모리 할당 제거 (P24).** 기존 `text.Split`으로 인한 거대 문자열 배열 힙 할당을 `StringReader` 스트림 기반 순회로 변경하여 O(1) 수준의 최소 메모리로 줄바꿈 및 주석을 파싱합니다.
+- **결과 씬 아트워크 적용 코루틴 수명 주기 검사 강화 (P25).** `ResultSceneUpdaterPatch` 코루틴 루프에서 `updater == null || !updater` 검사를 추가하여 씬 전환 중 네이티브 객체가 파괴된 경우 즉시 탈출하도록 보강했습니다.
+- **`SceneDetector.HandlePlayScene` 로직 정리.** 플레이 씬 진입 시의 중복된 앨범/아트워크 주입 로직을 단일 진입점으로 통합했습니다.
+
+### 업데이트 내성 및 계약 강화
+
+- **`TurnDirection` 및 `NoteSize` enum 계약 추가 (R8).** `NoteFieldInitializer`와 `NoteCreateDataBuilder`에서 사용하는 `IntiCreates.RythmGame.TurnDirection`(Right=0, Left=1) 및 `NoteSize`(Scale1=0)를 `GameCompatibility.ConstantContracts`와 검증 테스트에 추가하여 게임 업데이트 시 enum 멤버 값 변동을 즉시 감지합니다.
+
+### 검증
+
+- 게임 PC에서 빌드(경고 0)·단위 테스트 223개 통과(SongInfoParser 스트림 및 개행 처리 테스트, ConstantContracts TurnDirection/NoteSize 계약 검증 등 3개 추가).
+
 ## [0.7.5] - 2026-11-26
 
 ### 성능

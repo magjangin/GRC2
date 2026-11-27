@@ -169,7 +169,7 @@ namespace GRC2.Tests
         [Fact]
         public void ConstantContracts_CoverEveryGameEnumMemberInSource()
         {
-            var gameEnums = new[] { "NoteTypeId", "NoteDirectionIndex", "NoteSubLaneType", "NoteLaneLeftRight", "JudgeType", "MusicID" };
+            var gameEnums = new[] { "NoteTypeId", "NoteDirectionIndex", "NoteSubLaneType", "NoteLaneLeftRight", "JudgeType", "MusicID", "TurnDirection", "NoteSize" };
             var known = GameCompatibility.ConstantContracts.Select(c => c.Description).ToHashSet();
 
             var root = FindRepoRoot();

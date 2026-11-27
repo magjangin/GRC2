@@ -51,12 +51,10 @@ namespace GRC2.Parsers
         /// <returns>파싱된 곡 정보</returns>
         public static SongInfo ParseTxtFile(string filePath)
         {
-            var songInfo = new SongInfo();
-
             if (!File.Exists(filePath))
             {
                 MelonLogger.Warning($"[SongInfoParser] 파일을 찾을 수 없습니다: {filePath}");
-                return songInfo;
+                return new SongInfo();
             }
 
             try
@@ -64,9 +62,33 @@ namespace GRC2.Parsers
                 ModLog.Verbose($"[SongInfoParser] 곡 정보 파일 파싱 시작: {Path.GetFileName(filePath)}");
 
                 string text = ReadFileText(filePath);
-                string[] lines = text.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+                var songInfo = ParseText(text);
 
-                foreach (var line in lines)
+                LogParsedSummary(songInfo);
+                return songInfo;
+            }
+            catch (Exception ex)
+            {
+                Helpers.ErrorLogger.LogException(ex, "[SongInfoParser]", "곡 정보 파싱 오류");
+                return new SongInfo();
+            }
+        }
+
+        /// <summary>
+        /// 텍스트 내용에서 곡 정보를 파싱합니다.
+        /// </summary>
+        /// <param name="text">곡 정보 텍스트</param>
+        /// <returns>파싱된 곡 정보</returns>
+        public static SongInfo ParseText(string text)
+        {
+            var songInfo = new SongInfo();
+            if (string.IsNullOrEmpty(text))
+                return songInfo;
+
+            using (var reader = new StringReader(text))
+            {
+                string line;
+                while ((line = reader.ReadLine()) != null)
                 {
                     string trimmedLine = StripInlineComment(line);
                     if (string.IsNullOrWhiteSpace(trimmedLine))
@@ -74,12 +96,6 @@ namespace GRC2.Parsers
 
                     ApplyMetadataLine(trimmedLine, songInfo);
                 }
-
-                LogParsedSummary(songInfo);
-            }
-            catch (Exception ex)
-            {
-                Helpers.ErrorLogger.LogException(ex, "[SongInfoParser]", "곡 정보 파싱 오류");
             }
 
             return songInfo;

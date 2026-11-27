@@ -173,14 +173,14 @@ namespace GRC2.Harmony
             cRythmGameResultSceneUpdater updater,
             Sprite customSprite)
         {
-            if (updater == null || customSprite == null)
+            if (updater == null || !updater || customSprite == null)
                 yield break;
 
             float timeout = 10f;
             while (timeout > 0f)
             {
                 // 씬이 폐기되면 updater도 파괴됩니다.
-                if (updater == null)
+                if (updater == null || !updater)
                     yield break;
 
                 if (updater.isAbleFadeOpenOnSceneStart())
@@ -190,7 +190,7 @@ namespace GRC2.Harmony
                 yield return null;
             }
 
-            if (updater == null || !ArtworkImageRef.IsAvailable)
+            if (updater == null || !updater || !ArtworkImageRef.IsAvailable)
                 yield break;
 
             var image = ArtworkImageRef[updater];
