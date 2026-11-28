@@ -279,7 +279,7 @@ namespace GRC2.Processors
                 out int matchedCount,
                 out int unmatchedCount);
 
-            int totalStartCount = holdStartMap.Values.Sum(list => list.Count);
+            int totalStartCount = CountHoldStarts(holdStartMap);
             ModLog.Verbose($"[HoldNoteProcessor] 홀드 시작 노트 맵 생성 완료: {totalStartCount}개 (키 {holdStartMap.Count}개, noteList 매칭: {matchedCount}개, 매칭 실패: {unmatchedCount}개)");
 
             float baseBpm = holdEndNotes.FirstOrDefault()?.BaseBpm ?? NoteProcessorHelper.DefaultBpm;
@@ -355,9 +355,20 @@ namespace GRC2.Processors
                 MelonLogger.Warning("[HoldNoteProcessor]   (해당 레인의 홀드 시작 노트가 holdStartMap에 없습니다)");
         }
 
+        private static int CountHoldStarts(Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
+        {
+            if (holdStartMap == null || holdStartMap.Count == 0) return 0;
+            int count = 0;
+            foreach (var list in holdStartMap.Values)
+            {
+                if (list != null) count += list.Count;
+            }
+            return count;
+        }
+
         private static void LogRemainingHoldStarts(Dictionary<HoldEndKey, List<(NoteCreateData Note, BmsNote BmsNote)>> holdStartMap)
         {
-            var remainingStartCount = holdStartMap.Values.Sum(list => list.Count);
+            var remainingStartCount = CountHoldStarts(holdStartMap);
             if (remainingStartCount <= 0)
                 return;
 
@@ -376,15 +387,19 @@ namespace GRC2.Processors
         {
             var noteListBySample = new Dictionary<int, List<NoteCreateData>>();
 
-            foreach (var noteObj in noteList)
+            for (int i = 0; i < noteList.Count; i++)
             {
+                var noteObj = noteList[i];
                 if (noteObj == null)
                     continue;
 
                 int sampleValue = noteObj.perfectSample;
-                if (!noteListBySample.ContainsKey(sampleValue))
-                    noteListBySample[sampleValue] = new List<NoteCreateData>();
-                noteListBySample[sampleValue].Add(noteObj);
+                if (!noteListBySample.TryGetValue(sampleValue, out var list))
+                {
+                    list = new List<NoteCreateData>();
+                    noteListBySample[sampleValue] = list;
+                }
+                list.Add(noteObj);
             }
 
             ModLog.Verbose($"[HoldNoteProcessor] noteList 인덱싱 완료: {noteListBySample.Count}개 샘플 값");
@@ -401,8 +416,14 @@ namespace GRC2.Processors
             matchedCount = 0;
             unmatchedCount = 0;
 
-            foreach (var holdStartBms in allBmsNotes.Where(n => n.Type == NoteType.Hold && n.Duration > 0))
+            if (allBmsNotes == null) return holdStartMap;
+
+            for (int i = 0; i < allBmsNotes.Count; i++)
             {
+                var holdStartBms = allBmsNotes[i];
+                if (holdStartBms == null || holdStartBms.Type != NoteType.Hold || holdStartBms.Duration <= 0)
+                    continue;
+
                 var endSample = ToSampleIndex(holdStartBms.Time + holdStartBms.Duration);
                 var key = BuildEndKey(holdStartBms.Lane, holdStartBms.IsLeft, endSample);
                 NoteCreateData matchedNote = FindMatchingHoldStartNote(noteListBySample, holdStartBms);

@@ -237,6 +237,16 @@ namespace GRC2.Core
             new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "id", typeof(soRythmGameMusicDataMap.MusicID)),
             new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "charactorID", typeof(IntiCreates.PCD.MainCharactor)),
             new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "movieClipFileName", typeof(string)),
+            // 게임 노트 데이터(FairyNoteEditorLoader.NoteCreateData): 노트 생성·주입 핵심 필드 보호 (R11)
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "perfectSample", typeof(int)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "laneLeftRightID", typeof(NoteLaneLeftRight)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "subLaneID", typeof(NoteSubLaneType)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "noteTypeID", typeof(NoteTypeId)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "directionIndex", typeof(NoteDirectionIndex)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "turnDireciton", typeof(IntiCreates.RythmGame.TurnDirection)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "connectNodeDataArray", typeof(FairyNoteEditorLoader.NoteCreateData[])),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "simultaneouslyNote", typeof(FairyNoteEditorLoader.NoteCreateData)),
+            new FieldContract(typeof(FairyNoteEditorLoader.NoteCreateData), "isLast", typeof(bool)),
         };
 
         /// <summary>필드 계약 중 지금 게임 어셈블리에서 깨진 것(없거나 타입이 다름)을 설명 문자열로 돌려줍니다. 부작용이 없어 테스트에서도 씁니다.</summary>

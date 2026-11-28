@@ -504,10 +504,14 @@ namespace GRC2.Core
                 return;
             }
 
+            var sorted = GetAlbumsSortedByKey();
             AlbumInfo defaultAlbum = _albums.TryGetValue(RootAlbumKey, out var rootAlbum)
                 ? rootAlbum
-                : _albums.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase).First().Value;
-            SelectAlbum(defaultAlbum.AlbumFolderPath);
+                : (sorted.Count > 0 ? sorted[0].Value : null);
+            if (defaultAlbum != null)
+            {
+                SelectAlbum(defaultAlbum.AlbumFolderPath);
+            }
         }
 
         /// <summary>
@@ -539,6 +543,12 @@ namespace GRC2.Core
                     albumInfo.SongInfo = SongInfoParser.ParseTxtFile(albumInfo.TxtFile);
                 }
 
+                // info.txt가 없거나 제목이 비어 있는 경우, BMS 헤더(#TITLE, #ARTIST) 또는 폴더 이름을 폴백으로 활용(F1)
+                if (albumInfo.SongInfo == null || string.IsNullOrWhiteSpace(albumInfo.SongInfo.Title))
+                {
+                    albumInfo.SongInfo = CreateFallbackSongInfo(albumInfo);
+                }
+
                 return HasAlbumContent(albumInfo) ? albumInfo : null;
             }
             catch (Exception ex)
@@ -546,6 +556,39 @@ namespace GRC2.Core
                 MelonLogger.Error($"[AlbumManager] 앨범 폴더 스캔 오류 ({albumFolderPath}): {ex.Message}");
                 return null;
             }
+        }
+
+        private static SongInfo CreateFallbackSongInfo(AlbumInfo albumInfo)
+        {
+            var info = albumInfo.SongInfo ?? new SongInfo();
+
+            if (albumInfo.BmsFiles.Count > 0)
+            {
+                try
+                {
+                    string firstBms = albumInfo.BmsFiles[0];
+                    if (File.Exists(firstBms))
+                    {
+                        string text = TextFileDecoder.Decode(File.ReadAllBytes(firstBms), out _);
+                        var (bmsTitle, bmsArtist) = BmsParser.ExtractHeaderMetadata(text);
+                        if (!string.IsNullOrWhiteSpace(bmsTitle) && string.IsNullOrWhiteSpace(info.Title))
+                            info.Title = bmsTitle;
+                        if (!string.IsNullOrWhiteSpace(bmsArtist) && string.IsNullOrWhiteSpace(info.Artist))
+                            info.Artist = bmsArtist;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    ModLog.Verbose($"[AlbumManager] BMS 헤더 메타데이터 추출 생략: {ex.Message}");
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(info.Title))
+            {
+                info.Title = albumInfo.AlbumName;
+            }
+
+            return info;
         }
 
         private static bool TryPopulateAlbumFiles(AlbumInfo albumInfo)
@@ -664,7 +707,16 @@ namespace GRC2.Core
 
         private static AlbumInfo FindOrScanAlbum(string albumFolderPath)
         {
-            var album = _albums.Values.FirstOrDefault(a => a.AlbumFolderPath == albumFolderPath);
+            AlbumInfo album = null;
+            foreach (var a in _albums.Values)
+            {
+                if (string.Equals(a.AlbumFolderPath, albumFolderPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    album = a;
+                    break;
+                }
+            }
+
             if (album != null)
             {
                 return album;

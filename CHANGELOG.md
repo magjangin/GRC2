@@ -4,6 +4,26 @@
 `GRC2/Properties/AssemblyInfo.cs`의 `AssemblyVersion`·`AssemblyFileVersion`·`MelonInfo`, 그리고 이 파일.
 0.6.0 이전 내역은 [GitHub 릴리즈](https://github.com/magjangin/GRC2/releases)를 보세요.
 
+## [0.7.9] - 2026-11-28
+
+### 기능 및 편의성 강화
+
+- **info.txt 없는 커스텀 차트 BMS 헤더(#TITLE, #ARTIST) 자동 추출 및 폴백 (F1).** info.txt를 작성하지 않고 BMS 파일만 넣은 경우에도 첫 번째 BMS의 `#TITLE`과 `#ARTIST` 헤더를 자동으로 읽어 인게임 곡명 및 크레딧에 반영합니다. `#TITLE`이 없는 경우 폴더 이름을 곡명으로 활용하여 원본 일본어 곡명이 노출되는 문제를 방지합니다.
+
+### 업데이트 내성 및 계약 강화
+
+- **`FairyNoteEditorLoader.NoteCreateData` 핵심 필드 계약 9개 등록 (R11).** 모드가 생성하여 게임에 직접 주입하는 핵심 노트 구조체인 `NoteCreateData`의 주요 필드(`perfectSample`, `laneLeftRightID`, `subLaneID`, `noteTypeID`, `directionIndex`, `turnDireciton`, `connectNodeDataArray`, `simultaneouslyNote`, `isLast`)를 `GameCompatibility.FieldContracts`에 정식 등록하여 게임 업데이트에 따른 구조 변경을 조기 감지합니다.
+
+### 성능 및 안정성 최적화
+
+- **`HoldNoteProcessor` LINQ 체인 및 이중 해시 룩업 제거 (P31).** `BuildHoldStartMap`의 `allBmsNotes.Where` 이터레이터 제거, `Sum` 람다를 단순 루프로 전환, `BuildNoteListBySample`의 `ContainsKey` + 인덱서 2회 조회를 `TryGetValue` 1회 조회로 단축하여 해시 룩업 및 메모리 가비지를 절감했습니다.
+- **`BmsNoteConverter` 주입 검증 시 가비지 할당 제거 (P32).** `CheckIncompleteConnectedNotes`에서 `noteList.Where(...).ToList()`를 인덱스 루프로 개편하여 정상 변환 시 힙 할당 0을 달성하고, `CheckMissingEndNotes`의 `Any` 람다 클로저를 전용 정적 헬퍼 `HasMatchingEndNote`로 분리하여 $O(N)$ 클로저 할당을 제거했습니다.
+- **`AlbumManager` 경로 대소문자 방어 및 앨범 선택 최적화 (P33).** `FindOrScanAlbum`에서 Windows 경로 대소문자 불일치를 방어하고 LINQ `FirstOrDefault` 가비지를 제거했으며, `SelectDefaultAlbum`에서 불필요한 전체 앨범 재정렬 대신 캐시된 `GetAlbumsSortedByKey()`를 재사용하도록 개선했습니다.
+
+### 검증
+
+- 게임 PC에서 빌드(경고 0)·단위 테스트 234개 통과(BMS 헤더 추출 검증, 대소문자/콜론 지원, 마디 영역 진입 시 중단, NoteCreateData 필드 계약 등록 및 런타임 일치 검증 등 5개 추가).
+
 ## [0.7.8] - 2026-11-28
 
 ### 기능 및 파서 완전성 (숙제 해결)

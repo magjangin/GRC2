@@ -216,12 +216,19 @@ namespace GRC2.Converters
                 return false;
             }
 
-            var incomplete = noteList
-                .Where(note => note != null && RequiresConnectNode(note.noteTypeID) &&
+            List<NoteCreateData> incomplete = null;
+            for (int i = 0; i < noteList.Count; i++)
+            {
+                var note = noteList[i];
+                if (note != null && RequiresConnectNode(note.noteTypeID) &&
                     (note.connectNodeDataArray == null || note.connectNodeDataArray.Length == 0))
-                .ToList();
+                {
+                    if (incomplete == null) incomplete = new List<NoteCreateData>();
+                    incomplete.Add(note);
+                }
+            }
 
-            if (incomplete.Count == 0)
+            if (incomplete == null || incomplete.Count == 0)
             {
                 return false;
             }
@@ -269,12 +276,7 @@ namespace GRC2.Converters
             foreach (var startNote in startNotes)
             {
                 var expectedEndTime = startNote.Time + startNote.Duration;
-                var hasEndNote = endNotes.Any(end =>
-                    Math.Abs(end.Time - expectedEndTime) < TIME_TOLERANCE &&
-                    end.Lane == startNote.Lane &&
-                    end.IsLeft == startNote.IsLeft);
-
-                if (!hasEndNote)
+                if (!HasMatchingEndNote(endNotes, expectedEndTime, startNote.Lane, startNote.IsLeft, TIME_TOLERANCE))
                 {
                     missingEnds.Add(startNote);
                 }
@@ -303,6 +305,23 @@ namespace GRC2.Converters
             }
 
             return null; // 모든 끝 노트가 있음
+        }
+
+        private static bool HasMatchingEndNote(List<BmsNote> endNotes, float expectedEndTime, int lane, bool isLeft, float tolerance)
+        {
+            if (endNotes == null || endNotes.Count == 0) return false;
+            for (int i = 0; i < endNotes.Count; i++)
+            {
+                var end = endNotes[i];
+                if (end != null &&
+                    Math.Abs(end.Time - expectedEndTime) < tolerance &&
+                    end.Lane == lane &&
+                    end.IsLeft == isLeft)
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         /// <summary>

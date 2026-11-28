@@ -24,6 +24,65 @@ namespace GRC2.Parsers
         // 전부 버립니다(2026-11-25, SourceRulesTests가 \d를 막음).
         private static readonly Regex MeasureRegex = new Regex(@"^#([0-9]{3})([0-9]{2}):", RegexOptions.Compiled);
         private static readonly Regex WavKeyRegex = new Regex(@"^#WAV([0-9A-Za-z]{2,3})(?:\s|:)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex TitleHeaderRegex = new Regex(@"^#TITLE(?::|\s)\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+        private static readonly Regex ArtistHeaderRegex = new Regex(@"^#ARTIST(?::|\s)\s*(.+)", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        /// <summary>
+        /// BMS 파일에서 #TITLE, #ARTIST 헤더를 추출합니다. info.txt가 없는 앨범의 폴백으로 쓰입니다(F1).
+        /// </summary>
+        public static (string Title, string Artist) ExtractHeaderMetadata(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+                return (null, null);
+
+            string title = null;
+            string artist = null;
+
+            using (var reader = new StringReader(text))
+            {
+                string line;
+                int linesRead = 0;
+                while ((line = reader.ReadLine()) != null && linesRead++ < 200)
+                {
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+                    var trimmed = line.TrimStart();
+                    if (trimmed.StartsWith("//", StringComparison.Ordinal)) continue;
+
+                    if (title == null)
+                    {
+                        var m = TitleHeaderRegex.Match(trimmed);
+                        if (m.Success)
+                        {
+                            title = m.Groups[1].Value.Trim().Normalize(System.Text.NormalizationForm.FormC);
+                            if (artist != null) break;
+                            continue;
+                        }
+                    }
+
+                    if (artist == null)
+                    {
+                        var m = ArtistHeaderRegex.Match(trimmed);
+                        if (m.Success)
+                        {
+                            artist = m.Groups[1].Value.Trim().Normalize(System.Text.NormalizationForm.FormC);
+                            if (title != null) break;
+                            continue;
+                        }
+                    }
+
+                    // 마디 데이터(#xxx01: 등)가 나오기 시작하면 헤더 영역이 끝난 것이므로 중단
+                    if (trimmed.Length >= 6 && trimmed[0] == '#' &&
+                        trimmed[1] >= '0' && trimmed[1] <= '9' &&
+                        trimmed[2] >= '0' && trimmed[2] <= '9' &&
+                        trimmed[3] >= '0' && trimmed[3] <= '9')
+                    {
+                        break;
+                    }
+                }
+            }
+
+            return (title, artist);
+        }
 
         /// <summary>
         /// BMS 파일 파싱 메인 메서드
