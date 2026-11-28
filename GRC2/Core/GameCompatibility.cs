@@ -233,6 +233,10 @@ namespace GRC2.Core
             new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "playCountArray", typeof(int[])),
             new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "playFlagArray", typeof(ResultClearBadge[])),
             new FieldContract(typeof(sSaveDataDirector.PlayerMusicPlayData), "isNew", typeof(bool)),
+            // 게임 원본 곡 데이터(soRythmGameMusicDataMap.MusicData): 핵심 식별자 및 캐릭터/영상 필드 보호 (R10)
+            new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "id", typeof(soRythmGameMusicDataMap.MusicID)),
+            new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "charactorID", typeof(IntiCreates.PCD.MainCharactor)),
+            new FieldContract(typeof(soRythmGameMusicDataMap.MusicData), "movieClipFileName", typeof(string)),
         };
 
         /// <summary>필드 계약 중 지금 게임 어셈블리에서 깨진 것(없거나 타입이 다름)을 설명 문자열로 돌려줍니다. 부작용이 없어 테스트에서도 씁니다.</summary>

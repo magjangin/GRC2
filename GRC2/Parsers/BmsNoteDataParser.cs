@@ -21,9 +21,15 @@ namespace GRC2.Parsers
         };
 
         /// <summary>
-        /// 노트 데이터 파싱
+        /// 노트 데이터 파싱 (마디 길이 축소/확장 배율 지원)
         /// </summary>
-        public static List<BmsNote> ParseNoteData(int measure, int channel, string data, int valueWidth = 2)
+        public static List<BmsNote> ParseNoteData(
+            int measure,
+            int channel,
+            string data,
+            int valueWidth = 2,
+            float measureStartTick = -1f,
+            float measureLengthMultiplier = 1.0f)
         {
             var notes = new List<BmsNote>();
             
@@ -33,6 +39,7 @@ namespace GRC2.Parsers
             var (lane, isLeft) = ChannelToLaneMap[channel];
             var hexValues = ParseHexData(data, valueWidth);
             var measureLength = hexValues.Count;
+            float startTick = measureStartTick >= 0f ? measureStartTick : measure;
 
             for (int i = 0; i < hexValues.Count; i++)
             {
@@ -41,7 +48,7 @@ namespace GRC2.Parsers
 
                 // measure 내 위치 계산 (0.0 ~ 1.0)
                 var positionInMeasure = (float)i / measureLength;
-                var tick = measure + positionInMeasure;
+                var tick = startTick + positionInMeasure * measureLengthMultiplier;
 
                 NoteDirection? direction;
                 var noteType = GetNoteType(value, out direction);

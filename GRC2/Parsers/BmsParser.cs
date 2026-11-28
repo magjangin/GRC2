@@ -77,8 +77,15 @@ namespace GRC2.Parsers
                 // 1단계: BPM 정보 수집 (기본 BPM + #BPMXX: value 인덱스 테이블)
                 CollectBpmInfo(lines, ref baseBpm, ref baseFreq, bpmIndexTable);
 
+                // 1-1단계: 마디 길이 배율 채널 02 (#xxx02:factor) 수집 (E1 완전 수정)
+                var measureLengths = CollectMeasureLengths(lines);
+                var measureStartTicks = measureLengths.Count > 0 ? BuildMeasureStartTicks(measureLengths, 1000) : null;
+
                 // 2단계: 노트 데이터 파싱
-                ParseNotes(lines, notes, baseBpm, baseFreq, bpmIndexTable, bpmChanges, noteValueWidth);
+                ParseNotes(lines, notes, baseBpm, baseFreq, bpmIndexTable, bpmChanges, noteValueWidth, measureLengths, measureStartTicks);
+
+                // 노트 순서 무결성 보장: 마디 정의가 뒤섞인 파일이라도 Tick 순으로 정렬 (P30)
+                notes.Sort((a, b) => a.Tick.CompareTo(b.Tick));
 
                 // 3단계: 홀드 노트 매칭 (02-19 쌍)
                 HoldNoteProcessor.MatchHoldNotes(notes);
@@ -198,10 +205,65 @@ namespace GRC2.Parsers
         }
 
         /// <summary>
+        /// 채널 02(#xxx02:factor)로 지정된 마디 길이 배율을 수집합니다(E1).
+        /// </summary>
+        public static Dictionary<int, float> CollectMeasureLengths(string[] lines)
+        {
+            var lengths = new Dictionary<int, float>();
+            if (lines == null) return lengths;
+
+            foreach (var line in lines)
+            {
+                if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//", StringComparison.Ordinal))
+                    continue;
+
+                var measureMatch = MeasureRegex.Match(line);
+                if (measureMatch.Success)
+                {
+                    int measure = int.Parse(measureMatch.Groups[1].Value);
+                    int channel = int.Parse(measureMatch.Groups[2].Value);
+                    if (channel == 0x02)
+                    {
+                        var data = line.Substring(measureMatch.Length).Trim();
+                        if (float.TryParse(data, NumberStyles.Float, CultureInfo.InvariantCulture, out float length) && length > 0f)
+                        {
+                            lengths[measure] = length;
+                        }
+                    }
+                }
+            }
+            return lengths;
+        }
+
+        /// <summary>
+        /// 마디별 시작 Tick 누적 배열을 계산합니다.
+        /// </summary>
+        public static float[] BuildMeasureStartTicks(Dictionary<int, float> measureLengths, int maxMeasure = 1000)
+        {
+            var startTicks = new float[maxMeasure + 1];
+            float current = 0f;
+            for (int m = 0; m <= maxMeasure; m++)
+            {
+                startTicks[m] = current;
+                float len = (measureLengths != null && measureLengths.TryGetValue(m, out float l)) ? l : 1.0f;
+                current += len;
+            }
+            return startTicks;
+        }
+
+        /// <summary>
         /// 노트 데이터 파싱
         /// </summary>
-        private static void ParseNotes(string[] lines, List<BmsNote> notes, float baseBpm, float baseFreq,
-            Dictionary<int, float> bpmIndexTable, List<BpmChange> bpmChanges, int noteValueWidth)
+        private static void ParseNotes(
+            string[] lines,
+            List<BmsNote> notes,
+            float baseBpm,
+            float baseFreq,
+            Dictionary<int, float> bpmIndexTable,
+            List<BpmChange> bpmChanges,
+            int noteValueWidth,
+            Dictionary<int, float> measureLengths = null,
+            float[] measureStartTicks = null)
         {
             int currentMeasure = 0;
 
@@ -218,16 +280,23 @@ namespace GRC2.Parsers
                     var channel = int.Parse(measureMatch.Groups[2].Value);
                     var data = line.Substring(measureMatch.Length).Trim();
 
+                    float startTick = (measureStartTicks != null && currentMeasure >= 0 && currentMeasure < measureStartTicks.Length)
+                        ? measureStartTicks[currentMeasure]
+                        : currentMeasure;
+                    float lengthMultiplier = (measureLengths != null && measureLengths.TryGetValue(currentMeasure, out float len))
+                        ? len
+                        : 1.0f;
+
                     // BPM 변화 처리 (채널 03은 직접 BPM 값, 채널 08은 #BPMxx 인덱스. 04~07 BGA 채널은 건너뜁니다)
                     if (channel == 0x03 || channel == 0x08)
                     {
-                        ProcessBpmChange(channel, data, currentMeasure, baseBpm, bpmIndexTable, bpmChanges);
+                        ProcessBpmChange(channel, data, currentMeasure, baseBpm, bpmIndexTable, bpmChanges, startTick, lengthMultiplier);
                     }
 
                     // 노트 채널 처리 (11-12, 14-16, 18)
                     if (BmsNoteDataParser.ChannelToLaneMap.ContainsKey(channel))
                     {
-                        var parsedNotes = BmsNoteDataParser.ParseNoteData(currentMeasure, channel, data, noteValueWidth);
+                        var parsedNotes = BmsNoteDataParser.ParseNoteData(currentMeasure, channel, data, noteValueWidth, startTick, lengthMultiplier);
                         // ⚡ 파싱된 노트에 BaseBpm 설정 (매칭 시간 오차 범위 계산용)
                         foreach (var note in parsedNotes)
                         {
@@ -243,14 +312,23 @@ namespace GRC2.Parsers
         /// BPM 변화 처리. 채널 03은 값(16진수)이 BPM 자체이고, 채널 08은 값이 #BPMxx 표의 인덱스입니다(E1).
         /// 04·05·06·07은 BGA 채널이라 BPM 변화가 아닙니다. 예전에는 이 채널들도 BPM 인덱스로 읽었습니다.
         /// </summary>
-        private static void ProcessBpmChange(int channel, string data, int currentMeasure, float baseBpm,
-            Dictionary<int, float> bpmIndexTable, List<BpmChange> bpmChanges)
+        private static void ProcessBpmChange(
+            int channel,
+            string data,
+            int currentMeasure,
+            float baseBpm,
+            Dictionary<int, float> bpmIndexTable,
+            List<BpmChange> bpmChanges,
+            float measureStartTick = -1f,
+            float measureLengthMultiplier = 1.0f)
         {
             if (channel != 0x03 && channel != 0x08) return;
 
             var values = BmsNoteDataParser.ParseHexData(data);
             var measureLength = values.Count;
             if (measureLength == 0) return;
+
+            float startTick = measureStartTick >= 0f ? measureStartTick : currentMeasure;
 
             for (int i = 0; i < values.Count; i++)
             {
@@ -268,9 +346,9 @@ namespace GRC2.Parsers
                     bpmValue = (bpmIndexTable != null && bpmIndexTable.TryGetValue(value, out var v)) ? v : baseBpm;
                 }
 
-                // measure 내 위치 반영 (0.0~1.0)
+                // measure 내 위치 반영 (0.0~1.0) 및 마디 길이 배율 적용
                 var positionInMeasure = (float)i / measureLength;
-                var tick = currentMeasure + positionInMeasure;
+                var tick = startTick + positionInMeasure * measureLengthMultiplier;
 
                 bpmChanges.Add(new BpmChange
                 {

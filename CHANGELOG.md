@@ -4,6 +4,25 @@
 `GRC2/Properties/AssemblyInfo.cs`의 `AssemblyVersion`·`AssemblyFileVersion`·`MelonInfo`, 그리고 이 파일.
 0.6.0 이전 내역은 [GitHub 릴리즈](https://github.com/magjangin/GRC2/releases)를 보세요.
 
+## [0.7.8] - 2026-11-28
+
+### 기능 및 파서 완전성 (숙제 해결)
+
+- **BMS 채널 02 마디 길이 변경(#xxx02:factor) 지원 (E1 완전 해결).** 기존에 미지원 숙제로 남아 있던 채널 02 마디 길이 배율을 파싱 및 누적 Tick 계산에 완벽 반영했습니다. 3/4박, 5/4박, 6/8박 등 변박 마디가 포함된 BMS 차트에서도 이후 마디의 모든 노트와 BPM 타이밍이 정확하게 계산됩니다.
+
+### 성능 및 안정성
+
+- **`FairyNoteProcessor` 시작 노트 탐색 단일 패스 최적화 (P29).** `FindStartNoteObject`에서 `Where`, `OrderBy`, `ThenBy` LINQ 체인으로 매번 발생하던 람다 및 힙 할당을 단일 for 루프로 교체하여 가비지 생성을 $O(1)$ 수준으로 제거했습니다.
+- **`BmsParser` 노트 리스트 정렬 무결성 보장 (P30).** 마디 정의 순서가 뒤섞인 BMS 파일이라도 파싱 완료 시 `notes` 리스트가 Tick 순으로 완벽하게 오름차순 정렬되도록 보장했습니다.
+
+### 업데이트 내성 및 계약 강화
+
+- **`soRythmGameMusicDataMap.MusicData` 핵심 필드 계약 등록 (R10).** 원본 곡 데이터의 핵심 식별자 및 필드인 `id`, `charactorID`, `movieClipFileName`을 `FieldContracts`에 등록하여 게임 업데이트 시 구조 변경을 즉시 감지합니다.
+
+### 검증
+
+- 게임 PC에서 빌드(경고 0)·단위 테스트 229개 통과(마디 길이 배율 파싱 및 타이밍 검증, 마디 역순 정렬 검증, MusicData 필드 계약 등 3개 추가).
+
 ## [0.7.7] - 2026-11-27
 
 ### 성능 및 최적화

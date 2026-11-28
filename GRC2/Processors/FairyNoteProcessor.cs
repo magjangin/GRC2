@@ -383,18 +383,41 @@ namespace GRC2.Processors
             var key = (startBms.Lane, startBms.IsLeft);
             if (!startNoteMap.TryGetValue(key, out var entries) || entries.Count == 0) return null;
 
-            var exactMatch = entries.FirstOrDefault(entry => ReferenceEquals(entry.BmsNote, startBms));
-            if (exactMatch != null) return exactMatch.NoteObject;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (ReferenceEquals(entries[i].BmsNote, startBms))
+                    return entries[i].NoteObject;
+            }
 
             int targetSample = ToSampleIndex(startBms.Time);
             int maxDelta = Math.Max(StartLookupSampleSlack, ToSampleIndex(timeTolerance));
 
-            return entries
-                .Where(entry => Math.Abs(entry.Sample - targetSample) <= maxDelta)
-                .OrderBy(entry => Math.Abs(entry.Sample - targetSample))
-                .ThenBy(entry => Math.Abs(entry.BmsNote.Duration - startBms.Duration))
-                .Select(entry => entry.NoteObject)
-                .FirstOrDefault();
+            // 성능 최적화: Where/OrderBy/ThenBy LINQ 체인 할당 제거, 단일 패스 탐색 (P29)
+            NoteCreateData bestNote = null;
+            int bestSampleDelta = int.MaxValue;
+            float bestDurationDelta = float.MaxValue;
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                int sampleDelta = Math.Abs(entry.Sample - targetSample);
+                if (sampleDelta > maxDelta)
+                    continue;
+
+                float durationDelta = Math.Abs(entry.BmsNote.Duration - startBms.Duration);
+                bool isBetter = bestNote == null
+                    || sampleDelta < bestSampleDelta
+                    || (sampleDelta == bestSampleDelta && durationDelta < bestDurationDelta);
+
+                if (isBetter)
+                {
+                    bestNote = entry.NoteObject;
+                    bestSampleDelta = sampleDelta;
+                    bestDurationDelta = durationDelta;
+                }
+            }
+
+            return bestNote;
         }
 
         private static BmsNote FindFallbackStartForEnd(BmsNote fairyEnd, List<BmsNote> allBmsNotes, float timeTolerance)
